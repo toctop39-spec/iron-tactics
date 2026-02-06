@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Iron Tactics MP v47 (Stable Global)</title>
+    <title>Iron Tactics MP v48 (Global + No Speed Cheat)</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
@@ -207,7 +207,6 @@
             <br>
             <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button>
         </div>
-
         <div class="spec-settings">
             <h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3>
             <input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты">
@@ -681,6 +680,9 @@ const Lobby = {
 
         s.on('start_game_signal', () => {
             document.getElementById('connection-warning').style.display = 'none';
+            // Отключаем кнопки скорости в МП
+            document.getElementById('speed-controls').style.display = 'none';
+            Game.speed = 1;
             Game.loadPvpLevel();
         });
 
@@ -752,6 +754,7 @@ const Game = {
     },
     
     setSpeed(s) {
+        if(this.isMultiplayer) return; // Блокировка скорости в мультиплеере
         this.speed = s;
         document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
@@ -813,6 +816,7 @@ const Game = {
         document.getElementById('start-btn').classList.add('hidden');
         document.getElementById('player-stats').style.visibility = 'hidden'; 
         document.getElementById('spectator-hud').style.display = 'flex';
+        document.getElementById('speed-controls').style.display = 'flex'; // В наблюдении скорость работает
         this.updateUI(Object.keys(UNITS));
     },
 
@@ -867,6 +871,7 @@ const Game = {
 
         this.startGameUI("ВЫЖИВАНИЕ (ВСЕ ПРОТИВ ВСЕХ)");
         document.getElementById('start-btn').classList.add('hidden');
+        document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(Object.keys(UNITS));
     },
 
@@ -913,6 +918,7 @@ const Game = {
         document.getElementById('top-bar').style.display = 'flex';
         
         document.getElementById('build-menu').style.display = 'flex';
+        document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(data.unlock);
     },
 
@@ -1271,8 +1277,8 @@ endGame(win, customTitle) {
                 const bType = this.pendingConstruction;
                 const cost = UNITS[bType].cost;
                 
-                // ИСПРАВЛЕНИЕ: Теперь разрешает строить если территория принадлежит ВАМ (неважно кто вы)
-                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { 
+                // ИСПРАВЛЕННАЯ СТРОКА: РАЗРЕШАЕМ СТРОИТЬ ЕСЛИ ЭТО НАША ЗЕМЛЯ
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) {
                      this.showError("ДАЛЕКО ОТ БАЗЫ!");
                      return;
                 }

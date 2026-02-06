@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Iron Tactics MP v44 (Global Lobby)</title>
+    <title>Iron Tactics MP v46 (Fair Play & Anti-Freeze)</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
@@ -108,7 +108,6 @@
         .spec-row { margin: 10px 0; font-size: 1.2em; }
         input[type=range] { width: 200px; vertical-align: middle; }
         
-        /* Стили для лобби */
         .lobby-input {
             background: rgba(0,0,0,0.5); border: 1px solid #0af; color: white;
             padding: 10px; margin: 5px; width: 200px; font-size: 1em; text-align: center;
@@ -206,7 +205,6 @@
             <br>
             <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button>
         </div>
-
         <div class="spec-settings">
             <h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3>
             <input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты">
@@ -285,7 +283,7 @@ const RELOAD_COST = 1000;
 let MAP_W = 3500;
 let MAP_H = 2000;
 let ISLAND_RADIUS = 0;
-let CURRENT_ROOM = null; // Хранит имя текущей комнаты
+let CURRENT_ROOM = null; 
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -305,7 +303,6 @@ const MapUtils = {
     }
 };
 
-// --- КОНФИГУРАЦИЯ HYPERPARAMETERS ---
 const RL_CONFIG = {
     inputSize: 12, 
     outputSize: 11, 
@@ -330,22 +327,14 @@ class RLBrain {
     async initModel() {
         try {
             const loaded = await tf.loadLayersModel('localstorage://iron-tactics-ai-v1');
-            console.log("AI: Модель загружена из хранилища!");
-            
             const outputShape = loaded.layers[loaded.layers.length-1].outputShape;
-            if (Array.isArray(outputShape) && outputShape[1] !== RL_CONFIG.outputSize) {
-                 console.log(`AI: Старая модель (${outputShape[1]}) не подходит к новой конфигурации (${RL_CONFIG.outputSize}). Сброс.`);
-                 throw new Error("Architecture mismatch");
-            }
+            if (Array.isArray(outputShape) && outputShape[1] !== RL_CONFIG.outputSize) throw new Error("Architecture mismatch");
             this.model = loaded;
-            this.model.compile({ 
-                loss: 'meanSquaredError', 
-                optimizer: tf.train.adam(RL_CONFIG.learningRate) 
-            });
+            this.model.compile({ loss: 'meanSquaredError', optimizer: tf.train.adam(RL_CONFIG.learningRate) });
             const savedEps = localStorage.getItem('ai_epsilon');
             if (savedEps) this.epsilon = parseFloat(savedEps);
         } catch (e) {
-            console.log("AI: Создание новой модели (причина: " + e.message + ")");
+            console.log("AI: Creating new model...");
             this.createModel();
         }
         this.isReady = true;
@@ -356,26 +345,18 @@ class RLBrain {
         this.model.add(tf.layers.dense({ units: 64, inputShape: [RL_CONFIG.inputSize], activation: 'relu' }));
         this.model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
         this.model.add(tf.layers.dense({ units: RL_CONFIG.outputSize, activation: 'linear' }));
-        
-        this.model.compile({ 
-            loss: 'meanSquaredError', 
-            optimizer: tf.train.adam(RL_CONFIG.learningRate) 
-        });
+        this.model.compile({ loss: 'meanSquaredError', optimizer: tf.train.adam(RL_CONFIG.learningRate) });
     }
 
     async save() {
         if (!this.model) return;
         await this.model.save('localstorage://iron-tactics-ai-v1');
         localStorage.setItem('ai_epsilon', this.epsilon);
-        console.log(`AI: Сохранено. Epsilon: ${this.epsilon.toFixed(3)}`);
     }
 
     predict(state) {
         if (!this.isReady) return Math.floor(Math.random() * RL_CONFIG.outputSize);
-        if (Math.random() < this.epsilon) {
-            return Math.floor(Math.random() * RL_CONFIG.outputSize);
-        }
-
+        if (Math.random() < this.epsilon) return Math.floor(Math.random() * RL_CONFIG.outputSize);
         return tf.tidy(() => {
             const input = tf.tensor2d([state]);
             const output = this.model.predict(input);
@@ -394,7 +375,6 @@ class RLBrain {
         for (let i = 0; i < RL_CONFIG.batchSize; i++) {
             batch.push(this.memory[Math.floor(Math.random() * this.memory.length)]);
         }
-
         const states = batch.map(e => e.state);
         const nextStates = batch.map(e => e.nextState);
         tf.tidy(() => {
@@ -402,40 +382,20 @@ class RLBrain {
             const nextInput = tf.tensor2d(nextStates);
             const target = this.model.predict(input).arraySync();
             const targetNext = this.model.predict(nextInput).arraySync();
-
             for (let i = 0; i < RL_CONFIG.batchSize; i++) {
                 let updatedQ = batch[i].reward;
-                if (!batch[i].done) {
-                    updatedQ = batch[i].reward + RL_CONFIG.discountFactor * Math.max(...targetNext[i]);
-                }
+                if (!batch[i].done) updatedQ = batch[i].reward + RL_CONFIG.discountFactor * Math.max(...targetNext[i]);
                 target[i][batch[i].action] = updatedQ;
             }
-
-            const x = tf.tensor2d(states);
-            const y = tf.tensor2d(target);
-            this.model.fit(x, y, { epochs: 1, verbose: 0 });
+            this.model.fit(tf.tensor2d(states), tf.tensor2d(target), { epochs: 1, verbose: 0 });
         });
-        if (this.epsilon > RL_CONFIG.epsilonMin) {
-            this.epsilon *= RL_CONFIG.epsilonDecay;
-        }
+        if (this.epsilon > RL_CONFIG.epsilonMin) this.epsilon *= RL_CONFIG.epsilonDecay;
     }
 }
 
 const GlobalBrain = new RLBrain();
 
-const ACTIONS = {
-    0: 'BUILD_HOUSE',
-    1: 'BUILD_FACTORY',
-    2: 'BUILD_POWER',
-    3: 'BUILD_TURRET',
-    4: 'BUILD_AA',
-    5: 'TRAIN_SOLDIER',
-    6: 'TRAIN_TANK',
-    7: 'TRAIN_HELI',
-    8: 'ATTACK_ALL',
-    9: 'IDLE',
-    10: 'TRAIN_BUILDER' 
-};
+const ACTIONS = { 0: 'BUILD_HOUSE', 1: 'BUILD_FACTORY', 2: 'BUILD_POWER', 3: 'BUILD_TURRET', 4: 'BUILD_AA', 5: 'TRAIN_SOLDIER', 6: 'TRAIN_TANK', 7: 'TRAIN_HELI', 8: 'ATTACK_ALL', 9: 'IDLE', 10: 'TRAIN_BUILDER' };
 
 class BotAI {
     constructor(side) {
@@ -453,27 +413,17 @@ class BotAI {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const enemies = Game.units.filter(u => u.side !== this.side);
         const moneyNorm = Math.min(this.money / 20000, 1);
-        const energyNorm = this.energyFactor;
-        const houses = myUnits.filter(u => u.type === 'HOUSE').length / 20;
-        const factories = myUnits.filter(u => u.type === 'FACTORY').length / 5;
-        const power = myUnits.filter(u => u.type === 'POWER_PLANT').length / 10;
-        const army = myUnits.filter(u => !u.isBuilder && !u.isProducer).length / 50;
-        const builders = myUnits.filter(u => u.isBuilder).length / 5;
-        const enemyCount = enemies.length / 50;
-        
-        let threat = 0;
         const base = myUnits.find(u => u.isProducer);
+        let threat = 0;
         if (base) {
             const nearest = enemies.reduce((min, e) => Math.min(min, Math.hypot(e.x - base.x, e.y - base.y)), 9999);
             threat = Math.max(0, 1 - (nearest / 1000));
         }
-
         return [
-            moneyNorm, energyNorm, houses, factories, power, 
-            army, builders, enemyCount, threat, 
-            (this.timer % 100) / 100,
-            (this.side === 'enemy' ? 1 : 0),
-            1 // Bias
+            moneyNorm, this.energyFactor, myUnits.filter(u => u.type === 'HOUSE').length / 20,
+            myUnits.filter(u => u.type === 'FACTORY').length / 5, myUnits.filter(u => u.type === 'POWER_PLANT').length / 10,
+            myUnits.filter(u => !u.isBuilder && !u.isProducer).length / 50, myUnits.filter(u => u.isBuilder).length / 5,
+            enemies.length / 50, threat, (this.timer % 100) / 100, (this.side === 'enemy' ? 1 : 0), 1
         ];
     }
 
@@ -482,29 +432,13 @@ class BotAI {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const currentScore = myUnits.length + (this.money / 100);
         reward += (currentScore - this.prevScore);
-        
         if (this.energyFactor < 0.5) reward -= 0.5;
-
-        // Награда за целостность электросети
         const unpoweredCount = myUnits.filter(u => UNITS[u.type].energyUse > 0 && !u.isPowered).length;
-        if (unpoweredCount === 0) reward += 0.5; 
-        else reward -= (unpoweredCount * 0.2);
-
-        // Награда за высокий доход
+        if (unpoweredCount === 0) reward += 0.5; else reward -= (unpoweredCount * 0.2);
         let currentIncome = 0;
-        myUnits.forEach(u => {
-            if (UNITS[u.type].income && u.isPowered) {
-                let inc = UNITS[u.type].income;
-                if(u.buffIncomeMult) inc *= u.buffIncomeMult;
-                currentIncome += inc;
-            }
-        });
+        myUnits.forEach(u => { if (UNITS[u.type].income && u.isPowered) currentIncome += UNITS[u.type].income; });
         reward += (currentIncome / 20); 
-
-        // Штраф за отсутствие строителей
-        const builders = myUnits.filter(u => u.isBuilder).length;
-        if (builders === 0) reward -= 5;
-
+        if (myUnits.filter(u => u.isBuilder).length === 0) reward -= 5;
         this.prevScore = currentScore;
         return reward;
     }
@@ -531,17 +465,12 @@ class BotAI {
                 const reward = this.calculateReward();
                 this.brain.remember(this.prevState, this.prevAction, reward, currentState, false);
             }
-
             const action = this.brain.predict(currentState);
             this.executeAction(action);
-
             this.prevState = currentState;
             this.prevAction = action;
-
             if (this.timer % 60 === 0) {
-                this.brain.replay().then(() => {
-                    if (this.timer % 600 === 0) this.brain.save();
-                });
+                this.brain.replay().then(() => { if (this.timer % 600 === 0) this.brain.save(); });
             }
         }
     }
@@ -551,43 +480,27 @@ class BotAI {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const freeBuilder = myUnits.find(u => u.isBuilder && !u.assignedSite && !u.constructing);
         const producers = myUnits.filter(u => u.isProducer && u.spawnCooldown <= 0);
-        
         let validMove = false;
+        
         switch (action) {
-            case 'BUILD_HOUSE':
-                if (freeBuilder && this.money >= UNITS.HOUSE.cost) { if (this.tryPlaceBuilding(freeBuilder, 'HOUSE')) validMove = true; }
-                break;
-            case 'BUILD_FACTORY':
-                if (freeBuilder && this.money >= UNITS.FACTORY.cost) { if (this.tryPlaceBuilding(freeBuilder, 'FACTORY')) validMove = true; }
-                break;
-            case 'BUILD_POWER':
-                if (freeBuilder && this.money >= UNITS.POWER_PLANT.cost) { if (this.tryPlaceBuilding(freeBuilder, 'POWER_PLANT')) validMove = true; }
-                break;
-            case 'BUILD_TURRET':
-                if (freeBuilder && this.money >= UNITS.SENTINEL.cost) { if (this.tryPlaceBuilding(freeBuilder, 'SENTINEL')) validMove = true; }
-                break;
-            case 'BUILD_AA':
-                if (freeBuilder && this.money >= UNITS.AA_DEFENSE.cost) { if (this.tryPlaceBuilding(freeBuilder, 'AA_DEFENSE')) validMove = true; }
-                break;
+            case 'BUILD_HOUSE': if (freeBuilder && this.money >= UNITS.HOUSE.cost) if(this.tryPlaceBuilding(freeBuilder, 'HOUSE')) validMove=true; break;
+            case 'BUILD_FACTORY': if (freeBuilder && this.money >= UNITS.FACTORY.cost) if(this.tryPlaceBuilding(freeBuilder, 'FACTORY')) validMove=true; break;
+            case 'BUILD_POWER': if (freeBuilder && this.money >= UNITS.POWER_PLANT.cost) if(this.tryPlaceBuilding(freeBuilder, 'POWER_PLANT')) validMove=true; break;
+            case 'BUILD_TURRET': if (freeBuilder && this.money >= UNITS.SENTINEL.cost) if(this.tryPlaceBuilding(freeBuilder, 'SENTINEL')) validMove=true; break;
+            case 'BUILD_AA': if (freeBuilder && this.money >= UNITS.AA_DEFENSE.cost) if(this.tryPlaceBuilding(freeBuilder, 'AA_DEFENSE')) validMove=true; break;
             case 'TRAIN_BUILDER':
-                const builderProducers = producers.filter(u => u.type === 'HOUSE' || u.type === 'FACTORY');
-                if (builderProducers.length > 0 && this.money >= UNITS.BUILDER.cost) {
-                    const pb = builderProducers[Math.floor(Math.random() * builderProducers.length)];
-                    this.money -= UNITS.BUILDER.cost;
-                    pb.startProduction('BUILDER');
-                    validMove = true;
+                const bp = producers.filter(u => u.type === 'HOUSE' || u.type === 'FACTORY');
+                if (bp.length > 0 && this.money >= UNITS.BUILDER.cost) {
+                    const pb = bp[Math.floor(Math.random() * bp.length)];
+                    this.money -= UNITS.BUILDER.cost; pb.startProduction('BUILDER'); validMove = true;
                 }
                 break;
-            case 'TRAIN_SOLDIER':
-            case 'TRAIN_TANK':
-            case 'TRAIN_HELI':
+            case 'TRAIN_SOLDIER': case 'TRAIN_TANK': case 'TRAIN_HELI':
                 const type = (action === 'TRAIN_SOLDIER') ? 'SOLDIER' : (action === 'TRAIN_TANK' ? 'TANK' : 'HELICOPTER');
                 if (producers.length > 0 && this.money >= UNITS[type].cost) {
                     const prod = producers[Math.floor(Math.random() * producers.length)];
                     if (UNITS[prod.type].spawnList && UNITS[prod.type].spawnList.includes(type)) {
-                        this.money -= UNITS[type].cost;
-                        prod.startProduction(type);
-                        validMove = true;
+                        this.money -= UNITS[type].cost; prod.startProduction(type); validMove = true;
                     }
                 }
                 break;
@@ -603,8 +516,7 @@ class BotAI {
                 break;
             case 'IDLE': validMove = true; break;
         }
-        if (validMove) this.prevScore += 0.5;
-        else this.prevScore -= 0.1;
+        if (validMove) this.prevScore += 0.5; else this.prevScore -= 0.1;
     }
 
     tryPlaceBuilding(builder, type) {
@@ -638,7 +550,6 @@ class BotAI {
         this.energyFactor = (use > gen) ? (gen / use) : 1;
         if (this.energyFactor < 0.1) this.energyFactor = 0.1;
     }
-    
     checkPanic() {}
 }
 
@@ -646,9 +557,7 @@ const Lobby = {
     init() {
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
-        
         if (!Game.socket) {
-            // Подключаемся к серверу
             Game.socket = io();
             this.setupEvents();
         }
@@ -656,38 +565,29 @@ const Lobby = {
 
     setupEvents() {
         const s = Game.socket;
-        
         s.on('room_created', (data) => {
             CURRENT_ROOM = data.roomName;
             Game.myRole = data.side;
             document.getElementById('lobby-screen').classList.add('hidden');
             Game.showError(`ОЖИДАНИЕ СОПЕРНИКА В КОМНАТЕ: ${CURRENT_ROOM}...`);
-            const warn = document.getElementById('connection-warning');
-            warn.style.display = 'block';
-            warn.style.background = '#004488';
-            warn.innerText = `КОМНАТА: ${CURRENT_ROOM}. ЖДЕМ ИГРОКА...`;
+            document.getElementById('connection-warning').style.display = 'block';
+            document.getElementById('connection-warning').style.background = '#004488';
+            document.getElementById('connection-warning').innerText = `КОМНАТА: ${CURRENT_ROOM}. ЖДЕМ ИГРОКА...`;
         });
-
         s.on('room_joined', (data) => {
             CURRENT_ROOM = data.roomName;
             Game.myRole = data.side;
             document.getElementById('lobby-screen').classList.add('hidden');
         });
-
         s.on('start_game_signal', () => {
             document.getElementById('connection-warning').style.display = 'none';
+            // Disable Speed in MP
+            document.getElementById('speed-controls').style.display = 'none';
             Game.loadPvpLevel();
         });
-
-        s.on('error_msg', (msg) => {
-            alert(msg);
-        });
-        
+        s.on('error_msg', (msg) => { alert(msg); });
         s.on('remoteCommand', (data) => { Game.executeCommand(data); });
-        s.on('playerLeft', () => { 
-            alert("Соперник покинул игру."); 
-            location.reload(); 
-        });
+        s.on('playerLeft', () => { alert("Соперник покинул игру."); location.reload(); });
     },
 
     create() {
@@ -728,6 +628,11 @@ const Game = {
     bots: [],
     socket: null,
     myRole: 'player', 
+    
+    // --- ANTI-FREEZE LOOP VARIABLES ---
+    lastTime: 0,
+    accumulator: 0,
+    tickRate: 1000 / 60, // 60 FPS Logic Target
 
     init() {
         this.resize();
@@ -738,7 +643,9 @@ const Game = {
         window.addEventListener('mousemove', e => this.onMove(e));
         window.addEventListener('mouseup', e => this.onUp(e));
         canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
-        requestAnimationFrame(() => this.loop());
+        
+        // Start Loop
+        requestAnimationFrame((t) => this.loop(t));
     },
 
     resize() {
@@ -747,6 +654,7 @@ const Game = {
     },
     
     setSpeed(s) {
+        if(this.isMultiplayer) return; // Block speed change in MP
         this.speed = s;
         document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active');
@@ -766,10 +674,7 @@ const Game = {
         return owner;
     },
 
-    // Старая функция удалена, теперь вход через Lobby
-    startMultiplayer() {
-        // Заглушка
-    },
+    startMultiplayer() { }, // Deprecated
 
     startSpectator() {
         const botCount = parseInt(document.querySelector('input[type=range][max="8"]').value);
@@ -784,12 +689,9 @@ const Game = {
         MAP_H = mapSize;
         ISLAND_RADIUS = mapSize * 0.4;
         MapUtils.init();
-        
         this.resetGameData();
-
         this.camera.x = MAP_W/2 - canvas.width/2;
         this.camera.y = MAP_H/2 - canvas.height/2;
-
         const factions = [];
         for(let i=1; i<=botCount; i++) factions.push('bot'+i);
         const cx = MAP_W/2, cy = MAP_H/2;
@@ -798,17 +700,16 @@ const Game = {
             const angle = (Math.PI * 2 / factions.length) * i - Math.PI/2;
             const sx = cx + Math.cos(angle) * radius;
             const sy = cy + Math.sin(angle) * radius;
-            
             this.units.push(new Unit('HOUSE', sx, sy, side));
             this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
             this.bots.push(new BotAI(side));
         });
         this.generateBuffs();
-
         this.startGameUI("РЕЖИМ НАБЛЮДЕНИЯ");
         document.getElementById('start-btn').classList.add('hidden');
         document.getElementById('player-stats').style.visibility = 'hidden'; 
         document.getElementById('spectator-hud').style.display = 'flex';
+        document.getElementById('speed-controls').style.display = 'flex'; // Allow speed in spectator
         this.updateUI(Object.keys(UNITS));
     },
 
@@ -816,6 +717,7 @@ const Game = {
         this.isMultiplayer = true; this.isIslandMode = false;
         this.isSpectator = false;
         this.state = 'BATTLE'; this.money = 5000;
+        this.speed = 1; // Force 1x
         MAP_W = 3500; MAP_H = 2000;
         this.resetGameData();
         this.units.push(new Unit('HOUSE', 300, MAP_H/2, 'player', 'base_p1'));
@@ -833,14 +735,10 @@ const Game = {
         this.myRole = 'player';
         this.state = 'BATTLE';
         this.money = 4000;
-        
-        MAP_W = 4000;
-        MAP_H = 4000;
+        MAP_W = 4000; MAP_H = 4000;
         ISLAND_RADIUS = 1600;
         MapUtils.init();
-        
         this.resetGameData(); 
-
         const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4'];
         const cx = MAP_W/2, cy = MAP_H/2;
         const radius = ISLAND_RADIUS - 400;
@@ -848,10 +746,8 @@ const Game = {
             const angle = (Math.PI * 2 / factions.length) * i - Math.PI/2;
             const sx = cx + Math.cos(angle) * radius;
             const sy = cy + Math.sin(angle) * radius;
-            
             this.units.push(new Unit('HOUSE', sx, sy, side));
             this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
-            
             if (side !== 'player') {
                 this.bots.push(new BotAI(side));
             } else {
@@ -860,9 +756,9 @@ const Game = {
             }
         });
         this.generateBuffs();
-
         this.startGameUI("ВЫЖИВАНИЕ (ВСЕ ПРОТИВ ВСЕХ)");
         document.getElementById('start-btn').classList.add('hidden');
+        document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(Object.keys(UNITS));
     },
 
@@ -873,7 +769,6 @@ const Game = {
             attempts++;
             let bx = Math.random()*MAP_W;
             let by = Math.random()*MAP_H;
-            
             let overlap = false;
             for(let b of this.buffs) {
                 if (Math.hypot(b.x - bx, b.y - by) < 150) { overlap = true; break; }
@@ -898,7 +793,6 @@ const Game = {
             for(let i=0; i<count; i++) this.units.push(new Unit(type, MAP_W-250-Math.random()*800, 200+Math.random()*(MAP_H-400), 'enemy'));
         });
         this.bots.push(new BotAI('enemy'));
-
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('end-screen').classList.add('hidden');
         document.getElementById('start-btn').classList.remove('hidden');
@@ -906,8 +800,8 @@ const Game = {
         document.getElementById('phase-text').innerText = "РАССТАНОВКА";
         document.getElementById('menu-title').style.display = 'none';
         document.getElementById('top-bar').style.display = 'flex';
-        
         document.getElementById('build-menu').style.display = 'flex';
+        document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(data.unlock);
     },
 
@@ -923,7 +817,6 @@ const Game = {
         this.clickDelay = 0;
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
-        
         const emojis = ['🌲', '🌲', '🌳', '🪨', '🌿', '🪵'];
         const gridSize = 50; 
         const cols = Math.ceil(MAP_W / gridSize);
@@ -946,7 +839,6 @@ const Game = {
         document.getElementById('top-bar').style.display = 'flex';
         document.getElementById('phase-text').innerText = title;
         document.getElementById('role-display').innerText = "";
-        
         document.getElementById('build-menu').style.display = 'none';
         document.getElementById('menu-title').style.display = 'none';
     },
@@ -1264,7 +1156,7 @@ endGame(win, customTitle) {
                 const bType = this.pendingConstruction;
                 const cost = UNITS[bType].cost;
                 
-                if (this.getTerritoryOwner(m.x, m.y) !== 'player') {
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) {
                      this.showError("ДАЛЕКО ОТ БАЗЫ!");
                      return;
                 }
@@ -1476,160 +1368,28 @@ endGame(win, customTitle) {
         if (builders.length > 1) this.selection = this.selection.filter(s => !s.isBuilder).concat([builders[0]]);
     },
 
-    draw() {
-        if (this.isIslandMode) {
-             ctx.fillStyle = '#004488';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else {
-             ctx.fillStyle = '#222';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // --- NEW FIXED TIMESTEP LOOP (ANTI-FREEZE) ---
+    loop(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        let deltaTime = timestamp - this.lastTime;
+        this.lastTime = timestamp;
+
+        // Catch-up limit (prevent spiral of death)
+        if (deltaTime > 1000) deltaTime = 1000;
+
+        this.accumulator += deltaTime;
+
+        while (this.accumulator >= this.tickRate) {
+            // Apply speed multiplier (Fixed to 1x in MP)
+            let steps = this.isMultiplayer ? 1 : this.speed;
+            for(let i=0; i<steps; i++) {
+                this.update();
+            }
+            this.accumulator -= this.tickRate;
         }
 
-        ctx.save(); ctx.translate(-this.camera.x, -this.camera.y);
-        if (this.isIslandMode) {
-            ctx.fillStyle = '#1a1a1a'; 
-            ctx.beginPath();
-            const cx = MAP_W/2, cy = MAP_H/2;
-            for (let a = 0; a <= Math.PI * 2.1; a += 0.1) {
-                const r = MapUtils.getIslandRadius(a);
-                const px = cx + Math.cos(a) * r;
-                const py = cy + Math.sin(a) * r;
-                if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-            }
-            ctx.fill();
-            ctx.strokeStyle = '#4466aa'; ctx.lineWidth = 10; ctx.stroke();
-        }
-
-        const step = 100;
-        const sx = Math.floor(this.camera.x / step) * step, ex = sx + canvas.width + step;
-        const sy = Math.floor(this.camera.y / step) * step, ey = sy + canvas.height + step;
-        for (let x = sx; x < ex; x += step) {
-            for (let y = sy; y < ey; y += step) {
-                if (this.isIslandMode && MapUtils.isWater(x+50, y+50)) continue;
-                let owner = null, min = 400;
-                for(let u of this.units) { 
-                    if(u.isFlying || u.type === 'MINE') continue;
-                    let d = Math.hypot(u.x - (x+50), u.y - (y+50)); 
-                    if(d < min) { min = d; owner = u.side; } 
-                }
-                
-                if (owner) {
-                    const c = FACTIONS[owner] ? FACTIONS[owner].color : '#999';
-                    ctx.fillStyle = c;
-                    ctx.globalAlpha = 0.08; 
-                    ctx.fillRect(x, y, step, step);
-                    ctx.globalAlpha = 1.0;
-                }
-            }
-        }
-
-        this.buffs.forEach(b => {
-            ctx.fillStyle = b.color;
-            ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
-        });
-        ctx.font = '24px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle='#555';
-        this.decor.forEach(d => { if (d.x > this.camera.x && d.x < this.camera.x + canvas.width) ctx.fillText(d.char, d.x, d.y); });
-        
-        ctx.lineWidth = 2;
-        const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
-        this.units.forEach(u => {
-            if (u.type === 'POWER_PLANT') {
-                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < 300);
-                neighbors.forEach(n => {
-                    let factor = (u.side === 'player') ? Game.energyFactor : 1;
-                    if (u.side !== 'player') {
-                         const bot = Game.bots.find(b => b.side === u.side);
-                         if (bot) factor = bot.energyFactor;
-                    }
-
-                    if (factor < 0.5) ctx.strokeStyle = '#555'; 
-                    else {
-                        const baseColor = FACTIONS[u.side] ? FACTIONS[u.side].color : '#fff';
-                        ctx.strokeStyle = baseColor;
-                        ctx.globalAlpha = 0.3 + pulse * 0.4;
-                    }
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(u.x, u.y);
-                    ctx.lineTo(n.x, n.y);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1;
-                });
-            }
-        });
-        if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
-
-        this.constructions.forEach(s => {
-            ctx.save(); ctx.globalAlpha = 0.55;
-            ctx.font = (s.type && UNITS[s.type] && UNITS[s.type].emoji) ? '48px Arial' : '40px Arial';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#888';
-            ctx.fillText(UNITS[s.type].emoji, s.x, s.y); ctx.restore();
-            const pct = 1 - (s.remaining / s.total);
-            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2, 6);
-            ctx.fillStyle = '#6cf'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2 * pct, 6);
-        });
-        const buildings = this.units.filter(u => UNITS[u.type].spawnList || u.type === 'AA_DEFENSE' || u.type === 'HOSPITAL' || u.type === 'POWER_PLANT' || u.type === 'SENTINEL' || u.type === 'SILO');
-        const mobile = this.units.filter(u => !UNITS[u.type].spawnList && u.type !== 'AA_DEFENSE' && u.type !== 'HOSPITAL' && u.type !== 'POWER_PLANT' && u.type !== 'SENTINEL' && u.type !== 'SILO');
-        buildings.forEach(u => u.draw(ctx)); mobile.forEach(u => u.draw(ctx));
-        this.bullets.forEach(b => b.draw(ctx));
-        
-        for (let i = this.effects.length - 1; i >= 0; i--) {
-            const e = this.effects[i];
-            if (e.type === 'smoke') {
-                ctx.fillStyle = `rgba(200,200,200,${e.life/40})`;
-                ctx.beginPath(); ctx.arc(e.x, e.y, 5 + (20-e.life/2), 0, Math.PI*2); ctx.fill();
-                e.life--;
-            }
-            else if (e.type === 'shockwave') {
-                ctx.strokeStyle = (e.color) ? e.color : `rgba(255, 50, 0, ${e.life/20})`;
-                ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.stroke();
-                if (e.maxRadius) { 
-                    if (e.radius < e.maxRadius) e.radius += 2;
-                } else {
-                    e.radius += 3;
-                }
-                e.life--;
-            }
-            else {
-                ctx.fillStyle = '#fff';
-                ctx.font = '20px Arial'; ctx.fillText(e.char, e.x, e.y); 
-                e.life--; e.y -= 0.5;
-            }
-            
-            if (e.life <= 0) this.effects.splice(i, 1);
-        }
-
-        if (window.mousePos) {
-             const m = window.mousePos;
-             const hoveredBuff = this.buffs.find(b => Math.abs(b.x - m.x) < b.width/2 && Math.abs(b.y - m.y) < b.height/2);
-             if (hoveredBuff) {
-                 ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                 ctx.fillRect(m.x + 15, m.y, 220, 40);
-                 ctx.strokeStyle = '#fff';
-                 ctx.strokeRect(m.x + 15, m.y, 220, 40);
-                 ctx.fillStyle = '#fff';
-                 ctx.font = '16px Arial';
-                 ctx.textAlign = 'left';
-                 ctx.fillText(hoveredBuff.text, m.x + 25, m.y + 25);
-             }
-        }
-        
-        if (this.dragStart && this.dragCurr) {
-            const w = this.dragCurr.x - this.dragStart.rx;
-            const h = this.dragCurr.y - this.dragStart.ry;
-            ctx.strokeStyle = '#0f0'; ctx.strokeRect(this.dragStart.x, this.dragStart.y, w, h);
-        }
-        ctx.restore();
-    },
-
-    loop() { 
-        for(let i=0; i<this.speed; i++) this.update();
         this.draw(); 
-        requestAnimationFrame(() => this.loop()); 
+        requestAnimationFrame((t) => this.loop(t)); 
     },
 
     updateUI(unlocks, isMenu = false, titleText = '') {

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Iron Tactics MP v44 (Global Lobby)</title>
+    <title>Iron Tactics MP v47 (Stable Global)</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
@@ -85,8 +85,8 @@
 
         #connection-warning {
             position: absolute; top: 0; left: 0; width: 100%; height: 25px;
-            background: red; display: none; z-index: 200; box-shadow: 0 0 10px red;
-            text-align: center; color: white; font-weight: bold; padding-top: 5px;
+            background: #004488; display: none; z-index: 200; box-shadow: 0 0 10px #000;
+            text-align: center; line-height: 25px; font-weight: bold; color: #fff;
         }
         
         .energy-stat { font-weight: bold; margin: 0 15px; }
@@ -107,12 +107,6 @@
         }
         .spec-row { margin: 10px 0; font-size: 1.2em; }
         input[type=range] { width: 200px; vertical-align: middle; }
-        
-        /* Стили для лобби */
-        .lobby-input {
-            background: rgba(0,0,0,0.5); border: 1px solid #0af; color: white;
-            padding: 10px; margin: 5px; width: 200px; font-size: 1em; text-align: center;
-        }
 
         #spectator-hud {
             position: absolute; top: 70px; left: 20px;
@@ -121,12 +115,17 @@
             color: #fff; font-family: monospace; font-size: 14px; min-width: 250px;
         }
         .hud-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 3px 0; }
+        
+        .lobby-input {
+            background: rgba(0,0,0,0.5); border: 1px solid #0af; color: white;
+            padding: 10px; margin: 5px; width: 200px; font-size: 1em; text-align: center;
+        }
     </style>
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
-<div id="connection-warning">Ожидание сервера...</div>
+<div id="connection-warning">Ожидание...</div>
 
 <div id="ui-layer">
     <div id="spectator-hud"></div>
@@ -193,6 +192,8 @@
             <button class="menu-btn" style="background:#442266; border-color:#d0f; font-size: 1em; padding: 10px 30px;" onclick="Game.startSpectator()">📺 ЗАПУСТИТЬ СИМУЛЯЦИЮ</button>
         </div>
     </div>
+    
+    <h3 id="lobby-status" style="color: #aaa; margin-top: 20px;"></h3>
 </div>
 
 <div id="lobby-screen" class="screen clickable hidden">
@@ -308,7 +309,7 @@ const MapUtils = {
 // --- КОНФИГУРАЦИЯ HYPERPARAMETERS ---
 const RL_CONFIG = {
     inputSize: 12, 
-    outputSize: 11, 
+    outputSize: 11, // ИЗМЕНЕНО: БЫЛО 10, СТАЛО 11
     learningRate: 0.001,
     discountFactor: 0.95,
     epsilon: 1.0, 
@@ -329,23 +330,12 @@ class RLBrain {
 
     async initModel() {
         try {
-            const loaded = await tf.loadLayersModel('localstorage://iron-tactics-ai-v1');
+            this.model = await tf.loadLayersModel('localstorage://iron-tactics-ai-v1');
             console.log("AI: Модель загружена из хранилища!");
-            
-            const outputShape = loaded.layers[loaded.layers.length-1].outputShape;
-            if (Array.isArray(outputShape) && outputShape[1] !== RL_CONFIG.outputSize) {
-                 console.log(`AI: Старая модель (${outputShape[1]}) не подходит к новой конфигурации (${RL_CONFIG.outputSize}). Сброс.`);
-                 throw new Error("Architecture mismatch");
-            }
-            this.model = loaded;
-            this.model.compile({ 
-                loss: 'meanSquaredError', 
-                optimizer: tf.train.adam(RL_CONFIG.learningRate) 
-            });
             const savedEps = localStorage.getItem('ai_epsilon');
             if (savedEps) this.epsilon = parseFloat(savedEps);
         } catch (e) {
-            console.log("AI: Создание новой модели (причина: " + e.message + ")");
+            console.log("AI: Создание новой модели...");
             this.createModel();
         }
         this.isReady = true;
@@ -400,6 +390,7 @@ class RLBrain {
         tf.tidy(() => {
             const input = tf.tensor2d(states);
             const nextInput = tf.tensor2d(nextStates);
+            
             const target = this.model.predict(input).arraySync();
             const targetNext = this.model.predict(nextInput).arraySync();
 
@@ -413,6 +404,7 @@ class RLBrain {
 
             const x = tf.tensor2d(states);
             const y = tf.tensor2d(target);
+
             this.model.fit(x, y, { epochs: 1, verbose: 0 });
         });
         if (this.epsilon > RL_CONFIG.epsilonMin) {
@@ -423,6 +415,7 @@ class RLBrain {
 
 const GlobalBrain = new RLBrain();
 
+// ИЗМЕНЕНО: Добавлено действие TRAIN_BUILDER
 const ACTIONS = {
     0: 'BUILD_HOUSE',
     1: 'BUILD_FACTORY',
@@ -434,7 +427,7 @@ const ACTIONS = {
     7: 'TRAIN_HELI',
     8: 'ATTACK_ALL',
     9: 'IDLE',
-    10: 'TRAIN_BUILDER' 
+    10: 'TRAIN_BUILDER' // <--- НОВОЕ ДЕЙСТВИЕ
 };
 
 class BotAI {
@@ -452,6 +445,7 @@ class BotAI {
     getState() {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const enemies = Game.units.filter(u => u.side !== this.side);
+        
         const moneyNorm = Math.min(this.money / 20000, 1);
         const energyNorm = this.energyFactor;
         const houses = myUnits.filter(u => u.type === 'HOUSE').length / 20;
@@ -485,23 +479,7 @@ class BotAI {
         
         if (this.energyFactor < 0.5) reward -= 0.5;
 
-        // Награда за целостность электросети
-        const unpoweredCount = myUnits.filter(u => UNITS[u.type].energyUse > 0 && !u.isPowered).length;
-        if (unpoweredCount === 0) reward += 0.5; 
-        else reward -= (unpoweredCount * 0.2);
-
-        // Награда за высокий доход
-        let currentIncome = 0;
-        myUnits.forEach(u => {
-            if (UNITS[u.type].income && u.isPowered) {
-                let inc = UNITS[u.type].income;
-                if(u.buffIncomeMult) inc *= u.buffIncomeMult;
-                currentIncome += inc;
-            }
-        });
-        reward += (currentIncome / 20); 
-
-        // Штраф за отсутствие строителей
+        // ИЗМЕНЕНО: Штраф за отсутствие строителей
         const builders = myUnits.filter(u => u.isBuilder).length;
         if (builders === 0) reward -= 5;
 
@@ -511,6 +489,7 @@ class BotAI {
 
     update() {
         this.timer++;
+        // 1. ЭКОНОМИКА
         if (this.timer % 60 === 0) {
             this.calcEnergy();
             let income = 0;
@@ -525,6 +504,7 @@ class BotAI {
             if (this.money < 50) this.money += 10;
         }
 
+        // 2. ИИ ДУМАЕТ
         if (this.timer % 10 === 0) { 
             const currentState = this.getState();
             if (this.prevState) {
@@ -555,29 +535,44 @@ class BotAI {
         let validMove = false;
         switch (action) {
             case 'BUILD_HOUSE':
-                if (freeBuilder && this.money >= UNITS.HOUSE.cost) { if (this.tryPlaceBuilding(freeBuilder, 'HOUSE')) validMove = true; }
+                if (freeBuilder && this.money >= UNITS.HOUSE.cost) {
+                    if (this.tryPlaceBuilding(freeBuilder, 'HOUSE')) validMove = true;
+                }
                 break;
             case 'BUILD_FACTORY':
-                if (freeBuilder && this.money >= UNITS.FACTORY.cost) { if (this.tryPlaceBuilding(freeBuilder, 'FACTORY')) validMove = true; }
+                if (freeBuilder && this.money >= UNITS.FACTORY.cost) {
+                    if (this.tryPlaceBuilding(freeBuilder, 'FACTORY')) validMove = true;
+                }
                 break;
             case 'BUILD_POWER':
-                if (freeBuilder && this.money >= UNITS.POWER_PLANT.cost) { if (this.tryPlaceBuilding(freeBuilder, 'POWER_PLANT')) validMove = true; }
+                if (freeBuilder && this.money >= UNITS.POWER_PLANT.cost) {
+                    if (this.tryPlaceBuilding(freeBuilder, 'POWER_PLANT')) validMove = true;
+                }
                 break;
             case 'BUILD_TURRET':
-                if (freeBuilder && this.money >= UNITS.SENTINEL.cost) { if (this.tryPlaceBuilding(freeBuilder, 'SENTINEL')) validMove = true; }
+                if (freeBuilder && this.money >= UNITS.SENTINEL.cost) {
+                    if (this.tryPlaceBuilding(freeBuilder, 'SENTINEL')) validMove = true;
+                }
                 break;
             case 'BUILD_AA':
-                if (freeBuilder && this.money >= UNITS.AA_DEFENSE.cost) { if (this.tryPlaceBuilding(freeBuilder, 'AA_DEFENSE')) validMove = true; }
+                if (freeBuilder && this.money >= UNITS.AA_DEFENSE.cost) {
+                    if (this.tryPlaceBuilding(freeBuilder, 'AA_DEFENSE')) validMove = true;
+                }
                 break;
+            
+            // ИЗМЕНЕНО: Логика найма строителя
             case 'TRAIN_BUILDER':
+                // Ищем производителя (Дом или Завод)
                 const builderProducers = producers.filter(u => u.type === 'HOUSE' || u.type === 'FACTORY');
                 if (builderProducers.length > 0 && this.money >= UNITS.BUILDER.cost) {
+                    // Берем случайного свободного
                     const pb = builderProducers[Math.floor(Math.random() * builderProducers.length)];
                     this.money -= UNITS.BUILDER.cost;
                     pb.startProduction('BUILDER');
                     validMove = true;
                 }
                 break;
+
             case 'TRAIN_SOLDIER':
             case 'TRAIN_TANK':
             case 'TRAIN_HELI':
@@ -601,8 +596,11 @@ class BotAI {
                     }
                 }
                 break;
-            case 'IDLE': validMove = true; break;
+            case 'IDLE':
+                validMove = true;
+                break;
         }
+
         if (validMove) this.prevScore += 0.5;
         else this.prevScore -= 0.1;
     }
@@ -616,6 +614,7 @@ class BotAI {
             const dist = 60 + Math.random() * 150;
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
+
             if (tx < 100 || tx > MAP_W-100 || ty < 100 || ty > MAP_H-100) continue;
             const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 60);
             if (!busy) {
@@ -644,13 +643,20 @@ class BotAI {
 
 const Lobby = {
     init() {
+        // Скрываем главное меню, показываем лобби
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
         
-        if (!Game.socket) {
-            // Подключаемся к серверу
-            Game.socket = io();
-            this.setupEvents();
+        // Подключаемся к сокету
+        if (typeof io !== 'undefined') {
+            if (!Game.socket) {
+                Game.socket = io();
+                this.setupEvents();
+            }
+        } else {
+            alert("Ошибка: Сервер не найден (запустите node server.js). Доступен только одиночный режим.");
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
         }
     },
 
@@ -661,7 +667,6 @@ const Lobby = {
             CURRENT_ROOM = data.roomName;
             Game.myRole = data.side;
             document.getElementById('lobby-screen').classList.add('hidden');
-            Game.showError(`ОЖИДАНИЕ СОПЕРНИКА В КОМНАТЕ: ${CURRENT_ROOM}...`);
             const warn = document.getElementById('connection-warning');
             warn.style.display = 'block';
             warn.style.background = '#004488';
@@ -766,9 +771,8 @@ const Game = {
         return owner;
     },
 
-    // Старая функция удалена, теперь вход через Lobby
     startMultiplayer() {
-        // Заглушка
+       // Legacy
     },
 
     startSpectator() {
@@ -874,6 +878,7 @@ const Game = {
             let bx = Math.random()*MAP_W;
             let by = Math.random()*MAP_H;
             
+            // Overlap Check
             let overlap = false;
             for(let b of this.buffs) {
                 if (Math.hypot(b.x - bx, b.y - by) < 150) { overlap = true; break; }
@@ -1188,11 +1193,12 @@ const Game = {
     },
 
 endGame(win, customTitle) {
+        // --- БЛОК ОБУЧЕНИЯ ИИ (START) ---
         if (this.bots && this.bots.length > 0) {
             console.log("AI: Завершение эпизода. Распределение наград...");
             this.bots.forEach(bot => {
                 const isAlive = this.units.some(u => u.side === bot.side);
-                const finalReward = isAlive ? 500 : -500;
+                const finalReward = isAlive ? 100 : -100;
                 
                 if (bot.brain && bot.prevState) {
                     bot.brain.remember(bot.prevState, bot.prevAction, finalReward, bot.getState(), true);
@@ -1203,6 +1209,7 @@ endGame(win, customTitle) {
                 this.bots[0].brain.save();
             }
         }
+        // --- БЛОК ОБУЧЕНИЯ ИИ (END) ---
 
         this.state = 'END';
         document.getElementById('end-screen').classList.remove('hidden');
@@ -1264,7 +1271,8 @@ endGame(win, customTitle) {
                 const bType = this.pendingConstruction;
                 const cost = UNITS[bType].cost;
                 
-                if (this.getTerritoryOwner(m.x, m.y) !== 'player') {
+                // ИСПРАВЛЕНИЕ: Теперь разрешает строить если территория принадлежит ВАМ (неважно кто вы)
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { 
                      this.showError("ДАЛЕКО ОТ БАЗЫ!");
                      return;
                 }
@@ -1719,6 +1727,7 @@ class Unit {
         this.nukeTimer = 0;
         this.nukeTarget = null;
 
+        // ИЗМЕНЕНО: Добавлены переменные для отслеживания застревания
         this.prevX = x;
         this.prevY = y;
         this.stuckTimer = 0;
@@ -1836,10 +1845,13 @@ class Unit {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
         this.checkPower();
 
+        // ИЗМЕНЕНО: АНТИ-ЗАСТРЕВАНИЕ
         if (this.isBuilder && this.assignedSite) {
+            // Если он уже строит — он не застрял, он работает. Сбрасываем таймер.
             if (this.constructing) {
                 this.stuckTimer = 0;
             } else {
+                // Если должен идти, но смещение < 1 пикселя
                 if (Math.hypot(this.x - this.prevX, this.y - this.prevY) < 1) {
                     this.stuckTimer++;
                 } else {
@@ -1847,8 +1859,9 @@ class Unit {
                 }
             }
             
+            // 600 кадров = 10 секунд (было 300/5сек)
             if (this.stuckTimer > 600) {
-                this.hp = 0; 
+                this.hp = 0; // Умираем
                 Game.effects.push({x: this.x, y: this.y, char: '☠️', life: 60});
                 if(this.assignedSite) {
                     Game.constructions = Game.constructions.filter(s => s !== this.assignedSite);
@@ -1962,9 +1975,8 @@ class Unit {
                         Game.units.push(newUnit);
                         Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
 
-                        if (Game.isMultiplayer && CURRENT_ROOM) {
+                        if (Game.isMultiplayer) {
                             Game.socket.emit('gameCommand', {
-                                roomName: CURRENT_ROOM,
                                 type: 'spawn', unitType: this.productionType, side: this.side,
                                  x: spawnX, y: spawnY, id: newUnit.id
                             });

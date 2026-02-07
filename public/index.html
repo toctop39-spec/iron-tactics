@@ -736,7 +736,7 @@ const Game = {
     socket: null,
     myRole: 'player', 
 
-    init() {
+init() {
         this.resize();
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('keydown', e => this.keys[e.code] = true);
@@ -745,9 +745,11 @@ const Game = {
         window.addEventListener('mousemove', e => this.onMove(e));
         window.addEventListener('mouseup', e => this.onUp(e));
         canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
-        requestAnimationFrame(() => this.loop());
-    },
 
+        // ЗАПУСКАЕМ НОВУЮ СИСТЕМУ:
+        this.startWorkerHeartbeat(); // Логика (работает всегда)
+        this.renderLoop();           // Рисование (работает только когда видим)
+    },
     resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -1640,10 +1642,45 @@ endGame(win, customTitle) {
         ctx.restore();
     },
 
-    loop() { 
-        for(let i=0; i<this.speed; i++) this.update();
-        this.draw(); 
-        requestAnimationFrame(() => this.loop()); 
+ // Новая функция только для рисования
+    renderLoop() {
+        if (!document.hidden) {
+            this.draw();
+        }
+        // Рисование всегда через requestAnimationFrame (для плавности)
+        requestAnimationFrame(() => this.renderLoop());
+    },
+
+    // Функция запуска "сердца" игры через Web Worker
+    startWorkerHeartbeat() {
+        // Код воркера в виде строки (чтобы не создавать файл worker.js)
+        const workerCode = `
+            let interval = 1000 / 60; // 60 FPS = ~16.6ms
+            let timerID = null;
+            self.onmessage = function(e) {
+                if (e.data === "start") {
+                    timerID = setInterval(function() {
+                        postMessage("tick");
+                    }, interval);
+                } else if (e.data === "stop") {
+                    clearInterval(timerID);
+                }
+            };
+        `;
+
+        // Создаем воркер из строки
+        const blob = new Blob([workerCode], { type: "application/javascript" });
+        const worker = new Worker(URL.createObjectURL(blob));
+
+        // Когда воркер присылает "tick" — мы обновляем логику игры
+        worker.onmessage = () => {
+            // Если игра идет (BATTLE), обновляем логику
+            // Мы вызываем update 1 раз на каждый тик
+            this.update();
+        };
+
+        // Запускаем воркер
+        worker.postMessage("start");
     },
 
     updateUI(unlocks, isMenu = false, titleText = '') {

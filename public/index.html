@@ -1306,15 +1306,6 @@ else if (cmd.type === 'move') {
                 });
             }
         }
-            else if (cmd.type === 'help_build') {
-            const builder = this.units.find(u => u.id === cmd.builderId);
-            const site = this.constructions.find(s => s.id === cmd.siteId);
-            if (builder && site) {
-                builder.assignSite(site);
-                builder.moveTo(site.x, site.y);
-                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
-            }
-        }
         else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);

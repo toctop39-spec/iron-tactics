@@ -1307,7 +1307,13 @@ else if (cmd.type === 'path_move') {
                 });
             }
         }
-        else if (cmd.type === 'help_build') { // <--- Сразу начинается следующий блок
+        else if (cmd.type === 'build_start') {
+            const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
+            this.constructions.push(site);
+            const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
+            if (builder) builder.assignSite(site);
+        }
+                    else if (cmd.type === 'help_build') { // <--- Сразу начинается следующий блок
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);
             
@@ -1316,12 +1322,6 @@ else if (cmd.type === 'path_move') {
                 builder.moveTo(site.x, site.y);
                 Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
             }
-        }
-        else if (cmd.type === 'build_start') {
-            const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
-            this.constructions.push(site);
-            const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
-            if (builder) builder.assignSite(site);
         }
         else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);
@@ -1680,32 +1680,50 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                     this.updateUI(UNITS[clickedUnit.type].spawnList, true, clickedUnit.type === 'HOUSE' ? 'МЕНЮ ДОМА' : 'МЕНЮ ЗАВОДА'); return;
                 }
             }
-
-            const clickedSite = this.constructions.find(s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25);
             
-            // --- ИСПРАВЛЕНИЕ: ПОМОЩЬ В СТРОИТЕЛЬСТВЕ ---
-            if (clickedSite && clickedSite.owner === this.myRole) {
-                const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
-                if (builder) {
-                    // 1. Отправляем команду другим игрокам
-                    if (this.isMultiplayer && CURRENT_ROOM) {
-                        this.socket.emit('gameCommand', {
-                            roomName: CURRENT_ROOM,
-                            type: 'help_build', // Новая команда
-                            builderId: builder.id,
-                            siteId: clickedSite.id,
-                            side: this.myRole
-                        });
-                    }
+const clickedSite = this.constructions.find(
+    s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25
+);
 
-                    // 2. Выполняем у себя
-                    builder.assignSite(clickedSite);
-                    builder.moveTo(clickedSite.x, clickedSite.y);
-                    this.effects.push({x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30}); 
-                    return;
-                }
-            }
+// --- ПОМОЩЬ В СТРОИТЕЛЬСТВЕ ---
+if (clickedSite && clickedSite.owner === this.myRole) {
+    const builder = this.selection.find(
+        u => u.isBuilder && u.side === this.myRole
+    );
 
+    if (builder) {
+        // мультиплеер: отправляем команду
+        if (this.isMultiplayer && CURRENT_ROOM && this.socket) {
+            this.socket.emit('gameCommand', {
+                roomName: CURRENT_ROOM,
+                type: 'help_build',
+                builderId: builder.id,
+                siteId: clickedSite.id,
+                side: this.myRole
+            });
+        }
+
+        // локально
+        builder.assignSite(clickedSite);
+        builder.moveTo(clickedSite.x, clickedSite.y);
+        this.effects.push({
+            x: clickedSite.x,
+            y: clickedSite.y,
+            char: '🔧',
+            life: 30
+        });
+
+        return; // ⬅️ важно: выход, как в первом варианте
+    }
+}
+// -------------------------------------------
+
+// ⬇️ ВОЗВРАЩАЕМ ХВОСТ МЕТОДА (ИМЕННО ОН ЛОМАЛ КОД)
+this.selectedProducer = null;
+this.pendingConstruction = null;
+this.updateUI([]);
+this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
+            
     menuAction(type) {
         this.clickDelay = 20;
         if (type === 'HEAL_BTN') {

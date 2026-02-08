@@ -1280,18 +1280,6 @@ init() {
             const prod = this.units.find(u => u.id === cmd.producerId);
             if (prod) prod.startProduction(cmd.unitType, true);
         }
-
-            else if (cmd.type === 'help_build') {
-            const builder = this.units.find(u => u.id === cmd.builderId);
-            const site = this.constructions.find(s => s.id === cmd.siteId);
-            
-            // Если нашли и строителя, и стройплощадку — соединяем их
-            if (builder && site) {
-                builder.assignSite(site);
-                builder.moveTo(site.x, site.y);
-                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
-            }
-        }
         
 else if (cmd.type === 'move') {
             if (cmd.ids && cmd.ids.length > 0) {
@@ -1323,6 +1311,15 @@ else if (cmd.type === 'move') {
             this.constructions.push(site);
             const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
             if (builder) builder.assignSite(site);
+        }
+            else if (cmd.type === 'help_build') {
+            const builder = this.units.find(u => u.id === cmd.builderId);
+            const site = this.constructions.find(s => s.id === cmd.siteId);
+            if (builder && site) {
+                builder.assignSite(site);
+                builder.moveTo(site.x, site.y);
+                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
+            }
         }
         else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);

@@ -1306,12 +1306,6 @@ else if (cmd.type === 'move') {
                 });
             }
         }
-        else if (cmd.type === 'build_start') {
-            const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
-            this.constructions.push(site);
-            const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
-            if (builder) builder.assignSite(site);
-        }
             else if (cmd.type === 'help_build') {
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);
@@ -1324,6 +1318,17 @@ else if (cmd.type === 'move') {
         else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
+        }
+            else if (cmd.type === 'help_build') {
+            const builder = this.units.find(u => u.id === cmd.builderId);
+            const site = this.constructions.find(s => s.id === cmd.siteId);
+            
+            // Если нашли и строителя, и стройплощадку — соединяем их
+            if (builder && site) {
+                builder.assignSite(site);
+                builder.moveTo(site.x, site.y);
+                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
+            }
         }
         else if (cmd.type === 'sync_units') {
             if (cmd.side !== this.myRole) { 
@@ -1690,7 +1695,7 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                     this.effects.push({x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30}); 
                     return;
                 }
-            },
+            }
             // -------------------------------------------
 
     menuAction(type) {

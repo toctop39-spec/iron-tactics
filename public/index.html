@@ -1280,6 +1280,18 @@ init() {
             const prod = this.units.find(u => u.id === cmd.producerId);
             if (prod) prod.startProduction(cmd.unitType, true);
         }
+
+            else if (cmd.type === 'help_build') {
+            const builder = this.units.find(u => u.id === cmd.builderId);
+            const site = this.constructions.find(s => s.id === cmd.siteId);
+            
+            // Если нашли и строителя, и стройплощадку — соединяем их
+            if (builder && site) {
+                builder.assignSite(site);
+                builder.moveTo(site.x, site.y);
+                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
+            }
+        }
         
 else if (cmd.type === 'move') {
             if (cmd.ids && cmd.ids.length > 0) {
@@ -1658,20 +1670,31 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                 }
             }
 
-            const clickedSite = this.constructions.find(s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25);
+  const clickedSite = this.constructions.find(s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25);
+            
+            // --- ИСПРАВЛЕНИЕ: ПОМОЩЬ В СТРОИТЕЛЬСТВЕ ---
             if (clickedSite && clickedSite.owner === this.myRole) {
                 const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (builder) {
+                    // 1. Отправляем команду другим игрокам
+                    if (this.isMultiplayer && CURRENT_ROOM) {
+                        this.socket.emit('gameCommand', {
+                            roomName: CURRENT_ROOM,
+                            type: 'help_build', // Новая команда
+                            builderId: builder.id,
+                            siteId: clickedSite.id,
+                            side: this.myRole
+                        });
+                    }
+
+                    // 2. Выполняем у себя
                     builder.assignSite(clickedSite);
                     builder.moveTo(clickedSite.x, clickedSite.y);
-                    this.effects.push({x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30}); return;
+                    this.effects.push({x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30}); 
+                    return;
                 }
             }
-            this.selectedProducer = null;
-            this.pendingConstruction = null; this.updateUI([]);
-            this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
-        }
-    },
+            // -------------------------------------------
 
     menuAction(type) {
         this.clickDelay = 20;

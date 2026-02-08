@@ -1296,6 +1296,7 @@ else if (cmd.type === 'move') {
                 });
             }
         }
+            
 else if (cmd.type === 'path_move') {
             if (cmd.data) {
                 cmd.data.forEach(item => {
@@ -1305,7 +1306,7 @@ else if (cmd.type === 'path_move') {
                     }
                 });
             }
-        } // <--- Эта скобка закрывает 'path_move'
+        }
         else if (cmd.type === 'help_build') { // <--- Сразу начинается следующий блок
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);

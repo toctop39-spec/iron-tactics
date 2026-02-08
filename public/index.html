@@ -2611,10 +2611,15 @@ resolveCollision() {
                         Game.units.push(newUnit);
                         Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
 
-                        if (Game.isMultiplayer) {
+                 if (Game.isMultiplayer && CURRENT_ROOM) { // <-- Проверка на комнату
                             Game.socket.emit('gameCommand', {
-                                type: 'spawn', unitType: this.productionType, side: this.side,
-                                 x: spawnX, y: spawnY, id: newUnit.id
+                                roomName: CURRENT_ROOM, // <--- ВОТ ЧТО БЫЛО ЗАБЫТО
+                                type: 'spawn', 
+                                unitType: this.productionType, 
+                                side: this.side,
+                                x: spawnX, 
+                                y: spawnY, 
+                                id: newUnit.id
                             });
                         }
                     }

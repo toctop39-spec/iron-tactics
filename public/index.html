@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Iron Tactics MP v48 (Global + No Speed Cheat)</title>
+    <title>Iron Tactics MP v48 (Fixed)</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
@@ -160,7 +160,7 @@
     
     <div id="right-controls" class="clickable">
         <button id="reload-btn" class="action-circle-btn" onclick="Game.reloadGrads()">
-             <span></span>♻️</span><br>ПЕРЕЗАРЯД<br><span style="color:#ff0">1000$</span>
+             <span>♻️</span><br>ПЕРЕЗАРЯД<br><span style="color:#ff0">1000$</span>
         </button>
         <button id="arty-btn" class="action-circle-btn" onclick="Game.toggleArty()">
             <span>🚀 ЗАЛП</span>
@@ -1313,7 +1313,7 @@ else if (cmd.type === 'path_move') {
             const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
             if (builder) builder.assignSite(site);
         }
-                    else if (cmd.type === 'help_build') { // <--- Сразу начинается следующий блок
+                    else if (cmd.type === 'help_build') { 
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);
             
@@ -1338,7 +1338,7 @@ else if (cmd.type === 'path_move') {
                 });
             }
         }
-    }, // Закрывающая скобка метода executeCommand
+    }, 
 
     update() {
         if (this.clickDelay > 0) this.clickDelay--;
@@ -1643,17 +1643,6 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                 return;
             }
                 
-            else if (cmd.type === 'help_build') {
-            const builder = this.units.find(u => u.id === cmd.builderId);
-            const site = this.constructions.find(s => s.id === cmd.siteId);
-            
-            // Если нашли и строителя, и стройплощадку — соединяем их
-            if (builder && site) {
-                builder.assignSite(site);
-                builder.moveTo(site.x, site.y);
-                Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
-            }
-        }
 
             const clickedUnit = this.units.find(u => u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) < u.radius + 10);
             if (clickedUnit) {
@@ -1723,7 +1712,9 @@ this.selectedProducer = null;
 this.pendingConstruction = null;
 this.updateUI([]);
 this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
-            
+    }        
+    },
+
     menuAction(type) {
         this.clickDelay = 20;
         if (type === 'HEAL_BTN') {

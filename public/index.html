@@ -1669,29 +1669,55 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                 }
             }
 
-  const clickedSite = this.constructions.find(s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25);
-            
-            // --- ИСПРАВЛЕНИЕ: ПОМОЩЬ В СТРОИТЕЛЬСТВЕ ---
-            if (clickedSite && clickedSite.owner === this.myRole) {
-                const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
-                if (builder) {
-                    // 1. Отправляем команду другим игрокам
-                    if (this.isMultiplayer && CURRENT_ROOM) {
-                        this.socket.emit('gameCommand', {
-                            roomName: CURRENT_ROOM,
-                            type: 'help_build', // Новая команда
-                            builderId: builder.id,
-                            siteId: clickedSite.id,
-                            side: this.myRole
-                        });
-                    }
+// --- ПОМОЩЬ В СТРОИТЕЛЬСТВЕ (БЕЗ КРАШЕЙ) ---
 
-                    // 2. Выполняем у себя
-                    builder.assignSite(clickedSite);
-                    builder.moveTo(clickedSite.x, clickedSite.y);
-                    this.effects.push({x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30}); 
-                    return;
-                }
+if (!m || !Array.isArray(this.constructions)) return;
+
+const clickedSite = this.constructions.find(site => {
+    if (!site || !site.type) return false;
+
+    const def = UNITS[site.type];
+    if (!def || typeof def.radius !== 'number') return false;
+
+    return Math.hypot(site.x - m.x, site.y - m.y) <= def.radius + 25;
+});
+
+if (clickedSite && clickedSite.owner === this.myRole) {
+    const builder = this.selection?.find(
+        u => u && u.isBuilder === true && u.side === this.myRole
+    );
+
+    if (!builder) return;
+
+    // мультиплеер: уведомляем сервер
+    if (this.isMultiplayer && CURRENT_ROOM && this.socket) {
+        this.socket.emit('gameCommand', {
+            roomName: CURRENT_ROOM,
+            type: 'help_build',
+            builderId: builder.id,
+            siteId: clickedSite.id,
+            side: this.myRole
+        });
+    }
+
+    // локально
+    if (typeof builder.assignSite === 'function') {
+        builder.assignSite(clickedSite);
+    }
+
+    if (typeof builder.moveTo === 'function') {
+        builder.moveTo(clickedSite.x, clickedSite.y);
+    }
+
+    this.effects?.push({
+        x: clickedSite.x,
+        y: clickedSite.y,
+        char: '🔧',
+        life: 30
+    });
+
+    return;
+}
 
     menuAction(type) {
         this.clickDelay = 20;

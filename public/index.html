@@ -2583,94 +2583,90 @@ if (this.dragStart && this.dragCurr) {
 
 
 // --- РИСОВАНИЕ КРИВОЙ ПУТИ (СО СТРЕЛКАМИ) ---
-        if (this.isDrawingPath && this.drawPath.length > 0) {
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#00ff00';
-            ctx.setLineDash([10, 5]); // Пунктир
+if (this.isDrawingPath && this.drawPath.length > 1) {
+    ctx.save();
 
-            // 1. Рисуем главную линию (за мышкой)
+    /* ===============================
+       1. ГЛАВНАЯ ЛИНИЯ
+    =============================== */
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#00ff00';
+    ctx.setLineDash([10, 5]);
+
+    ctx.beginPath();
+    ctx.moveTo(this.drawPath[0].x, this.drawPath[0].y);
+    for (let i = 1; i < this.drawPath.length; i++) {
+        ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
+    }
+    ctx.stroke();
+
+    // угол главной стрелки
+    const last = this.drawPath[this.drawPath.length - 1];
+    const prev = this.drawPath[this.drawPath.length - 2];
+    const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+
+    // стрелка
+    const headLen = 20;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(
+        last.x - headLen * Math.cos(angle - Math.PI / 6),
+        last.y - headLen * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(
+        last.x - headLen * Math.cos(angle + Math.PI / 6),
+        last.y - headLen * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.stroke();
+
+    /* ===============================
+       2. ПРИЗРАЧНЫЕ ПУТИ ЮНИТОВ
+    =============================== */
+    const units = this.selection.filter(u => u.side === this.myRole);
+    if (units.length > 0) {
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.5;
+        ctx.setLineDash([5, 5]);
+
+        const startX = this.drawPath[0].x;
+        const startY = this.drawPath[0].y;
+
+        units.forEach(u => {
             ctx.beginPath();
-            ctx.moveTo(this.drawPath[0].x, this.drawPath[0].y);
+            ctx.moveTo(u.x, u.y);
+
+            let fx = u.x;
+            let fy = u.y;
+
             for (let i = 1; i < this.drawPath.length; i++) {
-                ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
+                fx = u.x + (this.drawPath[i].x - startX);
+                fy = u.y + (this.drawPath[i].y - startY);
+                ctx.lineTo(fx, fy);
             }
             ctx.stroke();
 
-            // Рисуем наконечник для главной линии
-            const last = this.drawPath[this.drawPath.length - 1];
-            const prev = this.drawPath.length > 1 ? this.drawPath[this.drawPath.length - 2] : this.drawPath[0];
-            
-            if (last && prev) {
-                const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-                const headLen = 20;
-                
-                ctx.setLineDash([]); // Сплошная линия для стрелки
-                ctx.beginPath();
-                ctx.moveTo(last.x, last.y);
-                ctx.lineTo(last.x - headLen * Math.cos(angle - Math.PI / 6), last.y - headLen * Math.sin(angle - Math.PI / 6));
-                ctx.moveTo(last.x, last.y);
-                ctx.lineTo(last.x - headLen * Math.cos(angle + Math.PI / 6), last.y - headLen * Math.sin(angle + Math.PI / 6));
-                ctx.stroke();
-            }
-
-            // 2. Рисуем "призрачные" пути для каждого юнита
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.5;
-            ctx.setLineDash([5, 5]);
-            
-            // Вычисляем центр группы
-            let avgX = 0, avgY = 0;
-            let validUnits = this.selection.filter(u => u.side === this.myRole);
-            if (validUnits.length > 0) {
-                validUnits.forEach(u => { avgX += u.x; avgY += u.y; });
-                avgX /= validUnits.length;
-                avgY /= validUnits.length;
-                
-                const startX = this.drawPath[0].x;
-                const startY = this.drawPath[0].y;
-
-                validUnits.forEach(u => {
-                    // Рисуем путь юнита
-                    ctx.beginPath();
-                    ctx.moveTo(u.x, u.y);
-                    
-                    let finalX = u.x;
-                    let finalY = u.y;
-                    
-                    // Проходим по всему пути со смещением
-                    for (let i = 0; i < this.drawPath.length; i++) {
-                        finalX = u.x + (this.drawPath[i].x - startX);
-                        finalY = u.y + (this.drawPath[i].y - startY);
-                        ctx.lineTo(finalX, finalY);
-                    }
-                    ctx.stroke();
-
-                    // Рисуем маленькую стрелочку в конце каждого пути юнита
-                    if (this.drawPath.length > 1) {
-                        const p2 = this.drawPath[this.drawPath.length - 2]; // Предпоследняя точка
-                        // Угол такой же, как у главной линии
-                        const angle = Math.atan2(last.y - prev.y, last.x - prev.x); 
-                        const miniLen = 10;
-
-                        ctx.save();
-                        ctx.setLineDash([]);
-                        ctx.beginPath();
-                        ctx.moveTo(finalX, finalY);
-                        ctx.lineTo(finalX - miniLen * Math.cos(angle - Math.PI / 6), finalY - miniLen * Math.sin(angle - Math.PI / 6));
-                        ctx.moveTo(finalX, finalY);
-                        ctx.lineTo(finalX - miniLen * Math.cos(angle + Math.PI / 6), finalY - miniLen * Math.sin(angle + Math.PI / 6));
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-                });
-            }
-            
-            ctx.globalAlpha = 1.0;
+            // маленькая стрелка
+            const miniLen = 10;
             ctx.setLineDash([]);
-        }
-  ctx.restore();
- }
-},
+            ctx.beginPath();
+            ctx.moveTo(fx, fy);
+            ctx.lineTo(
+                fx - miniLen * Math.cos(angle - Math.PI / 6),
+                fy - miniLen * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.moveTo(fx, fy);
+            ctx.lineTo(
+                fx - miniLen * Math.cos(angle + Math.PI / 6),
+                fy - miniLen * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.stroke();
+        });
+    }
+
+    ctx.restore();
+}
 
  // Новая функция только для рисования
     renderLoop() {

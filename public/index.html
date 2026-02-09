@@ -341,114 +341,6 @@ const MapUtils = {
     seed: 0,
     lakes: [],
     mountains: [],
-// --- НОВАЯ СИСТЕМА КАРТЫ ---
-const GRID_SIZE = 50; // Размер клетки (чем меньше, тем детальнее, но медленнее)
-
-const Editor = {
-    active: false,
-    grid: [], // Двумерный массив карты
-    cols: 0,
-    rows: 0,
-    tool: 'LAND',
-    brushSize: 2,
-    spawns: [],
-    customColor: '#228822',
-
-    open() {
-        document.getElementById('menu-screen').classList.add('hidden');
-        document.getElementById('editor-screen').classList.remove('hidden');
-        this.active = true;
-        
-        // Инициализация пустой сетки, если нет
-        MAP_W = 3500; MAP_H = 2000;
-        this.cols = Math.ceil(MAP_W / GRID_SIZE);
-        this.rows = Math.ceil(MAP_H / GRID_SIZE);
-        
-        if (this.grid.length === 0) this.clearMap();
-        
-        Game.state = 'EDITOR';
-        Game.camera = {x: 0, y: 0};
-        
-        // Перерисовываем один раз
-        this.draw();
-    },
-
-    close() {
-        this.active = false;
-        document.getElementById('editor-screen').classList.add('hidden');
-        document.getElementById('menu-screen').classList.remove('hidden');
-        Game.state = 'MENU';
-    },
-
-    clearMap() {
-        this.grid = [];
-        this.spawns = [];
-        for (let y = 0; y < this.rows; y++) {
-            const row = [];
-            for (let x = 0; x < this.cols; x++) {
-                row.push({ type: 'WATER', color: '#004488' }); // По умолчанию вода
-            }
-            this.grid.push(row);
-        }
-        this.updateInfo();
-    },
-
-    setTool(t) { this.tool = t; },
-    
-    updateColor() { this.customColor = document.getElementById('land-color').value; },
-
-    onMouseDown(e) {
-        if (!this.active) return;
-        this.painting = true;
-        this.paint(e);
-    },
-    
-    onMouseMove(e) {
-        if (!this.active || !this.painting) return;
-        this.paint(e);
-    },
-    
-    onMouseUp() { this.painting = false; },
-
-    paint(e) {
-        const r = canvas.getBoundingClientRect();
-        const mx = e.clientX - r.left + Game.camera.x;
-        const my = e.clientY - r.top + Game.camera.y;
-
-        const gx = Math.floor(mx / GRID_SIZE);
-        const gy = Math.floor(my / GRID_SIZE);
-
-        if (gx < 0 || gx >= this.cols || gy < 0 || gy >= this.rows) return;
-
-        if (this.tool === 'SPAWN') {
-            // Спавны ставятся по одному клику (не кистью)
-            if (this.spawns.length >= 8) return;
-            // Удаляем старый спавн если кликнули рядом
-            const existing = this.spawns.findIndex(s => Math.hypot(s.x - mx, s.y - my) < 100);
-            if (existing !== -1) {
-                this.spawns.splice(existing, 1);
-            } else {
-                this.spawns.push({ x: mx, y: my, id: this.spawns.length + 1 });
-            }
-            this.painting = false; // Чтобы не ставить спавны очередью
-            this.updateInfo();
-            return;
-        }
-
-        // Рисование кистью
-        const size = this.brushSize - 1;
-        for (let y = gy - size; y <= gy + size; y++) {
-            for (let x = gx - size; x <= gx + size; x++) {
-                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
-                    this.grid[y][x].type = this.tool;
-                    if (this.tool === 'LAND') this.grid[y][x].color = this.customColor;
-                    if (this.tool === 'WATER') this.grid[y][x].color = '#004488';
-                    if (this.tool === 'MOUNTAIN') this.grid[y][x].color = '#555';
-                }
-            }
-        }
-    },
-
     updateInfo() {
         document.getElementById('editor-players').innerText = this.spawns.length;
     },
@@ -513,15 +405,42 @@ const Editor = {
     }
 };
 
-// ОБНОВЛЕННЫЙ MAP UTILS (С поддержкой редактора)
+// 1. Сначала закрываем MapUtils (старый функционал + новые проверки)
 const MapUtils = {
-    // ... (старые init, seed и т.д. остаются, но мы меняем checkWater) ...
-    init() { /* старый код */ },
-    getIslandRadius(angle) { /* старый код */ },
+    seed: 0,
+    lakes: [],
+    mountains: [],
 
-    // ГЛАВНОЕ ИЗМЕНЕНИЕ:
+    init() { 
+        this.seed = Math.random() * 100; 
+        this.lakes = [];
+        this.mountains = [];
+        
+        // Генерация озер и гор (как было раньше)
+        for (let i = 0; i < 6; i++) {
+            this.lakes.push({
+                x: Math.random() * MAP_W,
+                y: Math.random() * MAP_H,
+                radius: 80 + Math.random() * 120,
+                color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
+            });
+        }
+        for (let i = 0; i < 5; i++) {
+            const r = 70 + Math.random() * 90;
+            const x = Math.random() * (MAP_W - 400) + 200;
+            const y = Math.random() * (MAP_H - 400) + 200;
+            if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
+            this.mountains.push({ x: x, y: y, radius: r });
+        }
+    },
+
+    getIslandRadius(angle) {
+        return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
+    },
+
+    // НОВАЯ ПРОВЕРКА ВОДЫ (С учетом редактора)
     checkWater(x, y) {
-        // 1. Если загружена кастомная карта
+        // 1. Если загружена кастомная карта из редактора
         if (Game.isCustomMap && Game.customGrid) {
             const gx = Math.floor(x / GRID_SIZE);
             const gy = Math.floor(y / GRID_SIZE);
@@ -537,12 +456,17 @@ const MapUtils = {
             const dist = Math.hypot(x - cx, y - cy);
             if (dist > this.getIslandRadius(Math.atan2(y - cy, x - cx))) return true;
         }
+        // Проверяем внутренние озера
         for (let lake of this.lakes) {
             if (Math.hypot(x - lake.x, y - lake.y) < lake.radius) return true;
         }
         return false;
     },
 
+    // Для совместимости
+    isWater(x, y) { return this.checkWater(x, y); },
+
+    // НОВАЯ ПРОВЕРКА ГОР (С учетом редактора)
     checkMountain(x, y, radius) {
         // 1. Кастомная карта
         if (Game.isCustomMap && Game.customGrid) {
@@ -562,72 +486,162 @@ const MapUtils = {
         }
         return null;
     }
-};
-    init() { 
-        this.seed = Math.random() * 100; 
-        this.lakes = [];
-        this.mountains = [];
+}; // <--- ВОТ ЗДЕСЬ ЗАКРЫВАЕТСЯ MapUtils
 
-// 1. ГЕНЕРАЦИЯ ОЗЕР (Вода)
-        // БЫЛО: 18 -> СТАЛО: 6 (Меньше воды)
-        for (let i = 0; i < 0; i++) {
-            this.lakes.push({
-                x: Math.random() * MAP_W,
-                y: Math.random() * MAP_H,
-                radius: 80 + Math.random() * 120, // Чуть уменьшил размер тоже
-                color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
-            });
-        }
+// 2. ТЕПЕРЬ ОБЪЯВЛЯЕМ НОВЫЕ КОНСТАНТЫ ОТДЕЛЬНО
+const GRID_SIZE = 50; 
 
-        // 2. ГЕНЕРАЦИЯ ГОР (Стены)
-        // БЫЛО: 12 -> СТАЛО: 5 (Меньше стен)
-        for (let i = 0; i < 0; i++) {
-            const r = 70 + Math.random() * 90; // Горы тоже чуть компактнее
-            const x = Math.random() * (MAP_W - 400) + 200;
-            const y = Math.random() * (MAP_H - 400) + 200;
+const Editor = {
+    active: false,
+    grid: [],
+    cols: 0,
+    rows: 0,
+    tool: 'LAND',
+    brushSize: 2,
+    spawns: [],
+    customColor: '#228822',
 
-            if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
-
-            this.mountains.push({
-                x: x, y: y, radius: r,
-                height: r * 1.5 
-            });
-        }
+    open() {
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('editor-screen').classList.remove('hidden');
+        this.active = true;
+        
+        MAP_W = 3500; MAP_H = 2000;
+        this.cols = Math.ceil(MAP_W / GRID_SIZE);
+        this.rows = Math.ceil(MAP_H / GRID_SIZE);
+        
+        if (this.grid.length === 0) this.clearMap();
+        
+        Game.state = 'EDITOR';
+        Game.camera = {x: 0, y: 0};
+        this.draw();
     },
 
-    getIslandRadius(angle) {
-        return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
+    close() {
+        this.active = false;
+        document.getElementById('editor-screen').classList.add('hidden');
+        document.getElementById('menu-screen').classList.remove('hidden');
+        Game.state = 'MENU';
     },
 
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-    // Переименовали обратно в isWater, чтобы старый код не ломался
-    isWater(x, y) {
-        // Если режим острова - проверяем океан вокруг
-        if (Game.isIslandMode) {
-            const cx = MAP_W / 2; const cy = MAP_H / 2;
-            const dist = Math.hypot(x - cx, y - cy);
-            if (dist > this.getIslandRadius(Math.atan2(y - cy, x - cx))) return true;
+    clearMap() {
+        this.grid = [];
+        this.spawns = [];
+        for (let y = 0; y < this.rows; y++) {
+            const row = [];
+            for (let x = 0; x < this.cols; x++) {
+                row.push({ type: 'WATER', color: '#004488' });
+            }
+            this.grid.push(row);
         }
-        // Проверяем внутренние озера
-        for (let lake of this.lakes) {
-            if (Math.hypot(x - lake.x, y - lake.y) < lake.radius) return true;
+        this.updateInfo();
+    },
+
+    setTool(t) { this.tool = t; },
+    updateColor() { this.customColor = document.getElementById('land-color').value; },
+
+    onMouseDown(e) {
+        if (!this.active) return;
+        this.painting = true;
+        this.paint(e);
+    },
+    
+    onMouseMove(e) {
+        if (!this.active || !this.painting) return;
+        this.paint(e);
+    },
+    
+    onMouseUp() { this.painting = false; },
+
+    paint(e) {
+        const r = canvas.getBoundingClientRect();
+        const mx = e.clientX - r.left + Game.camera.x;
+        const my = e.clientY - r.top + Game.camera.y;
+
+        const gx = Math.floor(mx / GRID_SIZE);
+        const gy = Math.floor(my / GRID_SIZE);
+
+        if (gx < 0 || gx >= this.cols || gy < 0 || gy >= this.rows) return;
+
+        if (this.tool === 'SPAWN') {
+            if (this.spawns.length >= 8) return;
+            const existing = this.spawns.findIndex(s => Math.hypot(s.x - mx, s.y - my) < 100);
+            if (existing !== -1) {
+                this.spawns.splice(existing, 1);
+            } else {
+                this.spawns.push({ x: mx, y: my, id: this.spawns.length + 1 });
+            }
+            this.painting = false; 
+            this.updateInfo();
+            return;
         }
-        return false;
-    },
 
-    // Добавляем checkWater для совместимости с новым кодом движения
-    checkWater(x, y) {
-        return this.isWater(x, y);
-    },
-
-    // Проверка: врезался ли в гору (возвращает гору или null)
-    checkMountain(x, y, radius) {
-        for (let m of this.mountains) {
-            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) {
-                return m;
+        const size = this.brushSize - 1;
+        for (let y = gy - size; y <= gy + size; y++) {
+            for (let x = gx - size; x <= gx + size; x++) {
+                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
+                    this.grid[y][x].type = this.tool;
+                    if (this.tool === 'LAND') this.grid[y][x].color = this.customColor;
+                    if (this.tool === 'WATER') this.grid[y][x].color = '#004488';
+                    if (this.tool === 'MOUNTAIN') this.grid[y][x].color = '#555';
+                }
             }
         }
-        return null;
+    },
+
+    updateInfo() {
+        document.getElementById('editor-players').innerText = this.spawns.length;
+    },
+
+    draw(ctx) {
+        if (!ctx) return;
+        
+        const startCol = Math.floor(Game.camera.x / GRID_SIZE);
+        const endCol = startCol + (canvas.width / GRID_SIZE) + 1;
+        const startRow = Math.floor(Game.camera.y / GRID_SIZE);
+        const endRow = startRow + (canvas.height / GRID_SIZE) + 1;
+
+        for (let y = startRow; y <= endRow; y++) {
+            for (let x = startCol; x <= endCol; x++) {
+                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
+                    const cell = this.grid[y][x];
+                    ctx.fillStyle = cell.color;
+                    ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    ctx.strokeRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                }
+            }
+        }
+
+        this.spawns.forEach((s, i) => {
+            ctx.fillStyle = '#f00';
+            ctx.beginPath(); ctx.arc(s.x, s.y, 30, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = '20px Arial';
+            ctx.fillText(`P${i+1}`, s.x, s.y);
+        });
+    },
+
+    saveAndPlay() {
+        if (this.spawns.length < 2) {
+            alert("Поставьте минимум 2 точки спавна!");
+            return;
+        }
+        const mapData = {
+            grid: this.grid,
+            spawns: this.spawns,
+            w: MAP_W,
+            h: MAP_H
+        };
+        const name = prompt("Название комнаты:", "CustomMap");
+        if (!name) return;
+
+        if (Game.socket) {
+            Game.socket.emit('create_room', { 
+                name: name, 
+                password: '', 
+                customMap: mapData 
+            });
+        }
     }
 };
 
@@ -1298,20 +1312,31 @@ updateTerritoryCache() {
     myRole: 'player', 
     territoryMode: 1,
 init() {
-        this.preloadAssets();
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-        window.addEventListener('keydown', e => this.keys[e.code] = true);
-        window.addEventListener('keyup', e => this.keys[e.code] = false);
-        canvas.addEventListener('mousedown', e => this.onDown(e));
-        window.addEventListener('mousemove', e => this.onMove(e));
-        window.addEventListener('mouseup', e => this.onUp(e));
-        canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
+    this.preloadAssets();
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('keydown', e => this.keys[e.code] = true);
+    window.addEventListener('keyup', e => this.keys[e.code] = false);
 
-        // ЗАПУСКАЕМ НОВУЮ СИСТЕМУ:
-        this.startWorkerHeartbeat(); // Логика (работает всегда)
-        this.renderLoop();           // Рисование (работает только когда видим)
-    },
+    // --- ВОТ СЮДА ВСТАВИТЬ НОВЫЕ СЛУШАТЕЛИ ---
+    canvas.addEventListener('mousedown', e => {
+        if (Editor.active) Editor.onMouseDown(e);
+        else this.onDown(e); // Здесь 'this' корректно ссылается на Game
+    });
+    window.addEventListener('mousemove', e => {
+        if (Editor.active) Editor.onMouseMove(e);
+        else this.onMove(e);
+    });
+    window.addEventListener('mouseup', e => {
+        if (Editor.active) Editor.onMouseUp(e);
+        else this.onUp(e);
+    });
+    canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
+    // ----------------------------------------
+
+    this.startWorkerHeartbeat(); 
+    this.renderLoop();           
+},
     resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -3669,18 +3694,6 @@ class Bullet {
 }
 
 Game.init();
-    canvas.addEventListener('mousedown', e => {
-    if (Editor.active) Editor.onMouseDown(e); // <--- Добавить
-    else this.onDown(e);
-});
-window.addEventListener('mousemove', e => {
-    if (Editor.active) Editor.onMouseMove(e); // <--- Добавить
-    else this.onMove(e);
-});
-window.addEventListener('mouseup', e => {
-    if (Editor.active) Editor.onMouseUp(e); // <--- Добавить
-    else this.onUp(e);
-});
 </script>
 </body>
 </html>

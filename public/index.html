@@ -265,6 +265,16 @@ const UNITS = {
     },
     HEAL_BTN: { type:'action', name: 'ЛЕЧИТЬ', emoji: '💉', cost: 500 }
 };
+
+    const HOUSE_UPGRADES = [
+    { name: 'Дом',     emoji: '🏠', cost: 0,      income: 3,    maxSpawn: 3,   energy: 10 }, // Ур 0
+    { name: 'Магазин', emoji: '🏪', cost: 1000,   income: 8,    maxSpawn: 8,   energy: 10 }, // Ур 1 (1000/100 = 10)
+    { name: 'ТЦ',      emoji: '🏬', cost: 3500,   income: 25,   maxSpawn: 25,  energy: 35 }, // Ур 2 (3500/100 = 35)
+    { name: 'Офис',    emoji: '🏢', cost: 12000,  income: 80,   maxSpawn: 80,  energy: 120 },// Ур 3
+    { name: 'Отель',   emoji: '🏨', cost: 35000,  income: 250,  maxSpawn: 250, energy: 200 },// Ур 4 (35000/100 = 350 -> макс 200)
+    { name: 'Банк',    emoji: '🏦', cost: 100000, income: 1000, maxSpawn: 0,   energy: 200 } // Ур 5 (Только доход)
+];
+    
 const SILO_AMMO = {
     ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1500,   damage: 300,  speed: 6,   radius: 60,  hp: 10 },
     HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 5000,  damage: 600,  speed: 3,   radius: 300, hp: 300 },
@@ -1288,6 +1298,13 @@ else if (cmd.type === 'move') {
                 this.effects.push({x: cmd.tx, y: cmd.ty, char: '📍', life: 20});
             }
         }
+    else if (cmd.type === 'upgrade_building') {
+    const u = this.units.find(unit => unit.id === cmd.id);
+    if (u) {
+        u.level = cmd.level;
+        Game.effects.push({x: u.x, y: u.y, char: '⬆️', life: 40});
+    }
+}
         else if (cmd.type === 'move_delta') {
             if (cmd.ids && cmd.ids.length > 0) {
                 const unitsToMove = this.units.filter(u => cmd.ids.includes(u.id));
@@ -1393,21 +1410,41 @@ else if (cmd.type === 'build_start') {
  if (this.frameCount % 60 === 0) {
     if (!this.isSpectator) {
         let income = 0;
+        
+        // 1. Сначала считаем доход
         this.units.forEach(u => {
             if (u.side === this.myRole && u.hp > 0) {
                 let inc = 0;
 
-                // --- НОВАЯ ЛОГИКА ДЛЯ ДОМА ---
+                // --- ЛОГИКА ДЛЯ ДОМА (С УРОВНЯМИ) ---
                 if (u.type === 'HOUSE') {
-                    // Формула: 3 минус количество созданных. Минимум 0.
-                    // Дает доход ВСЕГДА, даже если нет энергии (u.isPowered не проверяем)
-                    inc = Math.max(0, 3 - u.spawnedCount);
+                    // Безопасное получение уровня (если вдруг level undefined, будет 0)
+                    const lvl = u.level || 0; 
+                    const stats = HOUSE_UPGRADES[lvl];
+
+                    if (lvl === 0) {
+                        // Уровень 0: Доход падает, если наняты юниты (3 - spawnedCount)
+                        // Работает БЕЗ электричества
+                        inc = Math.max(0, stats.income - (u.spawnedCount || 0));
+                    } 
+                    else if (lvl === 5) {
+                        // Уровень 5 (БАНК): Работает ТОЛЬКО при наличии электричества
+                        if (u.isPowered) {
+                            inc = stats.income;
+                        }
+                    } 
+                    else {
+                        // Уровни 1-4 (Магазин, ТЦ, Офис, Отель): 
+                        // Стабильный доход, работает БЕЗ электричества (по вашему условию)
+                        inc = stats.income;
+                    }
                 } 
-                // --- ЛОГИКА ДЛЯ ОСТАЛЬНЫХ (Завод, Госпиталь и т.д.) ---
+                // --- ЛОГИКА ДЛЯ ОСТАЛЬНЫХ ЗДАНИЙ (Завод, Госпиталь) ---
                 else if (UNITS[u.type].income && u.isPowered) {
                     inc = UNITS[u.type].income;
                 }
 
+                // Применяем доход
                 if (inc > 0) {
                     if (u.buffIncomeMult) inc *= u.buffIncomeMult;
                     income += inc;
@@ -1415,6 +1452,62 @@ else if (cmd.type === 'build_start') {
                 }
             }
         });
+        
+        // Обновляем деньги игрока
+        this.money += income;
+        document.getElementById('income-display').innerText = `(+${income}/s)`;
+        document.getElementById('money').innerText = this.money;
+
+
+        // 2. РАСЧЕТ ЭНЕРГИИ (Это нужно вставить сразу ПОСЛЕ кода выше, в этом же блоке if)
+        // Чтобы БАНК знал, есть ли у него энергия в следующем кадре, и чтобы считалось потребление
+        
+        let gen = 0;
+        let use = 0;
+        const myUnits = this.units.filter(u => u.side === this.myRole);
+        
+        myUnits.forEach(u => {
+            // Генерация (СЭС)
+            if (UNITS[u.type].energyGen) {
+                let g = UNITS[u.type].energyGen;
+                if (u.buffEnergyMult) g *= u.buffEnergyMult;
+                gen += g;
+            }
+
+            // Потребление
+            let useVal = 0;
+            
+            if (u.type === 'HOUSE') {
+                // Берем потребление из настроек уровня
+                useVal = HOUSE_UPGRADES[u.level || 0].energy;
+            } 
+            else if (u.isProducer && u.spawnCooldown > 0 && UNITS[u.type].energyUse) {
+                // Заводы жрут энергию только когда строят
+                useVal = UNITS[u.type].energyUse;
+            } 
+            else if (['HOSPITAL', 'AA_DEFENSE', 'SENTINEL', 'SILO'].includes(u.type) && UNITS[u.type].energyUse) {
+                // Оборона жрет энергию всегда
+                useVal = UNITS[u.type].energyUse;
+            }
+
+            use += useVal;
+        });
+
+        this.energy = gen;
+        this.energyUse = use;
+        // Коэффициент эффективности (если энергии мало, заводы работают медленнее)
+        this.energyFactor = (use > gen) ? (gen / use) : 1;
+        if (this.energyFactor < 0.1) this.energyFactor = 0.1; 
+
+        // Обновление UI энергии
+        const enDisplay = document.getElementById('energy-val');
+        const enContainer = document.getElementById('energy-container');
+        enDisplay.innerText = `${gen} / -${use}`;
+        enContainer.className = 'energy-stat ' + (use > gen ? 'energy-bad' : (use > gen * 0.8 ? 'energy-low' : 'energy-ok'));
+        
+        if (use > gen) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
+    }
+}
         this.money += income;
                     document.getElementById('income-display').innerText = `(+${income}/s)`;
                     document.getElementById('money').innerText = this.money;
@@ -1692,6 +1785,23 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                     else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ'); 
                     return;
                 }
+                if (clickedUnit.type === 'HOUSE') { // Было: UNITS[clickedUnit.type].spawnList
+    this.selectedProducer = clickedUnit;
+    this.selection = [];
+    
+    // Формируем меню
+    let menuItems = [...UNITS['HOUSE'].spawnList];
+    
+    // Если уровень меньше максимального (5), добавляем кнопку UPGRADE
+    if (clickedUnit.level < 5) {
+        menuItems.push('UPGRADE_HOUSE');
+    }
+
+    // Заголовок меню меняем на название текущего уровня
+    const title = HOUSE_UPGRADES[clickedUnit.level].name.toUpperCase();
+    this.updateUI(menuItems, true, title); 
+    return;
+}
                 if (UNITS[clickedUnit.type].spawnList) {
                     this.selectedProducer = clickedUnit;
                     this.selection = []; 
@@ -1744,26 +1854,41 @@ this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
     }        
     },
 
-    menuAction(type) {
-        this.clickDelay = 20;
-        if (type === 'HEAL_BTN') {
-            const hospital = this.selection[0];
-            if (this.money < 500) { this.showError("НЕТ ДЕНЕГ!"); return; }
-            if (Game.energyFactor < 0.5) { this.showError("НЕТ ЭНЕРГИИ!"); return; } 
-            if (!hospital.isPowered) { this.showError("НЕТ ЭЛЕКТРИЧЕСТВА!"); return; }
-            
-            const patient = this.units.find(u => u.side === this.myRole && u.hp < u.maxHp && Math.hypot(u.x - hospital.x, u.y - hospital.y) < hospital.radius + 50);
-            if (patient) {
-                this.money -= 500;
-                patient.hp = patient.maxHp;
-                Game.effects.push({x: patient.x, y: patient.y, char: '✨', life: 40});
-                this.showError("ВЫЛЕЧЕН!");
-            } else {
-                this.showError("НЕТ РАНЕНЫХ РЯДОМ!");
+menuAction(type) {
+    this.clickDelay = 20;
+
+    // --- ЛОГИКА УЛУЧШЕНИЯ ---
+    if (type === 'UPGRADE_HOUSE') {
+        const u = this.selectedProducer;
+        if (!u || u.type !== 'HOUSE') return;
+
+        const nextLvl = u.level + 1;
+        const upgradeInfo = HOUSE_UPGRADES[nextLvl];
+
+        if (this.money >= upgradeInfo.cost) {
+            this.money -= upgradeInfo.cost;
+            u.level = nextLvl;
+            Game.effects.push({x: u.x, y: u.y, char: '⬆️', life: 40}); // Эффект
+
+            // Мультиплеер
+            if (this.isMultiplayer && CURRENT_ROOM) {
+                this.socket.emit('gameCommand', {
+                    roomName: CURRENT_ROOM,
+                    type: 'upgrade_building', // Новая команда
+                    id: u.id,
+                    level: nextLvl
+                });
             }
-            this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
-            return;
+
+            // Обновляем меню (показать следующую цену или убрать кнопку)
+            let menuItems = [...UNITS['HOUSE'].spawnList];
+            if (u.level < 5) menuItems.push('UPGRADE_HOUSE');
+            this.updateUI(menuItems, true, HOUSE_UPGRADES[u.level].name.toUpperCase());
+        } else {
+            this.showError(`НУЖНО ${upgradeInfo.cost}$!`);
         }
+        return;
+    }
         
         if (type.startsWith('LAUNCH_')) {
             const silo = this.selection[0];
@@ -1775,6 +1900,24 @@ this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
             document.body.style.cursor = 'crosshair';
             this.showError("ВЫБЕРИТЕ ЦЕЛЬ...");
             return;
+        }
+    // --- ЛОГИКА СПАВНА (ИЗМЕНЕННАЯ) ---
+    if (this.selectedProducer) {
+        const uInfo = UNITS[type];
+        
+        // ПРОВЕРКА ДЛЯ ДОМА С УЧЕТОМ УРОВНЯ
+        if (this.selectedProducer.type === 'HOUSE') {
+            const stats = HOUSE_UPGRADES[this.selectedProducer.level];
+            
+            // Если это БАНК (maxSpawn = 0) или лимит достигнут
+            if (stats.maxSpawn === 0) {
+                this.showError("БАНК НЕ ПРОИЗВОДИТ ЮНИТОВ!");
+                return;
+            }
+            if (this.selectedProducer.spawnedCount >= stats.maxSpawn) {
+                this.showError(`ЛИМИТ (${stats.maxSpawn}) ДОСТИГНУТ!`);
+                return;
+            }
         }
 
         if (this.selection.length > 0 && this.selection[0].isBuilder) {
@@ -2321,7 +2464,22 @@ if (this.dragStart && this.dragCurr) {
                     menu.appendChild(div);
                     return;
                 }
-
+// КНОПКА УЛУЧШЕНИЯ
+    if (key === 'UPGRADE_HOUSE') {
+        const u = this.selectedProducer;
+        const nextStats = HOUSE_UPGRADES[u.level + 1];
+        
+        const div = document.createElement('div'); div.className = 'unit-card';
+        div.style.borderColor = '#00ff00'; // Зеленая рамка
+        div.innerHTML = `
+            <div style="font-size:1.5em">${nextStats.emoji}</div>
+            <div style="font-size:0.7em; color:#fff">${nextStats.name}</div>
+            <div class="card-price" style="color:#0f0">${nextStats.cost}$</div>
+        `;
+        div.onclick = () => this.menuAction(key);
+        menu.appendChild(div);
+        return;
+    }
                 const u = UNITS[key];
                 if (isMenu && !this.selection.some(s=>s.isBuilder) && u && u.type === 'bldg') return;
                 const div = document.createElement('div'); div.className = 'unit-card';
@@ -2380,6 +2538,7 @@ class Unit {
 
         this.nukeTimer = 0;
         this.spawnedCount = 0;
+        this.level = 0;
         this.nukeTarget = null;
 
         // ИЗМЕНЕНО: Добавлены переменные для отслеживания застревания
@@ -2955,7 +3114,11 @@ _movePhysics() {
             // ФОЛЛБЭК: Если картинки нет, рисуем старый эмодзи
             ctx.font = (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO'].includes(this.type)) ? '30px Arial' : '20px Arial'; 
             ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            if (!this.isFlying || this.flyState === 0) ctx.fillText(this.emoji, this.x, this.y); 
+            if (!this.isFlying || this.flyState === 0) {
+    // Если это ДОМ, берем эмодзи из уровней, иначе стандартный
+    let char = (this.type === 'HOUSE') ? HOUSE_UPGRADES[this.level].emoji : this.emoji;
+    ctx.fillText(char, this.x, this.y); 
+}
         }
         // ----------------------------------
 

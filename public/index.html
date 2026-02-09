@@ -248,7 +248,7 @@ const UNITS = {
     SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', cost: 1000, hp: 500, range: 500, reload: 150, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 50000, hp: 99999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
     HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 200, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
-    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', spawnList: ['SOLDIER','SNIPER','TANK','GRAD','HELICOPTER'], constructTime: 40, energyUse: 15 },
+    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', spawnList: ['TANK','GRAD','HELICOPTER'], constructTime: 40, energyUse: 15 },
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 20, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
     HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 40, constructTime: 30, color: '#ef5350', energyUse: 5 },
     WALL: { 
@@ -1307,12 +1307,18 @@ else if (cmd.type === 'path_move') {
                 });
             }
         }
-        else if (cmd.type === 'build_start') {
-            const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
-            this.constructions.push(site);
-            const builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
-            if (builder) builder.assignSite(site);
-        }
+else if (cmd.type === 'build_start') {
+    const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
+    this.constructions.push(site);
+    
+    // ИЩЕМ КОНКРЕТНОГО СТРОИТЕЛЯ ПО ID
+    let builder = this.units.find(u => u.id === cmd.builderId);
+    
+    // Если вдруг ID не пришел (старая версия) или не найден, берем любого (как раньше), чтобы не крашнулось
+    if (!builder) builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
+
+    if (builder) builder.assignSite(site);
+}
                     else if (cmd.type === 'help_build') { 
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);
@@ -1384,18 +1390,32 @@ else if (cmd.type === 'path_move') {
                 hud.innerHTML = html;
             }
 
-            if (this.frameCount % 60 === 0) {
-                if (!this.isSpectator) {
-                    let income = 0;
-                    this.units.forEach(u => {
-                        if (u.side === this.myRole && u.hp > 0 && UNITS[u.type].income && u.isPowered) {
-                            let inc = UNITS[u.type].income;
-                            if (u.buffIncomeMult) inc *= u.buffIncomeMult;
-                            income += inc;
-                            Game.effects.push({x: u.x, y: u.y - 40, char: '💸', life: 40});
-                        }
-                    });
-                    this.money += income;
+ if (this.frameCount % 60 === 0) {
+    if (!this.isSpectator) {
+        let income = 0;
+        this.units.forEach(u => {
+            if (u.side === this.myRole && u.hp > 0) {
+                let inc = 0;
+
+                // --- НОВАЯ ЛОГИКА ДЛЯ ДОМА ---
+                if (u.type === 'HOUSE') {
+                    // Формула: 3 минус количество созданных. Минимум 0.
+                    // Дает доход ВСЕГДА, даже если нет энергии (u.isPowered не проверяем)
+                    inc = Math.max(0, 3 - u.spawnedCount);
+                } 
+                // --- ЛОГИКА ДЛЯ ОСТАЛЬНЫХ (Завод, Госпиталь и т.д.) ---
+                else if (UNITS[u.type].income && u.isPowered) {
+                    inc = UNITS[u.type].income;
+                }
+
+                if (inc > 0) {
+                    if (u.buffIncomeMult) inc *= u.buffIncomeMult;
+                    income += inc;
+                    Game.effects.push({x: u.x, y: u.y - 40, char: '💸', life: 40});
+                }
+            }
+        });
+        this.money += income;
                     document.getElementById('income-display').innerText = `(+${income}/s)`;
                     document.getElementById('money').innerText = this.money;
 
@@ -1618,9 +1638,18 @@ const GAP = (bType === 'WALL') ? -15 : 60;
                     this.pendingConstruction = null; document.body.style.cursor = 'default';
                     this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
                     
-                    if (this.isMultiplayer && CURRENT_ROOM) {
-                        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id });
-                    }
+              if (this.isMultiplayer && CURRENT_ROOM) {
+    this.socket.emit('gameCommand', { 
+        roomName: CURRENT_ROOM, 
+        type: 'build_start', 
+        bType: bType, 
+        x: m.x, 
+        y: m.y, 
+        side: this.myRole, 
+        id: site.id,
+        builderId: builder.id // <--- ДОБАВИТЬ ЭТО
+    });
+}
                 } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
@@ -1752,11 +1781,19 @@ this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
             this.pendingConstruction = type;
             document.body.style.cursor = 'cell'; return;
         }
-        if (this.selectedProducer) {
-            const uInfo = UNITS[type];
-            if (!this.selectedProducer.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
-            if (this.selectedProducer.spawnCooldown > 0) { this.showError("ЗАНЯТО!"); return; }
-            if (this.money < uInfo.cost) { this.showError("НЕТ ДЕНЕГ!"); return; }
+   if (this.selectedProducer) {
+    const uInfo = UNITS[type];
+    
+    // ПРОВЕРКА ДЛЯ ДОМА: Максимум 3 юнита
+    if (this.selectedProducer.type === 'HOUSE' && this.selectedProducer.spawnedCount >= 3) {
+        this.showError("ДОМ ПЕРЕПОЛНЕН (МАКС 3)!");
+        return;
+    }
+
+    if (!this.selectedProducer.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
+    if (this.selectedProducer.spawnCooldown > 0) { this.showError("ЗАНЯТО!"); return; }
+    if (this.money < uInfo.cost) { this.showError("НЕТ ДЕНЕГ!"); return; }
+    // ... (дальше код списания денег и старта производства)
 
             this.money -= uInfo.cost;
             this.selectedProducer.startProduction(type);
@@ -2342,6 +2379,7 @@ class Unit {
         this.buffRangeMult = 1;
 
         this.nukeTimer = 0;
+        this.spawnedCount = 0;
         this.nukeTarget = null;
 
         // ИЗМЕНЕНО: Добавлены переменные для отслеживания застревания
@@ -2643,6 +2681,7 @@ resolveCollision() {
             this.spawnCooldown -= factor;
             
             if (this.spawnCooldown <= 0) {
+                this.spawnedCount++;
                 if (!this.visualOnly) {
                     const angle = Math.random() * Math.PI * 2;
                     const dist = this.radius + 30;

@@ -1827,41 +1827,61 @@ this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
     },
 
 menuAction(type) {
-    this.clickDelay = 20;
+        this.clickDelay = 20;
 
-    // --- ЛОГИКА УЛУЧШЕНИЯ ---
-    if (type === 'UPGRADE_HOUSE') {
-        const u = this.selectedProducer;
-        if (!u || u.type !== 'HOUSE') return;
-
-        const nextLvl = u.level + 1;
-        const upgradeInfo = HOUSE_UPGRADES[nextLvl];
-
-        if (this.money >= upgradeInfo.cost) {
-            this.money -= upgradeInfo.cost;
-            u.level = nextLvl;
-            Game.effects.push({x: u.x, y: u.y, char: '⬆️', life: 40}); // Эффект
-
-            // Мультиплеер
-            if (this.isMultiplayer && CURRENT_ROOM) {
-                this.socket.emit('gameCommand', {
-                    roomName: CURRENT_ROOM,
-                    type: 'upgrade_building', // Новая команда
-                    id: u.id,
-                    level: nextLvl
-                });
+        // 1. ЛЕЧЕНИЕ (Госпиталь)
+        if (type === 'HEAL_BTN') {
+            const hospital = this.selection[0];
+            if (this.money < 500) { this.showError("НЕТ ДЕНЕГ!"); return; }
+            if (Game.energyFactor < 0.5) { this.showError("НЕТ ЭНЕРГИИ!"); return; } 
+            if (!hospital.isPowered) { this.showError("НЕТ ЭЛЕКТРИЧЕСТВА!"); return; }
+            
+            const patient = this.units.find(u => u.side === this.myRole && u.hp < u.maxHp && Math.hypot(u.x - hospital.x, u.y - hospital.y) < hospital.radius + 50);
+            if (patient) {
+                this.money -= 500;
+                patient.hp = patient.maxHp;
+                Game.effects.push({x: patient.x, y: patient.y, char: '✨', life: 40});
+                this.showError("ВЫЛЕЧЕН!");
+            } else {
+                this.showError("НЕТ РАНЕНЫХ РЯДОМ!");
             }
-
-            // Обновляем меню (показать следующую цену или убрать кнопку)
-            let menuItems = [...UNITS['HOUSE'].spawnList];
-            if (u.level < 5) menuItems.push('UPGRADE_HOUSE');
-            this.updateUI(menuItems, true, HOUSE_UPGRADES[u.level].name.toUpperCase());
-        } else {
-            this.showError(`НУЖНО ${upgradeInfo.cost}$!`);
+            this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
+            return;
         }
-        return;
-    }
+
+        // 2. УЛУЧШЕНИЕ ЗДАНИЯ (Дом -> Магазин и т.д.)
+        if (type === 'UPGRADE_HOUSE') {
+            const u = this.selectedProducer;
+            if (!u || u.type !== 'HOUSE') return;
+
+            const nextLvl = (u.level || 0) + 1;
+            const upgradeInfo = HOUSE_UPGRADES[nextLvl];
+
+            if (this.money >= upgradeInfo.cost) {
+                this.money -= upgradeInfo.cost;
+                u.level = nextLvl;
+                Game.effects.push({x: u.x, y: u.y, char: '⬆️', life: 40});
+
+                if (this.isMultiplayer && CURRENT_ROOM) {
+                    this.socket.emit('gameCommand', {
+                        roomName: CURRENT_ROOM,
+                        type: 'upgrade_building',
+                        id: u.id,
+                        level: nextLvl
+                    });
+                }
+
+                // Обновляем меню, чтобы показать следующую цену или убрать кнопку
+                let menuItems = [...UNITS['HOUSE'].spawnList];
+                if (u.level < 5) menuItems.push('UPGRADE_HOUSE');
+                this.updateUI(menuItems, true, HOUSE_UPGRADES[u.level].name.toUpperCase());
+            } else {
+                this.showError(`НУЖНО ${upgradeInfo.cost}$!`);
+            }
+            return;
+        }
         
+        // 3. ЗАПУСК РАКЕТ (Бункер)
         if (type.startsWith('LAUNCH_')) {
             const silo = this.selection[0];
             if (!silo.isPowered) { this.showError("БУНКЕР ОБЕСТОЧЕН!"); return; }
@@ -1873,50 +1893,61 @@ menuAction(type) {
             this.showError("ВЫБЕРИТЕ ЦЕЛЬ...");
             return;
         }
-    // --- ЛОГИКА СПАВНА (ИЗМЕНЕННАЯ) ---
-    if (this.selectedProducer) {
-        const uInfo = UNITS[type];
-        
-        // ПРОВЕРКА ДЛЯ ДОМА С УЧЕТОМ УРОВНЯ
-        if (this.selectedProducer.type === 'HOUSE') {
-            const stats = HOUSE_UPGRADES[this.selectedProducer.level];
-            
-            // Если это БАНК (maxSpawn = 0) или лимит достигнут
-            if (stats.maxSpawn === 0) {
-                this.showError("БАНК НЕ ПРОИЗВОДИТ ЮНИТОВ!");
-                return;
-            }
-            if (this.selectedProducer.spawnedCount >= stats.maxSpawn) {
-                this.showError(`ЛИМИТ (${stats.maxSpawn}) ДОСТИГНУТ!`);
-                return;
-            }
-        }
 
+        // 4. СТРОИТЕЛЬСТВО (Строитель выбрал здание)
         if (this.selection.length > 0 && this.selection[0].isBuilder) {
             this.pendingConstruction = type;
-            document.body.style.cursor = 'cell'; return;
+            document.body.style.cursor = 'cell'; 
+            return;
         }
-   if (this.selectedProducer) {
-    const uInfo = UNITS[type];
-    
-    // ПРОВЕРКА ДЛЯ ДОМА: Максимум 3 юнита
-    if (this.selectedProducer.type === 'HOUSE' && this.selectedProducer.spawnedCount >= 3) {
-        this.showError("ДОМ ПЕРЕПОЛНЕН (МАКС 3)!");
-        return;
-    }
 
-    if (!this.selectedProducer.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
-    if (this.selectedProducer.spawnCooldown > 0) { this.showError("ЗАНЯТО!"); return; }
-    if (this.money < uInfo.cost) { this.showError("НЕТ ДЕНЕГ!"); return; }
-    // ... (дальше код списания денег и старта производства)
+        // 5. ПРОИЗВОДСТВО ЮНИТОВ (Спавн)
+        if (this.selectedProducer) {
+            const uInfo = UNITS[type];
+            
+            // ПРОВЕРКА ЛИМИТОВ ДОМА
+            if (this.selectedProducer.type === 'HOUSE') {
+                const stats = HOUSE_UPGRADES[this.selectedProducer.level || 0];
+                
+                // Если это БАНК (maxSpawn = 0) или лимит достигнут
+                if (stats.maxSpawn === 0) {
+                    this.showError("БАНК НЕ ПРОИЗВОДИТ ЮНИТОВ!");
+                    return;
+                }
+                if (this.selectedProducer.spawnedCount >= stats.maxSpawn) {
+                    this.showError(`ЛИМИТ (${stats.maxSpawn}) ДОСТИГНУТ!`);
+                    return;
+                }
+            }
 
+            // ОБЩИЕ ПРОВЕРКИ
+            if (!this.selectedProducer.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
+            if (this.selectedProducer.spawnCooldown > 0) { this.showError("ЗАНЯТО!"); return; }
+            if (this.money < uInfo.cost) { this.showError("НЕТ ДЕНЕГ!"); return; }
+
+            // ПОКУПКА
             this.money -= uInfo.cost;
             this.selectedProducer.startProduction(type);
-            this.updateUI(UNITS[this.selectedProducer.type].spawnList, true, this.selectedProducer.type === 'HOUSE' ? 'МЕНЮ ДОМА' : 'МЕНЮ ЗАВОДА');
+
+            // Правильное обновление меню после покупки (чтобы не пропадала кнопка UPGRADE)
+            let menuItems = [...UNITS[this.selectedProducer.type].spawnList];
+            let menuTitle = this.selectedProducer.type === 'HOUSE' ? 'МЕНЮ ДОМА' : 'МЕНЮ ЗАВОДА';
+
+            if (this.selectedProducer.type === 'HOUSE') {
+                const lvl = this.selectedProducer.level || 0;
+                menuTitle = HOUSE_UPGRADES[lvl].name.toUpperCase();
+                if (lvl < 5) menuItems.push('UPGRADE_HOUSE');
+            }
+
+            this.updateUI(menuItems, true, menuTitle);
+
             if (this.isMultiplayer && CURRENT_ROOM) {
                 this.socket.emit('gameCommand', {
                     roomName: CURRENT_ROOM,
-                    type: 'production_start', unitType: type, side: this.myRole, producerId: this.selectedProducer.id
+                    type: 'production_start', 
+                    unitType: type, 
+                    side: this.myRole, 
+                    producerId: this.selectedProducer.id
                 });
             }
         }

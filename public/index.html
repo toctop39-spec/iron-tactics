@@ -337,76 +337,7 @@ let CURRENT_ROOM = null; // Хранит имя текущей комнаты
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const MapUtils = {
-    seed: 0,
-    lakes: [],
-    mountains: [],
-    updateInfo() {
-        document.getElementById('editor-players').innerText = this.spawns.length;
-    },
-
-    draw(ctx) {
-        if (!ctx) return;
-        
-        // Рисуем сетку
-        const startCol = Math.floor(Game.camera.x / GRID_SIZE);
-        const endCol = startCol + (canvas.width / GRID_SIZE) + 1;
-        const startRow = Math.floor(Game.camera.y / GRID_SIZE);
-        const endRow = startRow + (canvas.height / GRID_SIZE) + 1;
-
-        for (let y = startRow; y <= endRow; y++) {
-            for (let x = startCol; x <= endCol; x++) {
-                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
-                    const cell = this.grid[y][x];
-                    ctx.fillStyle = cell.color;
-                    ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
-                    
-                    // Сетка для наглядности
-                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                    ctx.strokeRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
-                }
-            }
-        }
-
-        // Рисуем спавны
-        this.spawns.forEach((s, i) => {
-            ctx.fillStyle = '#f00';
-            ctx.beginPath(); ctx.arc(s.x, s.y, 30, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.font = '20px Arial';
-            ctx.fillText(`P${i+1}`, s.x, s.y);
-        });
-    },
-
-    saveAndPlay() {
-        if (this.spawns.length < 2) {
-            alert("Поставьте минимум 2 точки спавна!");
-            return;
-        }
-        
-        const mapData = {
-            grid: this.grid,
-            spawns: this.spawns,
-            w: MAP_W,
-            h: MAP_H
-        };
-
-        // Запрашиваем имя комнаты
-        const name = prompt("Название комнаты:", "CustomMap");
-        if (!name) return;
-
-        // Отправляем на сервер специальный флаг customMap
-        if (Game.socket) {
-            Game.socket.emit('create_room', { 
-                name: name, 
-                password: '', 
-                customMap: mapData // Передаем всю карту
-            });
-        }
-    }
-};
-
-// 1. Сначала закрываем MapUtils (старый функционал + новые проверки)
-const MapUtils = {
+    const MapUtils = {
     seed: 0,
     lakes: [],
     mountains: [],
@@ -486,7 +417,7 @@ const MapUtils = {
         }
         return null;
     }
-}; // <--- ВОТ ЗДЕСЬ ЗАКРЫВАЕТСЯ MapUtils
+}; // <---
 
 // 2. ТЕПЕРЬ ОБЪЯВЛЯЕМ НОВЫЕ КОНСТАНТЫ ОТДЕЛЬНО
 const GRID_SIZE = 50; 

@@ -337,91 +337,10 @@ let CURRENT_ROOM = null; // Хранит имя текущей комнаты
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-    const MapUtils = {
-    seed: 0,
-    lakes: [],
-    mountains: [],
-
-    init() { 
-        this.seed = Math.random() * 100; 
-        this.lakes = [];
-        this.mountains = [];
-        
-        // Генерация озер и гор (как было раньше)
-        for (let i = 0; i < 6; i++) {
-            this.lakes.push({
-                x: Math.random() * MAP_W,
-                y: Math.random() * MAP_H,
-                radius: 80 + Math.random() * 120,
-                color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
-            });
-        }
-        for (let i = 0; i < 5; i++) {
-            const r = 70 + Math.random() * 90;
-            const x = Math.random() * (MAP_W - 400) + 200;
-            const y = Math.random() * (MAP_H - 400) + 200;
-            if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
-            this.mountains.push({ x: x, y: y, radius: r });
-        }
-    },
-
-    getIslandRadius(angle) {
-        return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
-    },
-
-    // НОВАЯ ПРОВЕРКА ВОДЫ (С учетом редактора)
-    checkWater(x, y) {
-        // 1. Если загружена кастомная карта из редактора
-        if (Game.isCustomMap && Game.customGrid) {
-            const gx = Math.floor(x / GRID_SIZE);
-            const gy = Math.floor(y / GRID_SIZE);
-            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
-                return Game.customGrid[gy][gx].type === 'WATER';
-            }
-            return true; // За границей карты вода
-        }
-
-        // 2. Старая логика (процедурная)
-        if (Game.isIslandMode) {
-            const cx = MAP_W / 2; const cy = MAP_H / 2;
-            const dist = Math.hypot(x - cx, y - cy);
-            if (dist > this.getIslandRadius(Math.atan2(y - cy, x - cx))) return true;
-        }
-        // Проверяем внутренние озера
-        for (let lake of this.lakes) {
-            if (Math.hypot(x - lake.x, y - lake.y) < lake.radius) return true;
-        }
-        return false;
-    },
-
-    // Для совместимости
-    isWater(x, y) { return this.checkWater(x, y); },
-
-    // НОВАЯ ПРОВЕРКА ГОР (С учетом редактора)
-    checkMountain(x, y, radius) {
-        // 1. Кастомная карта
-        if (Game.isCustomMap && Game.customGrid) {
-            const gx = Math.floor(x / GRID_SIZE);
-            const gy = Math.floor(y / GRID_SIZE);
-            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
-                if (Game.customGrid[gy][gx].type === 'MOUNTAIN') {
-                    // Возвращаем фиктивную гору для отталкивания
-                    return { x: gx*GRID_SIZE + 25, y: gy*GRID_SIZE + 25, radius: 25 }; 
-                }
-            }
-            return null;
-        }
-        // 2. Старая логика
-        for (let m of this.mountains) {
-            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
-        }
-        return null;
-    }
-}; // <---
-
-// 2. ТЕПЕРЬ ОБЪЯВЛЯЕМ НОВЫЕ КОНСТАНТЫ ОТДЕЛЬНО
+// 1. Сначала объявляем размер сетки
 const GRID_SIZE = 50; 
 
+// 2. Объявляем Редактор (отдельно!)
 const Editor = {
     active: false,
     grid: [],
@@ -573,6 +492,90 @@ const Editor = {
                 customMap: mapData 
             });
         }
+    }
+};
+
+// 3. Объявляем MapUtils (отдельно!)
+const MapUtils = {
+    seed: 0,
+    lakes: [],
+    mountains: [],
+
+    init() { 
+        this.seed = Math.random() * 100; 
+        this.lakes = [];
+        this.mountains = [];
+        
+        // Генерация озер
+        for (let i = 0; i < 6; i++) {
+            this.lakes.push({
+                x: Math.random() * MAP_W,
+                y: Math.random() * MAP_H,
+                radius: 80 + Math.random() * 120,
+                color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
+            });
+        }
+        // Генерация гор
+        for (let i = 0; i < 5; i++) {
+            const r = 70 + Math.random() * 90;
+            const x = Math.random() * (MAP_W - 400) + 200;
+            const y = Math.random() * (MAP_H - 400) + 200;
+            if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
+            this.mountains.push({ x: x, y: y, radius: r });
+        }
+    },
+
+    getIslandRadius(angle) {
+        return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
+    },
+
+    // НОВАЯ ПРОВЕРКА ВОДЫ (С учетом редактора)
+    checkWater(x, y) {
+        // 1. Если загружена кастомная карта из редактора
+        if (Game.isCustomMap && Game.customGrid) {
+            const gx = Math.floor(x / GRID_SIZE);
+            const gy = Math.floor(y / GRID_SIZE);
+            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
+                return Game.customGrid[gy][gx].type === 'WATER';
+            }
+            return true; // За границей карты вода
+        }
+
+        // 2. Старая логика (процедурная)
+        if (Game.isIslandMode) {
+            const cx = MAP_W / 2; const cy = MAP_H / 2;
+            const dist = Math.hypot(x - cx, y - cy);
+            if (dist > this.getIslandRadius(Math.atan2(y - cy, x - cx))) return true;
+        }
+        // Проверяем внутренние озера
+        for (let lake of this.lakes) {
+            if (Math.hypot(x - lake.x, y - lake.y) < lake.radius) return true;
+        }
+        return false;
+    },
+
+    // Для совместимости
+    isWater(x, y) { return this.checkWater(x, y); },
+
+    // НОВАЯ ПРОВЕРКА ГОР (С учетом редактора)
+    checkMountain(x, y, radius) {
+        // 1. Кастомная карта
+        if (Game.isCustomMap && Game.customGrid) {
+            const gx = Math.floor(x / GRID_SIZE);
+            const gy = Math.floor(y / GRID_SIZE);
+            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
+                if (Game.customGrid[gy][gx].type === 'MOUNTAIN') {
+                    // Возвращаем фиктивную гору для отталкивания
+                    return { x: gx*GRID_SIZE + 25, y: gy*GRID_SIZE + 25, radius: 25 }; 
+                }
+            }
+            return null;
+        }
+        // 2. Старая логика
+        for (let m of this.mountains) {
+            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
+        }
+        return null;
     }
 };
 

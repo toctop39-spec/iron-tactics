@@ -1125,39 +1125,6 @@ updateTerritoryCache() {
             }
         });
 
-    loadCustomLevel(spawns) {
-    this.isMultiplayer = true; 
-    this.isIslandMode = false; // Отключаем процедурную генерацию
-    this.isSpectator = false;
-    this.state = 'BATTLE'; 
-    this.money = 5000;
-    
-    this.resetGameData();
-    
-    // Ищем мой спавн
-    // В мультиплеере роли обычно player, enemy, bot1... 
-    // Нам нужно сопоставить myRole с индексом спавна.
-    // Для простоты: player = 0, enemy = 1, botX...
-    
-    // Но лучше просто перебрать все спавны и создать базы
-    const roles = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
-    
-    spawns.forEach((spawn, index) => {
-        if (index >= roles.length) return;
-        const side = roles[index];
-        
-        this.units.push(new Unit('HOUSE', spawn.x, spawn.y, side));
-        this.units.push(new Unit('BUILDER', spawn.x + 40, spawn.y + 40, side));
-        
-        if (side === this.myRole) {
-            this.camera.x = spawn.x - canvas.width/2;
-            this.camera.y = spawn.y - canvas.height/2;
-        }
-    });
-
-    this.startGameUI("КАСТОМНАЯ КАРТА");
-},
-
         // 3. ОТРИСОВКА: Проходим по готовой сетке и рисуем
         // Вспомогательная функция для определения владельца ячейки
         const getCellOwner = (idx) => {
@@ -1217,6 +1184,40 @@ updateTerritoryCache() {
             }
         }
     },
+
+       loadCustomLevel(spawns) {
+    this.isMultiplayer = true; 
+    this.isIslandMode = false; // Отключаем процедурную генерацию
+    this.isSpectator = false;
+    this.state = 'BATTLE'; 
+    this.money = 5000;
+    
+    this.resetGameData();
+    
+    // Ищем мой спавн
+    // В мультиплеере роли обычно player, enemy, bot1... 
+    // Нам нужно сопоставить myRole с индексом спавна.
+    // Для простоты: player = 0, enemy = 1, botX...
+    
+    // Но лучше просто перебрать все спавны и создать базы
+    const roles = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
+    
+    spawns.forEach((spawn, index) => {
+        if (index >= roles.length) return;
+        const side = roles[index];
+        
+        this.units.push(new Unit('HOUSE', spawn.x, spawn.y, side));
+        this.units.push(new Unit('BUILDER', spawn.x + 40, spawn.y + 40, side));
+        
+        if (side === this.myRole) {
+            this.camera.x = spawn.x - canvas.width/2;
+            this.camera.y = spawn.y - canvas.height/2;
+        }
+    });
+
+    this.startGameUI("КАСТОМНАЯ КАРТА");
+},
+
 
     camera: { x: 0, y: 0 },
     lastTerritoryCam: { x: 0, y: 0 }, 

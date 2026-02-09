@@ -1508,34 +1508,6 @@ else if (cmd.type === 'build_start') {
         if (use > gen) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
     }
 }
-        this.money += income;
-                    document.getElementById('income-display').innerText = `(+${income}/s)`;
-                    document.getElementById('money').innerText = this.money;
-
-                    let gen = 0;
-                    let use = 0;
-                    const myUnits = this.units.filter(u => u.side === this.myRole);
-                    myUnits.forEach(u => {
-                        if (UNITS[u.type].energyGen) {
-                            let g = UNITS[u.type].energyGen;
-                            if (u.buffEnergyMult) g *= u.buffEnergyMult;
-                            gen += g;
-                        }
-                        if (u.isProducer && u.spawnCooldown > 0 && UNITS[u.type].energyUse) use += UNITS[u.type].energyUse;
-                        if ((u.type === 'HOSPITAL' || u.type === 'AA_DEFENSE' || u.type === 'SENTINEL' || u.type === 'SILO') && UNITS[u.type].energyUse) use += UNITS[u.type].energyUse;
-                    });
-                    this.energy = gen;
-                    this.energyUse = use;
-                    this.energyFactor = (use > gen) ? (gen / use) : 1;
-                    if (this.energyFactor < 0.1) this.energyFactor = 0.1; 
-
-                    const enDisplay = document.getElementById('energy-val');
-                    const enContainer = document.getElementById('energy-container');
-                    enDisplay.innerText = `${gen} / -${use}`;
-                    enContainer.className = 'energy-stat ' + (use > gen ? 'energy-bad' : (use > gen * 0.8 ? 'energy-low' : 'energy-ok'));
-                    if (use > gen) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
-                }
-            }
 
             this.units.forEach(u => u.update());
             this.units = this.units.filter(u => u.hp > 0);

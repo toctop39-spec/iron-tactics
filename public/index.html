@@ -320,6 +320,68 @@ let CURRENT_ROOM = null; // Хранит имя текущей комнаты
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+    const WorldMap = {
+    paths: [],
+    
+    init(w, h) {
+        this.paths = [];
+        
+        // 1. СЕВЕРНАЯ АМЕРИКА
+        const na = new Path2D();
+        na.moveTo(100, 200); na.lineTo(600, 100); na.lineTo(1000, 150); // Верх
+        na.lineTo(1100, 600); na.lineTo(900, 900); na.lineTo(500, 800); // Флорида/Мексика
+        na.lineTo(200, 500); na.closePath();
+        this.paths.push(na);
+
+        // 2. ЮЖНАЯ АМЕРИКА
+        const sa = new Path2D();
+        sa.moveTo(600, 900); sa.lineTo(1000, 900); sa.lineTo(1100, 1200); // Бразилия
+        sa.lineTo(700, 1800); sa.lineTo(550, 1100); sa.closePath();
+        this.paths.push(sa);
+
+        // 3. ЕВРАЗИЯ (Европа + Россия + Азия)
+        const eu = new Path2D();
+        eu.moveTo(1300, 300); eu.lineTo(1600, 100); eu.lineTo(2800, 100); // Россия верх
+        eu.lineTo(3200, 300); eu.lineTo(3000, 900); // Камчатка/Китай
+        eu.lineTo(2200, 1000); eu.lineTo(1900, 600); // Индия/Бл.Восток
+        eu.lineTo(1400, 600); eu.lineTo(1250, 400); eu.closePath(); // Европа
+        this.paths.push(eu);
+
+        // 4. АФРИКА
+        const af = new Path2D();
+        af.moveTo(1350, 700); af.lineTo(1800, 700); 
+        af.lineTo(1900, 1200); af.lineTo(1600, 1600); // ЮАР
+        af.lineTo(1300, 1000); af.closePath();
+        this.paths.push(af);
+
+        // 5. АВСТРАЛИЯ
+        const au = new Path2D();
+        au.moveTo(2400, 1200); au.lineTo(2900, 1100); 
+        au.lineTo(2950, 1600); au.lineTo(2450, 1550); au.closePath();
+        this.paths.push(au);
+    },
+
+    // Проверка: находится ли точка на суше
+    isLand(x, y) {
+        // Мы используем фиктивный контекст, чтобы проверить попадание в путь
+        for (let p of this.paths) {
+            if (ctx.isPointInPath(p, x, y)) return true;
+        }
+        return false;
+    },
+
+    draw(ctx) {
+        ctx.fillStyle = '#2d5a27'; // Цвет травы
+        ctx.strokeStyle = '#4a7c45'; // Береговая линия
+        ctx.lineWidth = 10;
+        
+        for (let p of this.paths) {
+            ctx.stroke(p);
+            ctx.fill(p);
+        }
+    }
+};
+
 const MapUtils = {
     seed: 0,
     lakes: [],
@@ -364,6 +426,10 @@ const MapUtils = {
     // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
     // Переименовали обратно в isWater, чтобы старый код не ломался
     isWater(x, y) {
+        if (this.useRealMap) {
+            // Если точка НЕ на суше — значит это вода
+            return !WorldMap.isLand(x, y);
+        }
         // Если режим острова - проверяем океан вокруг
         if (Game.isIslandMode) {
             const cx = MAP_W / 2; const cy = MAP_H / 2;
@@ -2158,7 +2224,22 @@ onUp(e) {
         if (builders.length > 1) this.selection = this.selection.filter(s => !s.isBuilder).concat([builders[0]]);
     },
 
-    draw() {
+        draw() {
+        // ФОН (ВОДА)
+        if (this.isIslandMode || MapUtils.useRealMap) {
+             ctx.fillStyle = '#004488'; // Синий океан
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+             ctx.fillStyle = '#222';
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        ctx.save(); ctx.translate(-this.camera.x, -this.camera.y);
+
+        // ОТРИСОВКА КАРТЫ ЗЕМЛИ
+        if (MapUtils.useRealMap) {
+            WorldMap.draw(ctx); // <--- Рисуем континенты
+        }
         if (this.isIslandMode) {
              ctx.fillStyle = '#004488';
              ctx.fillRect(0, 0, canvas.width, canvas.height);

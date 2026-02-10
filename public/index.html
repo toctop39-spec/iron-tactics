@@ -1198,45 +1198,42 @@ init() {
         this.startGameUI("PVP БОЙ");
     },
 
-    setMapMode(isReal, seed) {
-        this.isIslandMode = isReal;
+setMapMode(isReal, seed) {
+        this.isIslandMode = isReal; // Для логики воды
         
         if (isReal) {
-            // Настраиваем "Реалистичную" карту
-            MapUtils.seed = seed;
+            // Настраиваем Карту Земли
+            MapUtils.init(true); // <--- Передаем true, чтобы включить WorldMap
+            
             MAP_W = 3500;
-            MAP_H = 3500; // Квадратная для острова
-            ISLAND_RADIUS = 1500;
+            MAP_H = 2000;
             
-            MapUtils.init(); // Генерируем озера и горы по сиду
-            this.decor = []; // Пересоздаем декор
+            this.decor = []; 
             
-            // Центрируем камеру
-            if (this.myRole === 'player') {
-                this.camera.x = MAP_W/2 - canvas.width/2 - 1000;
-            } else {
-                this.camera.x = MAP_W/2 - canvas.width/2 + 1000;
-            }
-            this.camera.y = MAP_H/2 - canvas.height/2;
-
-            // Перемещаем базы на остров
-            // Находим базы и строителей и ставим их на новые позиции
+            // Расстановка баз (Америка vs Россия)
             const p1Base = this.units.find(u => u.id === 'base_p1');
-            const p1Build = this.units.find(u => u.id === 'builder_p1');
             const p2Base = this.units.find(u => u.id === 'base_p2');
-            const p2Build = this.units.find(u => u.id === 'builder_p2');
-
-            // Позиции слева и справа от центра острова
-            const cx = MAP_W/2, cy = MAP_H/2;
-            const dist = 1000;
-
-            if(p1Base) { p1Base.x = cx - dist; p1Base.y = cy; }
-            if(p1Build) { p1Build.x = cx - dist + 100; p1Build.y = cy; }
             
-            if(p2Base) { p2Base.x = cx + dist; p2Base.y = cy; }
-            if(p2Build) { p2Build.x = cx + dist - 100; p2Build.y = cy; }
+            // Игрок 1 (Синие) - в Северной Америке (координаты примерно 500, 500)
+            if(p1Base) { p1Base.x = 500; p1Base.y = 500; }
+            
+            // Игрок 2 (Красные) - в России/Азии (координаты примерно 2500, 400)
+            if(p2Base) { p2Base.x = 2500; p2Base.y = 400; }
+            
+            // Перемещаем строителей рядом с базами
+            const p1B = this.units.find(u => u.id === 'builder_p1');
+            const p2B = this.units.find(u => u.id === 'builder_p2');
+            if(p1Base && p1B) { p1B.x = p1Base.x + 100; p1B.y = p1Base.y; }
+            if(p2Base && p2B) { p2B.x = p2Base.x - 100; p2B.y = p2Base.y; }
 
-            Game.showError("РЕЖИМ: РЕАЛИСТИЧНАЯ КАРТА 🗺️");
+            // Камера на игрока
+            if (this.myRole === 'player') {
+                this.camera.x = 0; this.camera.y = 0;
+            } else {
+                this.camera.x = 1500; this.camera.y = 0;
+            }
+
+            Game.showError("РЕЖИМ: ПЛАНЕТА ЗЕМЛЯ 🌍");
         }
     },
     

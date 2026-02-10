@@ -177,7 +177,6 @@
             <button class="menu-btn" onclick="Game.loadLevel(1)">👤 ОДИНОЧНАЯ КАМПАНИЯ</button>
             <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.loadAdvancedMode()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
             <button class="menu-btn" style="background:#004488; border-color:#0af;" onclick="Lobby.init()">🌐 ГЛОБАЛЬНЫЙ МУЛЬТИПЛЕЕР</button>
-            <button class="menu-btn" style="background:#442266; border-color:#d0f;" onclick="Editor.open()">🎨 РЕДАКТОР КАРТ</button>
         </div>
         
         <div class="spec-settings">
@@ -222,27 +221,6 @@
     <button class="menu-btn" style="margin-top:50px;" onclick="document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('menu-screen').classList.remove('hidden')">НАЗАД</button>
 </div>
 
-    <div id="editor-screen" class="screen clickable hidden">
-    <div style="position:absolute; top:10px; left:10px; display:flex; gap:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:10px;">
-        <button class="speed-btn" onclick="Editor.setTool('LAND')">🌲 ЗЕМЛЯ</button>
-        <button class="speed-btn" onclick="Editor.setTool('WATER')">💧 ВОДА</button>
-        <button class="speed-btn" onclick="Editor.setTool('MOUNTAIN')">⛰️ ГОРА</button>
-        <button class="speed-btn" onclick="Editor.setTool('SPAWN')">🚩 СПАВН (Макс 8)</button>
-        <button class="speed-btn" style="background:#550000" onclick="Editor.clearMap()">🗑️ ОЧИСТИТЬ</button>
-    </div>
-
-    <div style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:10px; color:white;">
-        Кисть: <input type="range" min="1" max="5" value="2" oninput="Editor.brushSize = parseInt(this.value)">
-        <br>
-        Цвет земли: <input type="color" id="land-color" value="#228822" onchange="Editor.updateColor()">
-        <br>
-        Игроков: <span id="editor-players">0</span>/8
-        <br><br>
-        <button class="menu-btn" style="font-size:1em; padding:10px;" onclick="Editor.saveAndPlay()">🚀 СОЗДАТЬ КОМНАТУ</button>
-        <button class="menu-btn" style="font-size:1em; padding:10px; background:#444;" onclick="Editor.close()">НАЗАД</button>
-    </div>
-</div>
-    
 <div id="end-screen" class="screen hidden clickable">
     <h1 id="end-title">ПОБЕДА</h1>
     <button id="end-btn" class="menu-btn">ДАЛЕЕ</button>
@@ -337,165 +315,6 @@ let CURRENT_ROOM = null; // Хранит имя текущей комнаты
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// 1. Сначала объявляем размер сетки
-const GRID_SIZE = 50; 
-
-// 2. Объявляем Редактор (отдельно!)
-const Editor = {
-    active: false,
-    grid: [],
-    cols: 0,
-    rows: 0,
-    tool: 'LAND',
-    brushSize: 2,
-    spawns: [],
-    customColor: '#228822',
-
-    open() {
-        document.getElementById('menu-screen').classList.add('hidden');
-        document.getElementById('editor-screen').classList.remove('hidden');
-        this.active = true;
-        
-        MAP_W = 3500; MAP_H = 2000;
-        this.cols = Math.ceil(MAP_W / GRID_SIZE);
-        this.rows = Math.ceil(MAP_H / GRID_SIZE);
-        
-        if (this.grid.length === 0) this.clearMap();
-        
-        Game.state = 'EDITOR';
-        Game.camera = {x: 0, y: 0};
-        this.draw();
-    },
-
-    close() {
-        this.active = false;
-        document.getElementById('editor-screen').classList.add('hidden');
-        document.getElementById('menu-screen').classList.remove('hidden');
-        Game.state = 'MENU';
-    },
-
-    clearMap() {
-        this.grid = [];
-        this.spawns = [];
-        for (let y = 0; y < this.rows; y++) {
-            const row = [];
-            for (let x = 0; x < this.cols; x++) {
-                row.push({ type: 'WATER', color: '#004488' });
-            }
-            this.grid.push(row);
-        }
-        this.updateInfo();
-    },
-
-    setTool(t) { this.tool = t; },
-    updateColor() { this.customColor = document.getElementById('land-color').value; },
-
-    onMouseDown(e) {
-        if (!this.active) return;
-        this.painting = true;
-        this.paint(e);
-    },
-    
-    onMouseMove(e) {
-        if (!this.active || !this.painting) return;
-        this.paint(e);
-    },
-    
-    onMouseUp() { this.painting = false; },
-
-    paint(e) {
-        const r = canvas.getBoundingClientRect();
-        const mx = e.clientX - r.left + Game.camera.x;
-        const my = e.clientY - r.top + Game.camera.y;
-
-        const gx = Math.floor(mx / GRID_SIZE);
-        const gy = Math.floor(my / GRID_SIZE);
-
-        if (gx < 0 || gx >= this.cols || gy < 0 || gy >= this.rows) return;
-
-        if (this.tool === 'SPAWN') {
-            if (this.spawns.length >= 8) return;
-            const existing = this.spawns.findIndex(s => Math.hypot(s.x - mx, s.y - my) < 100);
-            if (existing !== -1) {
-                this.spawns.splice(existing, 1);
-            } else {
-                this.spawns.push({ x: mx, y: my, id: this.spawns.length + 1 });
-            }
-            this.painting = false; 
-            this.updateInfo();
-            return;
-        }
-
-        const size = this.brushSize - 1;
-        for (let y = gy - size; y <= gy + size; y++) {
-            for (let x = gx - size; x <= gx + size; x++) {
-                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
-                    this.grid[y][x].type = this.tool;
-                    if (this.tool === 'LAND') this.grid[y][x].color = this.customColor;
-                    if (this.tool === 'WATER') this.grid[y][x].color = '#004488';
-                    if (this.tool === 'MOUNTAIN') this.grid[y][x].color = '#555';
-                }
-            }
-        }
-    },
-
-    updateInfo() {
-        document.getElementById('editor-players').innerText = this.spawns.length;
-    },
-
-    draw(ctx) {
-        if (!ctx) return;
-        
-        const startCol = Math.floor(Game.camera.x / GRID_SIZE);
-        const endCol = startCol + (canvas.width / GRID_SIZE) + 1;
-        const startRow = Math.floor(Game.camera.y / GRID_SIZE);
-        const endRow = startRow + (canvas.height / GRID_SIZE) + 1;
-
-        for (let y = startRow; y <= endRow; y++) {
-            for (let x = startCol; x <= endCol; x++) {
-                if (y >= 0 && y < this.rows && x >= 0 && x < this.cols) {
-                    const cell = this.grid[y][x];
-                    ctx.fillStyle = cell.color;
-                    ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-                    ctx.strokeRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
-                }
-            }
-        }
-
-        this.spawns.forEach((s, i) => {
-            ctx.fillStyle = '#f00';
-            ctx.beginPath(); ctx.arc(s.x, s.y, 30, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.font = '20px Arial';
-            ctx.fillText(`P${i+1}`, s.x, s.y);
-        });
-    },
-
-    saveAndPlay() {
-        if (this.spawns.length < 2) {
-            alert("Поставьте минимум 2 точки спавна!");
-            return;
-        }
-        const mapData = {
-            grid: this.grid,
-            spawns: this.spawns,
-            w: MAP_W,
-            h: MAP_H
-        };
-        const name = prompt("Название комнаты:", "CustomMap");
-        if (!name) return;
-
-        if (Game.socket) {
-            Game.socket.emit('create_room', { 
-                name: name, 
-                password: '', 
-                customMap: mapData 
-            });
-        }
-    }
-};
-
-// 3. Объявляем MapUtils (отдельно!)
 const MapUtils = {
     seed: 0,
     lakes: [],
@@ -505,23 +324,31 @@ const MapUtils = {
         this.seed = Math.random() * 100; 
         this.lakes = [];
         this.mountains = [];
-        
-        // Генерация озер
-        for (let i = 0; i < 6; i++) {
+
+// 1. ГЕНЕРАЦИЯ ОЗЕР (Вода)
+        // БЫЛО: 18 -> СТАЛО: 6 (Меньше воды)
+        for (let i = 0; i < 0; i++) {
             this.lakes.push({
                 x: Math.random() * MAP_W,
                 y: Math.random() * MAP_H,
-                radius: 80 + Math.random() * 120,
+                radius: 80 + Math.random() * 120, // Чуть уменьшил размер тоже
                 color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
             });
         }
-        // Генерация гор
-        for (let i = 0; i < 5; i++) {
-            const r = 70 + Math.random() * 90;
+
+        // 2. ГЕНЕРАЦИЯ ГОР (Стены)
+        // БЫЛО: 12 -> СТАЛО: 5 (Меньше стен)
+        for (let i = 0; i < 0; i++) {
+            const r = 70 + Math.random() * 90; // Горы тоже чуть компактнее
             const x = Math.random() * (MAP_W - 400) + 200;
             const y = Math.random() * (MAP_H - 400) + 200;
+
             if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
-            this.mountains.push({ x: x, y: y, radius: r });
+
+            this.mountains.push({
+                x: x, y: y, radius: r,
+                height: r * 1.5 
+            });
         }
     },
 
@@ -529,19 +356,10 @@ const MapUtils = {
         return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
     },
 
-    // НОВАЯ ПРОВЕРКА ВОДЫ (С учетом редактора)
-    checkWater(x, y) {
-        // 1. Если загружена кастомная карта из редактора
-        if (Game.isCustomMap && Game.customGrid) {
-            const gx = Math.floor(x / GRID_SIZE);
-            const gy = Math.floor(y / GRID_SIZE);
-            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
-                return Game.customGrid[gy][gx].type === 'WATER';
-            }
-            return true; // За границей карты вода
-        }
-
-        // 2. Старая логика (процедурная)
+    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+    // Переименовали обратно в isWater, чтобы старый код не ломался
+    isWater(x, y) {
+        // Если режим острова - проверяем океан вокруг
         if (Game.isIslandMode) {
             const cx = MAP_W / 2; const cy = MAP_H / 2;
             const dist = Math.hypot(x - cx, y - cy);
@@ -554,26 +372,17 @@ const MapUtils = {
         return false;
     },
 
-    // Для совместимости
-    isWater(x, y) { return this.checkWater(x, y); },
+    // Добавляем checkWater для совместимости с новым кодом движения
+    checkWater(x, y) {
+        return this.isWater(x, y);
+    },
 
-    // НОВАЯ ПРОВЕРКА ГОР (С учетом редактора)
+    // Проверка: врезался ли в гору (возвращает гору или null)
     checkMountain(x, y, radius) {
-        // 1. Кастомная карта
-        if (Game.isCustomMap && Game.customGrid) {
-            const gx = Math.floor(x / GRID_SIZE);
-            const gy = Math.floor(y / GRID_SIZE);
-            if (gy >= 0 && gy < Game.customGrid.length && gx >= 0 && gx < Game.customGrid[0].length) {
-                if (Game.customGrid[gy][gx].type === 'MOUNTAIN') {
-                    // Возвращаем фиктивную гору для отталкивания
-                    return { x: gx*GRID_SIZE + 25, y: gy*GRID_SIZE + 25, radius: 25 }; 
-                }
-            }
-            return null;
-        }
-        // 2. Старая логика
         for (let m of this.mountains) {
-            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
+            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) {
+                return m;
+            }
         }
         return null;
     }
@@ -964,23 +773,13 @@ const Lobby = {
             document.getElementById('lobby-screen').classList.add('hidden');
         });
 
-s.on('start_game_signal', (data) => { // Добавляем data аргумент
-    document.getElementById('connection-warning').style.display = 'none';
-    document.getElementById('speed-controls').style.display = 'none';
-    Game.speed = 1;
-    
-    // Если пришли данные карты - грузим их
-    if (data && data.customMap) {
-        Game.isCustomMap = true;
-        Game.customGrid = data.customMap.grid;
-        MAP_W = data.customMap.w;
-        MAP_H = data.customMap.h;
-        Game.loadCustomLevel(data.customMap.spawns); // Новая функция загрузки
-    } else {
-        Game.isCustomMap = false;
-        Game.loadPvpLevel();
-    }
-});
+        s.on('start_game_signal', () => {
+            document.getElementById('connection-warning').style.display = 'none';
+            // Отключаем кнопки скорости в МП
+            document.getElementById('speed-controls').style.display = 'none';
+            Game.speed = 1;
+            Game.loadPvpLevel();
+        });
 
         s.on('error_msg', (msg) => {
             alert(msg);
@@ -1188,40 +987,6 @@ updateTerritoryCache() {
         }
     },
 
-       loadCustomLevel(spawns) {
-    this.isMultiplayer = true; 
-    this.isIslandMode = false; // Отключаем процедурную генерацию
-    this.isSpectator = false;
-    this.state = 'BATTLE'; 
-    this.money = 5000;
-    
-    this.resetGameData();
-    
-    // Ищем мой спавн
-    // В мультиплеере роли обычно player, enemy, bot1... 
-    // Нам нужно сопоставить myRole с индексом спавна.
-    // Для простоты: player = 0, enemy = 1, botX...
-    
-    // Но лучше просто перебрать все спавны и создать базы
-    const roles = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
-    
-    spawns.forEach((spawn, index) => {
-        if (index >= roles.length) return;
-        const side = roles[index];
-        
-        this.units.push(new Unit('HOUSE', spawn.x, spawn.y, side));
-        this.units.push(new Unit('BUILDER', spawn.x + 40, spawn.y + 40, side));
-        
-        if (side === this.myRole) {
-            this.camera.x = spawn.x - canvas.width/2;
-            this.camera.y = spawn.y - canvas.height/2;
-        }
-    });
-
-    this.startGameUI("КАСТОМНАЯ КАРТА");
-},
-
-
     camera: { x: 0, y: 0 },
     lastTerritoryCam: { x: 0, y: 0 }, 
     lastTerritoryTime: -100,         
@@ -1247,31 +1012,20 @@ updateTerritoryCache() {
     myRole: 'player', 
     territoryMode: 1,
 init() {
-    this.preloadAssets();
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    window.addEventListener('keydown', e => this.keys[e.code] = true);
-    window.addEventListener('keyup', e => this.keys[e.code] = false);
+        this.preloadAssets();
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        window.addEventListener('keydown', e => this.keys[e.code] = true);
+        window.addEventListener('keyup', e => this.keys[e.code] = false);
+        canvas.addEventListener('mousedown', e => this.onDown(e));
+        window.addEventListener('mousemove', e => this.onMove(e));
+        window.addEventListener('mouseup', e => this.onUp(e));
+        canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
 
-    // --- ВОТ СЮДА ВСТАВИТЬ НОВЫЕ СЛУШАТЕЛИ ---
-    canvas.addEventListener('mousedown', e => {
-        if (Editor.active) Editor.onMouseDown(e);
-        else this.onDown(e); // Здесь 'this' корректно ссылается на Game
-    });
-    window.addEventListener('mousemove', e => {
-        if (Editor.active) Editor.onMouseMove(e);
-        else this.onMove(e);
-    });
-    window.addEventListener('mouseup', e => {
-        if (Editor.active) Editor.onMouseUp(e);
-        else this.onUp(e);
-    });
-    canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.onRight(e); });
-    // ----------------------------------------
-
-    this.startWorkerHeartbeat(); 
-    this.renderLoop();           
-},
+        // ЗАПУСКАЕМ НОВУЮ СИСТЕМУ:
+        this.startWorkerHeartbeat(); // Логика (работает всегда)
+        this.renderLoop();           // Рисование (работает только когда видим)
+    },
     resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -1754,7 +1508,6 @@ else if (cmd.type === 'build_start') {
         if (use > gen) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
     }
 }
-
             this.units.forEach(u => u.update());
             this.units = this.units.filter(u => u.hp > 0);
             
@@ -2273,7 +2026,7 @@ onUp(e) {
             this.drawPath = [];
             return;
         }
-        // ... дальше старый код (dragStart и т.д.) ...
+       
 
         if (this.dragStart) {
             const m = this.getMouse(e);
@@ -2342,38 +2095,6 @@ onUp(e) {
     },
 
     draw() {
-        // 1. Если открыт редактор - рисуем его и выходим
-    if (Editor.active) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0,0,canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(-Game.camera.x, -Game.camera.y);
-        Editor.draw(ctx);
-        ctx.restore();
-        return;
-    }
-
-    // 2. Если играем на кастомной карте
-    if (Game.isCustomMap && Game.customGrid) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0,0,canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(-this.camera.x, -this.camera.y);
-        
-        // Рисуем тайлы (тот же код, что в Editor.draw, но оптимизированный)
-        const startCol = Math.floor(this.camera.x / GRID_SIZE);
-        const endCol = startCol + (canvas.width / GRID_SIZE) + 1;
-        const startRow = Math.floor(this.camera.y / GRID_SIZE);
-        const endRow = startRow + (canvas.height / GRID_SIZE) + 1;
-
-        for (let y = startRow; y <= endRow; y++) {
-            for (let x = startCol; x <= endCol; x++) {
-                if (y >= 0 && y < Game.customGrid.length && x >= 0 && x < Game.customGrid[0].length) {
-                    ctx.fillStyle = Game.customGrid[y][x].color;
-                    ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE+1, GRID_SIZE+1); // +1 чтобы убрать щели
-                }
-            }
-        }
         if (this.isIslandMode) {
              ctx.fillStyle = '#004488';
              ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2583,88 +2304,93 @@ if (this.dragStart && this.dragCurr) {
 
 
 // --- РИСОВАНИЕ КРИВОЙ ПУТИ (СО СТРЕЛКАМИ) ---
-if (this.isDrawingPath && this.drawPath.length > 1) {
-    ctx.save();
+        if (this.isDrawingPath && this.drawPath.length > 0) {
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#00ff00';
+            ctx.setLineDash([10, 5]); // Пунктир
 
-    /* ===============================
-       1. ГЛАВНАЯ ЛИНИЯ
-    =============================== */
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#00ff00';
-    ctx.setLineDash([10, 5]);
-
-    ctx.beginPath();
-    ctx.moveTo(this.drawPath[0].x, this.drawPath[0].y);
-    for (let i = 1; i < this.drawPath.length; i++) {
-        ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
-    }
-    ctx.stroke();
-
-    // угол главной стрелки
-    const last = this.drawPath[this.drawPath.length - 1];
-    const prev = this.drawPath[this.drawPath.length - 2];
-    const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-
-    // стрелка
-    const headLen = 20;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(
-        last.x - headLen * Math.cos(angle - Math.PI / 6),
-        last.y - headLen * Math.sin(angle - Math.PI / 6)
-    );
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(
-        last.x - headLen * Math.cos(angle + Math.PI / 6),
-        last.y - headLen * Math.sin(angle + Math.PI / 6)
-    );
-    ctx.stroke();
-
-    /* ===============================
-       2. ПРИЗРАЧНЫЕ ПУТИ ЮНИТОВ
-    =============================== */
-    const units = this.selection.filter(u => u.side === this.myRole);
-    if (units.length > 0) {
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.5;
-        ctx.setLineDash([5, 5]);
-
-        const startX = this.drawPath[0].x;
-        const startY = this.drawPath[0].y;
-
-        units.forEach(u => {
+            // 1. Рисуем главную линию (за мышкой)
             ctx.beginPath();
-            ctx.moveTo(u.x, u.y);
-
-            let fx = u.x;
-            let fy = u.y;
-
+            ctx.moveTo(this.drawPath[0].x, this.drawPath[0].y);
             for (let i = 1; i < this.drawPath.length; i++) {
-                fx = u.x + (this.drawPath[i].x - startX);
-                fy = u.y + (this.drawPath[i].y - startY);
-                ctx.lineTo(fx, fy);
+                ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
             }
             ctx.stroke();
 
-            // маленькая стрелка
-            const miniLen = 10;
+            // Рисуем наконечник для главной линии
+            const last = this.drawPath[this.drawPath.length - 1];
+            const prev = this.drawPath.length > 1 ? this.drawPath[this.drawPath.length - 2] : this.drawPath[0];
+            
+            if (last && prev) {
+                const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+                const headLen = 20;
+                
+                ctx.setLineDash([]); // Сплошная линия для стрелки
+                ctx.beginPath();
+                ctx.moveTo(last.x, last.y);
+                ctx.lineTo(last.x - headLen * Math.cos(angle - Math.PI / 6), last.y - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(last.x, last.y);
+                ctx.lineTo(last.x - headLen * Math.cos(angle + Math.PI / 6), last.y - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.stroke();
+            }
+
+            // 2. Рисуем "призрачные" пути для каждого юнита
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.5;
+            ctx.setLineDash([5, 5]);
+            
+            // Вычисляем центр группы
+            let avgX = 0, avgY = 0;
+            let validUnits = this.selection.filter(u => u.side === this.myRole);
+            if (validUnits.length > 0) {
+                validUnits.forEach(u => { avgX += u.x; avgY += u.y; });
+                avgX /= validUnits.length;
+                avgY /= validUnits.length;
+                
+                const startX = this.drawPath[0].x;
+                const startY = this.drawPath[0].y;
+
+                validUnits.forEach(u => {
+                    // Рисуем путь юнита
+                    ctx.beginPath();
+                    ctx.moveTo(u.x, u.y);
+                    
+                    let finalX = u.x;
+                    let finalY = u.y;
+                    
+                    // Проходим по всему пути со смещением
+                    for (let i = 0; i < this.drawPath.length; i++) {
+                        finalX = u.x + (this.drawPath[i].x - startX);
+                        finalY = u.y + (this.drawPath[i].y - startY);
+                        ctx.lineTo(finalX, finalY);
+                    }
+                    ctx.stroke();
+
+                    // Рисуем маленькую стрелочку в конце каждого пути юнита
+                    if (this.drawPath.length > 1) {
+                        const p2 = this.drawPath[this.drawPath.length - 2]; // Предпоследняя точка
+                        // Угол такой же, как у главной линии
+                        const angle = Math.atan2(last.y - prev.y, last.x - prev.x); 
+                        const miniLen = 10;
+
+                        ctx.save();
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(finalX, finalY);
+                        ctx.lineTo(finalX - miniLen * Math.cos(angle - Math.PI / 6), finalY - miniLen * Math.sin(angle - Math.PI / 6));
+                        ctx.moveTo(finalX, finalY);
+                        ctx.lineTo(finalX - miniLen * Math.cos(angle + Math.PI / 6), finalY - miniLen * Math.sin(angle + Math.PI / 6));
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                });
+            }
+            
+            ctx.globalAlpha = 1.0;
             ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.moveTo(fx, fy);
-            ctx.lineTo(
-                fx - miniLen * Math.cos(angle - Math.PI / 6),
-                fy - miniLen * Math.sin(angle - Math.PI / 6)
-            );
-            ctx.moveTo(fx, fy);
-            ctx.lineTo(
-                fx - miniLen * Math.cos(angle + Math.PI / 6),
-                fy - miniLen * Math.sin(angle + Math.PI / 6)
-            );
-            ctx.stroke();
-        });
-    ctx.restore();
-}
+        }
+  ctx.restore();
+},
 
  // Новая функция только для рисования
     renderLoop() {

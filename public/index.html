@@ -201,14 +201,19 @@
 <div id="lobby-screen" class="screen clickable hidden">
     <h1 style="color:#4f4;">СЕТЕВАЯ ИГРА</h1>
     <div style="display:flex; gap: 40px;">
-        <div class="spec-settings">
-            <h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3>
-            <input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты">
-            <br>
-            <input type="password" id="create-pass" class="lobby-input" placeholder="Пароль">
-            <br>
-            <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button>
-        </div>
+ <div class="spec-settings">
+    <h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3>
+    <input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты">
+    <br>
+    <input type="password" id="create-pass" class="lobby-input" placeholder="Пароль">
+    <br>
+    <label style="color: #4f4; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; margin: 10px 0;">
+        <input type="checkbox" id="map-mode-check" style="width: 18px; height: 18px;"> 
+        🗺️ Реалистичная карта
+    </label>
+    <br>
+    <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button>
+</div>
         <div class="spec-settings">
             <h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3>
             <input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты">
@@ -736,19 +741,19 @@ tryPlaceBuilding(builder, type) {
 }
 
 const Lobby = {
+    desiredMapMode: false, // Храним выбор хоста
+
     init() {
-        // Скрываем главное меню, показываем лобби
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
         
-        // Подключаемся к сокету
         if (typeof io !== 'undefined') {
             if (!Game.socket) {
                 Game.socket = io();
                 this.setupEvents();
             }
         } else {
-            alert("Ошибка: Сервер не найден (запустите node server.js). Доступен только одиночный режим.");
+            alert("Ошибка: Сервер не найден. Доступен только одиночный режим.");
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('menu-screen').classList.remove('hidden');
         }
@@ -759,7 +764,7 @@ const Lobby = {
         
         s.on('room_created', (data) => {
             CURRENT_ROOM = data.roomName;
-            Game.myRole = data.side;
+            Game.myRole = data.side; // Обычно 'player' для создателя
             document.getElementById('lobby-screen').classList.add('hidden');
             const warn = document.getElementById('connection-warning');
             warn.style.display = 'block';
@@ -775,26 +780,40 @@ const Lobby = {
 
         s.on('start_game_signal', () => {
             document.getElementById('connection-warning').style.display = 'none';
-            // Отключаем кнопки скорости в МП
             document.getElementById('speed-controls').style.display = 'none';
             Game.speed = 1;
+            
+            // Загружаем уровень
             Game.loadPvpLevel();
+
+            // Если мы ХОСТ (player) и выбрали реалистичную карту, отправляем команду сопернику
+            if (Game.myRole === 'player' && Lobby.desiredMapMode) {
+                const mapSeed = Math.random() * 1000;
+                // Применяем себе
+                Game.setMapMode(true, mapSeed);
+                // Отправляем сопернику
+                setTimeout(() => {
+                    Game.socket.emit('gameCommand', { 
+                        roomName: CURRENT_ROOM, 
+                        type: 'sync_map_settings', 
+                        isReal: true, 
+                        seed: mapSeed 
+                    });
+                }, 500);
+            }
         });
 
-        s.on('error_msg', (msg) => {
-            alert(msg);
-        });
-        
+        s.on('error_msg', (msg) => { alert(msg); });
         s.on('remoteCommand', (data) => { Game.executeCommand(data); });
-        s.on('playerLeft', () => { 
-            alert("Соперник покинул игру."); 
-            location.reload(); 
-        });
+        s.on('playerLeft', () => { alert("Соперник покинул игру."); location.reload(); });
     },
 
     create() {
         const name = document.getElementById('create-name').value;
         const pass = document.getElementById('create-pass').value;
+        // Сохраняем выбор карты
+        this.desiredMapMode = document.getElementById('map-mode-check').checked;
+        
         if(!name) return alert("Введите имя комнаты!");
         Game.socket.emit('create_room', { name, password: pass });
     },
@@ -1112,6 +1131,48 @@ init() {
         this.camera.y = (MAP_H/2) - (canvas.height/2);
         this.startGameUI("PVP БОЙ");
     },
+
+    setMapMode(isReal, seed) {
+        this.isIslandMode = isReal;
+        
+        if (isReal) {
+            // Настраиваем "Реалистичную" карту
+            MapUtils.seed = seed;
+            MAP_W = 3500;
+            MAP_H = 3500; // Квадратная для острова
+            ISLAND_RADIUS = 1500;
+            
+            MapUtils.init(); // Генерируем озера и горы по сиду
+            this.decor = []; // Пересоздаем декор
+            
+            // Центрируем камеру
+            if (this.myRole === 'player') {
+                this.camera.x = MAP_W/2 - canvas.width/2 - 1000;
+            } else {
+                this.camera.x = MAP_W/2 - canvas.width/2 + 1000;
+            }
+            this.camera.y = MAP_H/2 - canvas.height/2;
+
+            // Перемещаем базы на остров
+            // Находим базы и строителей и ставим их на новые позиции
+            const p1Base = this.units.find(u => u.id === 'base_p1');
+            const p1Build = this.units.find(u => u.id === 'builder_p1');
+            const p2Base = this.units.find(u => u.id === 'base_p2');
+            const p2Build = this.units.find(u => u.id === 'builder_p2');
+
+            // Позиции слева и справа от центра острова
+            const cx = MAP_W/2, cy = MAP_H/2;
+            const dist = 1000;
+
+            if(p1Base) { p1Base.x = cx - dist; p1Base.y = cy; }
+            if(p1Build) { p1Build.x = cx - dist + 100; p1Build.y = cy; }
+            
+            if(p2Base) { p2Base.x = cx + dist; p2Base.y = cy; }
+            if(p2Build) { p2Build.x = cx + dist - 100; p2Build.y = cy; }
+
+            Game.showError("РЕЖИМ: РЕАЛИСТИЧНАЯ КАРТА 🗺️");
+        }
+    },
     
     loadAdvancedMode() {
         this.isMultiplayer = false;
@@ -1290,7 +1351,10 @@ init() {
             const prod = this.units.find(u => u.id === cmd.producerId);
             if (prod) prod.startProduction(cmd.unitType, true);
         }
-        
+            else if (cmd.type === 'sync_map_settings') {
+    // Пришла команда от хоста сменить карту
+    Game.setMapMode(cmd.isReal, cmd.seed);
+} 
 else if (cmd.type === 'move') {
             if (cmd.ids && cmd.ids.length > 0) {
                 const unitsToMove = this.units.filter(u => cmd.ids.includes(u.id));

@@ -2349,43 +2349,127 @@ onUp(e) {
             return;
         }
        
-
-        if (this.dragStart) {
+if (this.dragStart) {
             const m = this.getMouse(e);
+            
+            // === 1. ЭТО БЫЛ КЛИК (НЕ ПЕРЕТАСКИВАНИЕ) ===
+            // (Если мышка сдвинулась меньше чем на 5 пикселей)
             if (Math.hypot(m.rawX - this.dragStart.rx, m.rawY - this.dragStart.ry) < 5) {
-                const clicked = this.units.filter(u => (u.side === this.myRole || this.isSpectator) && Math.hypot(u.x - m.x, u.y - m.y) < 30);
+                
+                // Ищем юнитов под курсором (с небольшим запасом радиуса +10px для удобства)
+                // Игнорируем чужих юнитов, если мы не зритель
+                const clicked = this.units.filter(u => 
+                    (u.side === this.myRole || this.isSpectator) && 
+                    Math.hypot(u.x - m.x, u.y - m.y) < (u.radius + 15)
+                );
+
                 if (this.isSpectator) {
+                    // Логика зрителя: просто показать инфо
                     if (clicked.length > 0) {
                          const u = clicked[0];
                          this.showError(`${UNITS[u.type].name} [${FACTIONS[u.side].name}] HP: ${Math.floor(u.hp)}`);
                     }
                     this.selection = [];
                 } else {
-                    const builder = clicked.find(u => u.isBuilder);
-                    this.selection = builder ? [builder] : clicked;
-                    this._normalizeSelection();
-                   if (this.selection.length > 0 && this.selection[0].isBuilder) this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO'], true, 'МЕНЮ СТРОИТЕЛЯ');
-else if (this.selection.length > 0 && this.selection[0].type === 'HOSPITAL') this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
-                    else if (this.selection.length > 0 && this.selection[0].type === 'SILO') {
-                        if (this.selection[0].nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(this.selection[0].nukeTimer/60)}s`);
-                        else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                    // Логика Игрока
+                    
+                    // Приоритет клика:
+                    // 1. Строитель (если они в куче)
+                    // 2. Склад, Завод или другое здание
+                    // 3. Любой другой юнит
+                    let target = clicked.find(u => u.isBuilder);
+                    if (!target && clicked.length > 0) target = clicked[0];
+
+                    // Сбрасываем предыдущий выбор завода
+                    this.selectedProducer = null;
+
+                    if (!target) {
+                        // Кликнули в пустоту -> снимаем выделение
+                        this.selection = [];
+                        this.updateUI([]);
+                    } else {
+                        // Выделяем юнита (кроме случаев, когда это здание-производитель, там логика другая)
+                        this.selection = [target];
+
+                        // --- А) МЕНЮ СТРОИТЕЛЯ ---
+                        if (target.isBuilder) {
+                            // Добавил 'WAREHOUSE' в список построек
+                            this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, 'МЕНЮ СТРОИТЕЛЯ');
+                        }
+                        // --- Б) МЕНЮ СКЛАДА (НОВОЕ) ---
+                        else if (target.type === 'WAREHOUSE') {
+                            this.openWarehouseMenu(target);
+                        }
+                        // --- В) МЕНЮ ГОСПИТАЛЯ ---
+                        else if (target.type === 'HOSPITAL') {
+                            this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
+                        }
+                        // --- Г) МЕНЮ БУНКЕРА (SILO) ---
+                        else if (target.type === 'SILO') {
+                            if (target.nukeTimer > 0) {
+                                this.updateUI([], true, `ЗАПУСК: ${Math.floor(target.nukeTimer/60)}s`);
+                            } else {
+                                this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                            }
+                        }
+                        // --- Д) ПРОИЗВОДСТВО (ДОМ или ЗАВОД) ---
+                        else if (UNITS[target.type].spawnList) {
+                            this.selectedProducer = target;
+                            this.selection = []; // Снимаем выделение, чтобы не мешало
+                            
+                            let list = [...UNITS[target.type].spawnList];
+                            let title = 'МЕНЮ';
+
+                            // Заголовок для Дома
+                            if (target.type === 'HOUSE') {
+                                const lvl = target.level || 0;
+                                title = HOUSE_UPGRADES[lvl].name.toUpperCase();
+                                // Добавляем кнопку апгрейда, если не макс уровень
+                                if (lvl < 5) list.push('UPGRADE_HOUSE');
+                            } 
+                            // Заголовок для Завода
+                            else if (target.type === 'FACTORY') {
+                                title = 'ЗАВОД (РЕСУРСЫ/ТЕХНИКА)';
+                            }
+
+                            this.updateUI(list, true, title);
+                        }
+                        // --- Е) ОБЫЧНЫЙ ЮНИТ (Солдат, Танк) ---
+                        else {
+                            this.updateUI([]);
+                        }
                     }
-                    else this.updateUI([]);
                 }
-            } else {
+            } 
+            // === 2. ЭТО БЫЛО ВЫДЕЛЕНИЕ РАМКОЙ (DRAG) ===
+            else {
                 if (!this.isSpectator) {
                     const x1 = Math.min(this.dragStart.x, m.x), x2 = Math.max(this.dragStart.x, m.x);
                     const y1 = Math.min(this.dragStart.y, m.y), y2 = Math.max(this.dragStart.y, m.y);
-                    this.selection = this.units.filter(u => !UNITS[u.type].spawnList && u.side === this.myRole && u.x > x1 && u.x < x2 && u.y > y1 && u.y < y2);
+                    
+                    // Выбираем юнитов в рамке
+                    // Исключаем здания-производители (SpawnList) и чужих юнитов
+                    this.selection = this.units.filter(u => 
+                        !UNITS[u.type].spawnList && 
+                        u.side === this.myRole && 
+                        u.x > x1 && u.x < x2 && 
+                        u.y > y1 && u.y < y2
+                    );
+                    
+                    // Если попал строитель вместе с солдатами - убираем солдат (приоритет строителю)
                     this._normalizeSelection();
-                    if (this.selection.some(s=>s.isBuilder) && this.selection.length===1) this.updateUI(['HOUSE','FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO'], true, 'МЕНЮ СТРОИТЕЛЯ');
-                    else this.updateUI([]);
+
+                    // Если выбран ТОЛЬКО строитель рамкой - открываем его меню
+                    if (this.selection.length === 1 && this.selection[0].isBuilder) {
+                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, 'МЕНЮ СТРОИТЕЛЯ');
+                    } else {
+                        this.updateUI([]);
+                    }
                 }
             }
             this.dragStart = null;
             this.dragCurr = null;
         }
-    },
 
     onRight(e) {
         if (this.state !== 'BATTLE' || this.isSpectator) return;

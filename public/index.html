@@ -132,12 +132,19 @@
 
     <div id="top-bar" class="clickable">
         <div style="display: flex; align-items: center;">
-            <div id="player-stats">
-                💵 <span id="money">0</span> 
-                <span id="income-display" style="font-size:0.7em; color:#4f4; margin-left: 5px;">(+0/s)</span> 
-                <span id="energy-container" class="energy-stat">⚡ <span id="energy-val">0</span></span>
-                | 🚩 Ур. <span id="level">1</span>
-            </div>
+      <div id="player-stats" style="display: flex; gap: 15px; align-items: center; font-size: 0.9em;">
+    <div>
+        💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0/s)</span>
+    </div>
+    <div style="color: #aaa;">|</div>
+    <div title="Железо">🔩 <span id="res-iron">0</span></div>
+    <div title="Химия">🧪 <span id="res-chem">0</span></div>
+    <div title="Микросхемы">💾 <span id="res-chips">0</span></div>
+    <div style="color: #aaa;">|</div>
+    <span id="energy-container" class="energy-stat">⚡ <span id="energy-val">0</span></span>
+    <div style="color: #aaa;">|</div>
+    <span>🚩 Ур. <span id="level">1</span></span>
+</div>
             
         <div id="speed-controls">
     <button class="speed-btn active" onclick="Game.setSpeed(1)">1x</button>
@@ -237,33 +244,76 @@ const BUFF_TYPES = {
     AA_RANGE:      { color: 'rgba(150, 0, 255, 0.3)',  text: '📡 ПВО: Радиус x2',     target: 'AA_DEFENSE', type: 'range', val: 2 }
 };
 
+// --- НОВЫЕ КОНСТАНТЫ ---
+const RES_LIMIT = 99; // Лимит ресурсов в "кармане"
+const MAX_MONEY_POCKET = 999999;
+const WAREHOUSE_SLOTS = 8;
+const SLOT_COST = 5000;
+
+// Функция для форматирования цены в меню
+const formatCost = (u) => {
+    let s = `$${u.cost}`;
+    if(u.resCost) {
+        if(u.resCost.iron) s += ` | 🔩${u.resCost.iron}`;
+        if(u.resCost.chem) s += ` | 🧪${u.resCost.chem}`;
+        if(u.resCost.chips) s += ` | 💾${u.resCost.chips}`;
+    }
+    return s;
+};
+
 const UNITS = {
     SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 60, dmg: 15, range: 140, speed: 0.7, reload: 40, color: '#44aaff', radius: 15, buildTime: 5, isInfantry: true },
     SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 15, buildTime: 5, isInfantry: true },
-    TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', cost: 5000, hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 25, buildTime: 20 },
-    GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', cost: 6000, hp: 150, dmg: 200, range: 1200, speed: 0.4, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
-    HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 8000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', hp: 800, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 20 },
+    
+    // --- ОБНОВЛЕННАЯ ТЕХНИКА (С РЕСУРСАМИ) ---
+    TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
+               cost: 5000, resCost: { iron: 100, chips: 2 }, // Требует ресурсы
+               hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 25, buildTime: 20 },
+    
+    GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
+               cost: 8000, resCost: { iron: 150, chips: 5, chem: 3 }, // Требует ресурсы
+               hp: 150, dmg: 200, range: 1200, speed: 0.4, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
+    
+    HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
+                  resCost: { iron: 300, chips: 8, chem: 8 }, // Требует ресурсы
+                  hp: 800, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 20 },
+
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.8, color: '#e6c200', radius: 15, buildTime: 5, isBuilder: true },
+    
+    // --- ЗДАНИЯ ---
     POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 25, color: '#ffd700', constructTime: 10, energyGen: 50 },
     SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', cost: 1000, hp: 500, range: 500, reload: 150, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 50000, hp: 99999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
+    
     HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 200, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
-    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', spawnList: ['TANK','GRAD','HELICOPTER'], constructTime: 40, energyUse: 15 },
+    
+    // --- ЗАВОД: Добавлены кнопки крафта ресурсов ---
+    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
+               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HELICOPTER'], // Новые кнопки
+               constructTime: 40, energyUse: 15 },
+               
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 20, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
     HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 40, constructTime: 30, color: '#ef5350', energyUse: 5 },
-    WALL: { 
-        type: 'bldg',         // Это здание
-        name: 'Стена',        // Имя
-        emoji: '🧱',          // Эмодзи
-        // imageSrc: 'ссылка_на_картинку', // Можно добавить картинку
-        cost: 100,            // Дешево
-        hp: 1000,             // Много жизней
-        radius: 20,           // Размер
-        constructTime: 5,     // Строится быстро (5 сек)
-        energyUse: 0,         // Не требует энергии
-        color: '#555555'      // Цвет на мини-карте
+    WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
+    
+    // --- НОВОЕ ЗДАНИЕ: СКЛАД ---
+    WAREHOUSE: { 
+        type: 'bldg', name: 'Склад', emoji: '🏚️', 
+        cost: 2000, resCost: { iron: 25 }, // Стоит 25 железа
+        hp: 800, radius: 35, constructTime: 15, energyUse: 5, color: '#8d6e63' 
     },
-    HEAL_BTN: { type:'action', name: 'ЛЕЧИТЬ', emoji: '💉', cost: 500 }
+
+    HEAL_BTN: { type:'action', name: 'ЛЕЧИТЬ', emoji: '💉', cost: 500 },
+    
+    // --- ВИРТУАЛЬНЫЕ КНОПКИ КРАФТА (для меню) ---
+    CRAFT_IRON: { type: 'action', name: 'Железо x5', emoji: '🔩', cost: 75, producedRes: { iron: 5 } }, // 15 * 5 = 75$
+    CRAFT_CHEM: { type: 'action', name: 'Химия x1', emoji: '🧪', cost: 150, resCost: { iron: 10 }, producedRes: { chem: 1 } },
+    CRAFT_CHIP: { type: 'action', name: 'Чип x1', emoji: '💾', cost: 1000, resCost: { iron: 15, chem: 15 }, producedRes: { chips: 1 } },
+    
+    // --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
+    WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
+    WH_DEPOSIT: { type: 'action', name: 'ПОЛОЖИТЬ ВСЕ', emoji: '📥', cost: 0 },
+    WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 }
 };
 
     const HOUSE_UPGRADES = [
@@ -812,6 +862,7 @@ const Game = {
     artyMode: false,
     drawPath: [],
     isDrawingPath: false,
+    resources: { iron: 0, chem: 0, chips: 0 },
     dragStart: null,
     level: 1, 
     money: 0, 
@@ -985,6 +1036,42 @@ updateTerritoryCache() {
                 }
             }
         }
+    },
+
+    openWarehouseMenu(wh) {
+        const menu = document.getElementById('build-menu');
+        menu.innerHTML = '';
+        menu.style.display = 'flex';
+        document.getElementById('menu-title').style.display = 'block';
+        document.getElementById('menu-title').innerText = 'СКЛАД (8 СЛОТОВ)';
+
+        wh.storage.forEach((slot, idx) => {
+            const div = document.createElement('div'); 
+            div.className = 'unit-card';
+            div.style.width = '90px'; // Чуть шире
+
+            if (slot.locked) {
+                div.style.background = '#300';
+                div.innerHTML = `<div>🔒</div><div style="font-size:0.7em">КУПИТЬ</div><div class="card-price">5000$</div>`;
+                div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_BUY_SLOT'); };
+            } else {
+                if (slot.type === 'empty') {
+                    div.innerHTML = `<div>📦</div><div style="font-size:0.7em">ПУСТО</div><div style="color:#aaa; font-size:0.6em">Положить</div>`;
+                    div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_DEPOSIT'); };
+                } else {
+                    let icon = '';
+                    if (slot.type === 'iron') icon = '🔩';
+                    if (slot.type === 'chem') icon = '🧪';
+                    if (slot.type === 'chips') icon = '💾';
+                    if (slot.type === 'money') icon = '💵';
+                    
+                    div.style.background = '#003300';
+                    div.innerHTML = `<div>${icon}</div><div style="font-size:1.2em; font-weight:bold">${slot.count}</div><div style="color:#4f4; font-size:0.6em">Забрать</div>`;
+                    div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_WITHDRAW'); };
+                }
+            }
+            menu.appendChild(div);
+        });
     },
 
     camera: { x: 0, y: 0 },
@@ -1212,6 +1299,7 @@ init() {
         this.clickDelay = 0;
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
+        this.resources = { iron: 0, chem: 0, chips: 0 };
         
         const emojis = ['🌲', '🌲', '🌳', '🪨', '🌿', '🪵'];
         const gridSize = 50; 
@@ -1247,6 +1335,69 @@ init() {
         document.getElementById('phase-text').innerText = "БОЙ";
         this.buildType = null;
         this.updateUI([]);
+    },
+    checkCost(uType) {
+        const u = UNITS[uType];
+        if (this.money < u.cost) return false;
+        
+        if (u.resCost) {
+            const total = this.getTotalResources(); // Карман + Склады
+            if ((u.resCost.iron || 0) > total.iron) return false;
+            if ((u.resCost.chem || 0) > total.chem) return false;
+            if ((u.resCost.chips || 0) > total.chips) return false;
+        }
+        return true;
+    },
+    payCost(uType) {
+        const u = UNITS[uType];
+        this.money -= u.cost;
+        
+        if (u.resCost) {
+            this.spendResource('iron', u.resCost.iron || 0);
+            this.spendResource('chem', u.resCost.chem || 0);
+            this.spendResource('chips', u.resCost.chips || 0);
+        }
+    },
+    getTotalResources() {
+        let total = { ...this.resources };
+        this.units.forEach(u => {
+            if (u.side === this.myRole && u.type === 'WAREHOUSE' && u.storage) {
+                u.storage.forEach(slot => {
+                    if (!slot.locked && slot.type !== 'empty') {
+                        if (slot.type === 'money') { /* деньги не считаем тут */ }
+                        else { total[slot.type] = (total[slot.type] || 0) + slot.count; }
+                    }
+                });
+            }
+        });
+        return total;
+    },
+    spendResource(type, amount) {
+        if (amount <= 0) return;
+        
+        // 1. Берем из кармана
+        if (this.resources[type] >= amount) {
+            this.resources[type] -= amount;
+            return;
+        } else {
+            amount -= this.resources[type];
+            this.resources[type] = 0;
+        }
+
+        // 2. Ищем по складам
+        for (let u of this.units) {
+            if (u.side === this.myRole && u.type === 'WAREHOUSE' && u.storage) {
+                for (let slot of u.storage) {
+                    if (!slot.locked && slot.type === type && slot.count > 0) {
+                        let take = Math.min(amount, slot.count);
+                        slot.count -= take;
+                        amount -= take;
+                        if (slot.count === 0) slot.type = 'empty'; // Слот освободился
+                        if (amount <= 0) return;
+                    }
+                }
+            }
+        }
     },
     nextLevel() { this.loadLevel(this.level + 1); },
     restartLevel() { 
@@ -1406,6 +1557,20 @@ else if (cmd.type === 'build_start') {
                 });
                 hud.innerHTML = html;
             }
+
+            // Внутри Game.update(), там где обновляется UI денег:
+    document.getElementById('money').innerText = Math.floor(this.money);
+    
+    // --- НОВОЕ: Обновляем ресурсы ---
+    document.getElementById('res-iron').innerText = Math.floor(this.resources.iron);
+    document.getElementById('res-chem').innerText = Math.floor(this.resources.chem);
+    document.getElementById('res-chips').innerText = Math.floor(this.resources.chips);
+    
+    // Подсветка красным, если лимит
+    ['iron', 'chem', 'chips'].forEach(r => {
+        const el = document.getElementById(`res-${r}`);
+        el.style.color = (this.resources[r] >= RES_LIMIT) ? '#ff4444' : '#fff';
+    });
 
  if (this.frameCount % 60 === 0) {
     if (!this.isSpectator) {
@@ -1825,15 +1990,146 @@ this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
     }        
     },
 
-menuAction(type) {
+// --- ПОЛНОСТЬЮ НОВАЯ ФУНКЦИЯ MENUACTION ---
+    menuAction(type) {
         this.clickDelay = 20;
 
-        // 1. ЛЕЧЕНИЕ (Госпиталь)
+        // ==========================================
+        // 1. ЛОГИКА СКЛАДА (WAREHOUSE)
+        // ==========================================
+        if (type.startsWith('WH_')) {
+            const wh = this.selection[0];
+            if (!wh || wh.type !== 'WAREHOUSE') return;
+            
+            // Получаем выбранный слот (индекс должен сохраняться при клике в UI)
+            const slotIdx = this.selectedSlot; 
+            if (slotIdx === undefined || !wh.storage[slotIdx]) return;
+            
+            const slot = wh.storage[slotIdx];
+
+            // А) КУПИТЬ СЛОТ
+            if (type === 'WH_BUY_SLOT') {
+                if (this.money >= SLOT_COST) {
+                    this.money -= SLOT_COST;
+                    slot.locked = false;
+                    Game.effects.push({x: wh.x, y: wh.y, char: '🔓', life: 30});
+                    this.showError("СЛОТ КУПЛЕН!");
+                    this.openWarehouseMenu(wh); // Обновляем меню
+                } else {
+                    this.showError("НУЖНО 5000$!");
+                }
+                return;
+            }
+
+            // Б) ПОЛОЖИТЬ НА СКЛАД (DEPOSIT)
+            if (type === 'WH_DEPOSIT') {
+                if (slot.locked) return;
+
+                // Определяем, что класть
+                let resType = slot.type;
+                
+                // Если слот пуст, выбираем первый доступный ресурс у игрока
+                if (resType === 'empty') {
+                    if (this.resources.iron > 0) resType = 'iron';
+                    else if (this.resources.chem > 0) resType = 'chem';
+                    else if (this.resources.chips > 0) resType = 'chips';
+                    else if (this.money > 0) resType = 'money';
+                    else { this.showError("КАРМАНЫ ПУСТЫ!"); return; }
+                }
+
+                // Вычисляем лимиты
+                const limit = (resType === 'money') ? MAX_MONEY_POCKET : RES_LIMIT; // 999999 или 99
+                
+                // Если слот уже полон
+                if (slot.count >= limit) { this.showError("СЛОТ ПОЛОН!"); return; }
+
+                // Сколько можем положить (место в слоте)
+                const spaceInSlot = limit - slot.count;
+                
+                // Сколько у нас есть в кармане
+                const amountInPocket = (resType === 'money') ? this.money : this.resources[resType];
+
+                // Сколько реально переносим
+                const toTransfer = Math.min(spaceInSlot, amountInPocket);
+
+                if (toTransfer <= 0) { this.showError("НЕТ РЕСУРСОВ!"); return; }
+
+                // ТРАНЗАКЦИЯ
+                if (resType === 'money') this.money -= toTransfer;
+                else this.resources[resType] -= toTransfer;
+
+                slot.type = resType;
+                slot.count += toTransfer;
+
+                this.openWarehouseMenu(wh);
+                return;
+            }
+
+            // В) ЗАБРАТЬ СО СКЛАДА (WITHDRAW)
+            if (type === 'WH_WITHDRAW') {
+                if (slot.type === 'empty' || slot.count <= 0) return;
+
+                const resType = slot.type;
+                const limit = (resType === 'money') ? MAX_MONEY_POCKET : RES_LIMIT;
+
+                // Сколько есть в кармане сейчас
+                const currentPocket = (resType === 'money') ? this.money : this.resources[resType];
+
+                // Сколько места в кармане
+                const spaceInPocket = limit - currentPocket;
+
+                if (spaceInPocket <= 0) { this.showError("КАРМАН ПОЛОН!"); return; }
+
+                // Сколько реально переносим
+                const toTransfer = Math.min(spaceInPocket, slot.count);
+
+                // ТРАНЗАКЦИЯ
+                if (resType === 'money') this.money += toTransfer;
+                else this.resources[resType] += toTransfer;
+
+                slot.count -= toTransfer;
+                if (slot.count <= 0) slot.type = 'empty'; // Слот освободился
+
+                this.openWarehouseMenu(wh);
+                return;
+            }
+            return;
+        }
+
+        // ==========================================
+        // 2. КРАФТ РЕСУРСОВ (В ЗАВОДЕ)
+        // ==========================================
+        if (type.startsWith('CRAFT_')) {
+            const uInfo = UNITS[type];
+            const factory = this.selectedProducer;
+
+            if (!factory || !factory.isProducer) return;
+            if (factory.spawnCooldown > 0) { this.showError("ЗАВОД ЗАНЯТ!"); return; }
+            
+            // 1. Проверяем цену (деньги + материалы)
+            if (!this.checkCost(type)) { this.showError("НЕДОСТАТОЧНО РЕСУРСОВ!"); return; }
+
+            // 2. Проверяем место в кармане (нельзя скрафтить сверх 99)
+            if (!this.hasSpaceForCraft(type)) { this.showError("НЕТ МЕСТА (МАКС 99)!"); return; }
+
+            // 3. Списываем и запускаем
+            this.payCost(type);
+            factory.startProduction(type); // Запускаем процесс как обычную постройку
+            
+            // Обновляем UI, чтобы показать актуальные ресурсы
+            this.updateUI(UNITS.FACTORY.spawnList, true, 'МЕНЮ ЗАВОДА');
+            return;
+        }
+
+        // ==========================================
+        // 3. СПЕЦИАЛЬНЫЕ ДЕЙСТВИЯ (Лечение, Апгрейд, Ракеты)
+        // ==========================================
+        
+        // ЛЕЧЕНИЕ
         if (type === 'HEAL_BTN') {
             const hospital = this.selection[0];
             if (this.money < 500) { this.showError("НЕТ ДЕНЕГ!"); return; }
-            if (Game.energyFactor < 0.5) { this.showError("НЕТ ЭНЕРГИИ!"); return; } 
-            if (!hospital.isPowered) { this.showError("НЕТ ЭЛЕКТРИЧЕСТВА!"); return; }
+            if (this.energyFactor < 0.5 || !hospital.isPowered) { this.showError("НЕТ ЭНЕРГИИ!"); return; }
             
             const patient = this.units.find(u => u.side === this.myRole && u.hp < u.maxHp && Math.hypot(u.x - hospital.x, u.y - hospital.y) < hospital.radius + 50);
             if (patient) {
@@ -1844,15 +2140,13 @@ menuAction(type) {
             } else {
                 this.showError("НЕТ РАНЕНЫХ РЯДОМ!");
             }
-            this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
             return;
         }
 
-        // 2. УЛУЧШЕНИЕ ЗДАНИЯ (Дом -> Магазин и т.д.)
+        // УЛУЧШЕНИЕ ДОМА
         if (type === 'UPGRADE_HOUSE') {
             const u = this.selectedProducer;
             if (!u || u.type !== 'HOUSE') return;
-
             const nextLvl = (u.level || 0) + 1;
             const upgradeInfo = HOUSE_UPGRADES[nextLvl];
 
@@ -1860,17 +2154,13 @@ menuAction(type) {
                 this.money -= upgradeInfo.cost;
                 u.level = nextLvl;
                 Game.effects.push({x: u.x, y: u.y, char: '⬆️', life: 40});
-
+                
+                // Мультиплеер
                 if (this.isMultiplayer && CURRENT_ROOM) {
-                    this.socket.emit('gameCommand', {
-                        roomName: CURRENT_ROOM,
-                        type: 'upgrade_building',
-                        id: u.id,
-                        level: nextLvl
-                    });
+                    this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'upgrade_building', id: u.id, level: nextLvl });
                 }
 
-                // Обновляем меню, чтобы показать следующую цену или убрать кнопку
+                // Обновляем меню
                 let menuItems = [...UNITS['HOUSE'].spawnList];
                 if (u.level < 5) menuItems.push('UPGRADE_HOUSE');
                 this.updateUI(menuItems, true, HOUSE_UPGRADES[u.level].name.toUpperCase());
@@ -1879,67 +2169,60 @@ menuAction(type) {
             }
             return;
         }
-        
-        // 3. ЗАПУСК РАКЕТ (Бункер)
+
+        // ЗАПУСК РАКЕТ (БУНКЕР)
         if (type.startsWith('LAUNCH_')) {
             const silo = this.selection[0];
-            if (!silo.isPowered) { this.showError("БУНКЕР ОБЕСТОЧЕН!"); return; }
-            
-            const ammoKey = type.replace('LAUNCH_', '');
-            this.launchMode = ammoKey;
+            if (!silo.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
+            this.launchMode = type.replace('LAUNCH_', '');
             this.launchSilo = silo;
             document.body.style.cursor = 'crosshair';
             this.showError("ВЫБЕРИТЕ ЦЕЛЬ...");
             return;
         }
 
-        // 4. СТРОИТЕЛЬСТВО (Строитель выбрал здание)
+        // РЕЖИМ СТРОИТЕЛЯ (ВЫБОР ЗДАНИЯ)
         if (this.selection.length > 0 && this.selection[0].isBuilder) {
+            // Проверка цены перед выбором режима стройки
+            if (!this.checkCost(type)) { this.showError("НЕДОСТАТОЧНО РЕСУРСОВ!"); return; }
+            
             this.pendingConstruction = type;
             document.body.style.cursor = 'cell'; 
             return;
         }
 
-        // 5. ПРОИЗВОДСТВО ЮНИТОВ (Спавн)
+        // ==========================================
+        // 4. ПРОИЗВОДСТВО ЮНИТОВ (СПАВН)
+        // ==========================================
         if (this.selectedProducer) {
             const uInfo = UNITS[type];
-            
-            // ПРОВЕРКА ЛИМИТОВ ДОМА
+
+            // Проверки лимитов дома
             if (this.selectedProducer.type === 'HOUSE') {
                 const stats = HOUSE_UPGRADES[this.selectedProducer.level || 0];
-                
-                // Если это БАНК (maxSpawn = 0) или лимит достигнут
-                if (stats.maxSpawn === 0) {
-                    this.showError("БАНК НЕ ПРОИЗВОДИТ ЮНИТОВ!");
-                    return;
-                }
-                if (this.selectedProducer.spawnedCount >= stats.maxSpawn) {
-                    this.showError(`ЛИМИТ (${stats.maxSpawn}) ДОСТИГНУТ!`);
-                    return;
-                }
+                if (stats.maxSpawn === 0) { this.showError("БАНК НЕ СТРОИТ!"); return; }
+                if (this.selectedProducer.spawnedCount >= stats.maxSpawn) { this.showError("ЛИМИТ ДОМА!"); return; }
             }
 
-            // ОБЩИЕ ПРОВЕРКИ
+            // Общие проверки
             if (!this.selectedProducer.isPowered) { this.showError("ОБЕСТОЧЕНО!"); return; }
             if (this.selectedProducer.spawnCooldown > 0) { this.showError("ЗАНЯТО!"); return; }
-            if (this.money < uInfo.cost) { this.showError("НЕТ ДЕНЕГ!"); return; }
+            
+            // ПРОВЕРКА ЦЕНЫ (ДЕНЬГИ + РЕСУРСЫ)
+            if (!this.checkCost(type)) { this.showError("НЕДОСТАТОЧНО СРЕДСТВ!"); return; }
 
-            // ПОКУПКА
-            this.money -= uInfo.cost;
+            // ОПЛАТА И СТАРТ
+            this.payCost(type);
             this.selectedProducer.startProduction(type);
 
-            // Правильное обновление меню после покупки (чтобы не пропадала кнопка UPGRADE)
+            // Обновление UI меню (чтобы показать актуальные ресурсы)
             let menuItems = [...UNITS[this.selectedProducer.type].spawnList];
-            let menuTitle = this.selectedProducer.type === 'HOUSE' ? 'МЕНЮ ДОМА' : 'МЕНЮ ЗАВОДА';
+            let title = this.selectedProducer.type === 'HOUSE' ? HOUSE_UPGRADES[this.selectedProducer.level||0].name.toUpperCase() : 'МЕНЮ ЗАВОДА';
+            if (this.selectedProducer.type === 'HOUSE' && (this.selectedProducer.level||0) < 5) menuItems.push('UPGRADE_HOUSE');
+            
+            this.updateUI(menuItems, true, title);
 
-            if (this.selectedProducer.type === 'HOUSE') {
-                const lvl = this.selectedProducer.level || 0;
-                menuTitle = HOUSE_UPGRADES[lvl].name.toUpperCase();
-                if (lvl < 5) menuItems.push('UPGRADE_HOUSE');
-            }
-
-            this.updateUI(menuItems, true, menuTitle);
-
+            // Мультиплеер
             if (this.isMultiplayer && CURRENT_ROOM) {
                 this.socket.emit('gameCommand', {
                     roomName: CURRENT_ROOM,
@@ -1952,6 +2235,45 @@ menuAction(type) {
         }
     },
 
+    // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ДОБАВИТЬ В ОБЪЕКТ GAME) ---
+
+    // Проверяет, хватает ли места в кармане для результата крафта
+    hasSpaceForCraft(craftType) {
+        const product = UNITS[craftType].producedRes;
+        if (!product) return true;
+        
+        if (product.iron && this.resources.iron + product.iron > RES_LIMIT) return false;
+        if (product.chem && this.resources.chem + product.chem > RES_LIMIT) return false;
+        if (product.chips && this.resources.chips + product.chips > RES_LIMIT) return false;
+        
+        return true;
+    },
+
+    // Проверяет, хватает ли денег и ресурсов (Карман + Склад)
+    checkCost(type) {
+        const u = UNITS[type];
+        if (this.money < u.cost) return false;
+        if (!u.resCost) return true;
+
+        const total = this.getTotalResources(); // Функция суммирует карман и все склады
+        
+        if ((u.resCost.iron || 0) > total.iron) return false;
+        if ((u.resCost.chem || 0) > total.chem) return false;
+        if ((u.resCost.chips || 0) > total.chips) return false;
+        
+        return true;
+    },
+
+    // Списывает ресурсы (сначала карман, потом склад)
+    payCost(type) {
+        const u = UNITS[type];
+        this.money -= u.cost;
+        if (u.resCost) {
+            this.spendResource('iron', u.resCost.iron || 0);
+            this.spendResource('chem', u.resCost.chem || 0);
+            this.spendResource('chips', u.resCost.chips || 0);
+        }
+    },
 onMove(e) { 
         // Если рисуем путь с CTRL
         if (this.isDrawingPath) {
@@ -2042,8 +2364,8 @@ onUp(e) {
                     const builder = clicked.find(u => u.isBuilder);
                     this.selection = builder ? [builder] : clicked;
                     this._normalizeSelection();
-                    if (this.selection.length > 0 && this.selection[0].isBuilder) this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO'], true, 'МЕНЮ СТРОИТЕЛЯ');
-                    else if (this.selection.length > 0 && this.selection[0].type === 'HOSPITAL') this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
+                   if (this.selection.length > 0 && this.selection[0].isBuilder) this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO'], true, 'МЕНЮ СТРОИТЕЛЯ');
+else if (this.selection.length > 0 && this.selection[0].type === 'HOSPITAL') this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
                     else if (this.selection.length > 0 && this.selection[0].type === 'SILO') {
                         if (this.selection[0].nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(this.selection[0].nukeTimer/60)}s`);
                         else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
@@ -2490,7 +2812,7 @@ if (this.dragStart && this.dragCurr) {
                     else { this.buildType = key; document.querySelectorAll('.unit-card').forEach(c => c.classList.remove('active'));
                     div.classList.add('active'); }
                 };
-                if (u) div.innerHTML = `<div style="font-size:2em">${u.emoji}</div><div class="card-price">${u.cost}$</div>`;
+                if (u) div.innerHTML = `<div style="font-size:2em">${u.emoji}</div><div class="card-price" style="font-size:0.7em; line-height:1.1">${formatCost(u)}</div>`;
                 menu.appendChild(div);
             });
         }
@@ -2548,6 +2870,14 @@ class Unit {
         this.prevY = y;
         this.stuckTimer = 0;
     }
+
+    if (type === 'WAREHOUSE') {
+            this.storage = [];
+            for(let i=0; i<WAREHOUSE_SLOTS; i++) {
+                // Первый слот открыт, остальные закрыты
+                this.storage.push({ locked: i > 0, type: 'empty', count: 0 });
+            }
+        }
 
     applyBuffs() {
         const zone = Game.buffs.find(b => 
@@ -2620,6 +2950,7 @@ class Unit {
         this.target = {x: site.x, y: site.y}; 
         this.constructing = false; 
     }
+    
 
     startArtySequence(tx, ty) { 
         if (this.ammo > 0) { 
@@ -2842,6 +3173,20 @@ resolveCollision() {
             this.spawnCooldown -= factor;
             
             if (this.spawnCooldown <= 0) {
+                f (this.productionType.startsWith('CRAFT_')) {
+        const info = UNITS[this.productionType];
+        if (this.side === 'player') {
+            if (info.producedRes) {
+                if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
+                if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
+                if (info.producedRes.chips) Game.resources.chips += info.producedRes.chips;
+                Game.showError(`ПРОИЗВЕДЕНО: ${info.name}`);
+            }
+        }
+        Game.effects.push({x: this.x, y: this.y, char: '✅', life: 40});
+        // НЕ создаем юнита (new Unit...), просто завершаем
+        return; 
+    }
                 this.spawnedCount++;
                 if (!this.visualOnly) {
                     const angle = Math.random() * Math.PI * 2;

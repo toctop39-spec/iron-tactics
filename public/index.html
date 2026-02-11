@@ -1752,7 +1752,7 @@ Tutorial.update();
         this.camera.x = Math.max(0, Math.min(this.camera.x, MAP_W - canvas.width));
         this.camera.y = Math.max(0, Math.min(this.camera.y, MAP_H - canvas.height));
         if (this.state === 'BATTLE') {
-            if (this.isMultiplayer && this.frameCount % 300 === 0) {
+            if (this.isMultiplayer && this.frameCount % 30 === 0) {
                 const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({ id: u.id, x: u.x, y: u.y, hp: u.hp, loyalty: u.loyalty }));
                 if (myUnits.length > 0 && CURRENT_ROOM) {
                     this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits });

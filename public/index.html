@@ -2375,9 +2375,31 @@ menuAction(type) {
     },
 
 onUp(e) {
+        // --- ЛОГИКА РИСОВАНИЯ ПУТИ (CTRL) ---
         if (this.isDrawingPath) {
-            this.isDrawingPath = false;
-            this.drawPath = [];
+            this.isDrawingPath = false; // Выключаем режим рисования
+            
+            // Если путь достаточно длинный, отправляем юнитов
+            if (this.drawPath.length > 2) {
+                // 1. Копируем путь (чтобы он не удалился следующей строкой)
+                const pathToSend = [...this.drawPath];
+
+                // 2. Двигаем своих юнитов локально
+                const myUnits = this.selection.filter(u => u.side === this.myRole);
+                myUnits.forEach(u => u.setPath(pathToSend));
+
+                // 3. Отправляем команду в МУЛЬТИПЛЕЕР (чтобы враг видел движение)
+                if (this.isMultiplayer && CURRENT_ROOM && myUnits.length > 0) {
+                    const packet = myUnits.map(u => ({ id: u.id, path: pathToSend }));
+                    this.socket.emit('gameCommand', {
+                        roomName: CURRENT_ROOM,
+                        type: 'path_move',
+                        data: packet
+                    });
+                }
+            }
+
+            this.drawPath = []; // Теперь очищаем визуальную линию
             return;
         }
 

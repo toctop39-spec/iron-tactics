@@ -2375,7 +2375,12 @@ menuAction(type) {
     },
 
 onUp(e) {
-        // Если выделение не начиналось, ничего не делаем
+        if (this.isDrawingPath) {
+            this.isDrawingPath = false;
+            this.drawPath = [];
+            return;
+        }
+
         if (!this.dragStart) return;
 
         const m = this.getMouse(e);

@@ -347,15 +347,15 @@ const UNITS = {
     
     // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
     TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
-               cost: 5000, resCost: { iron: 100, chips: 2 }, // <--- НОВАЯ ЦЕНА
+               cost: 5000, resCost: { iron: 35, chem: 2 }, // <--- НОВАЯ ЦЕНА
                hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 25, buildTime: 20 },
     
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
-               cost: 8000, resCost: { iron: 150, chips: 5, chem: 3 }, // <--- НОВАЯ ЦЕНА
+               cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.4, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
     
     HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
-                  resCost: { iron: 300, chips: 8, chem: 8 }, // <--- НОВАЯ ЦЕНА
+                  resCost: { iron: 80, chips: 4, chem: 8 }, // <--- НОВАЯ ЦЕНА
                   hp: 800, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 20 },
     
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.8, color: '#e6c200', radius: 15, buildTime: 5, isBuilder: true },

@@ -281,7 +281,12 @@
 </div>
 
 <div id="lobby-screen" class="screen clickable hidden">
-    <h1 style="color:#4f4;">СЕТЕВАЯ ИГРА</h1>
+    <h1 style="color:#4f4;">
+        СЕТЕВАЯ ИГРА 
+        <span style="font-size: 0.5em; color: #aaa; margin-left: 15px;">
+            (Онлайн: <span id="online-count" style="color: #fff;">0</span>)
+        </span>
+    </h1>
     <div style="display:flex; gap: 40px;">
         <div class="spec-settings">
             <h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3>
@@ -878,9 +883,15 @@ const Lobby = {
         }
     },
 
-    setupEvents() {
+setupEvents() {
         const s = Game.socket;
         
+        // --- НОВЫЙ КОД: СЧЕТЧИК ОНЛАЙНА ---
+        s.on('update_online', (count) => {
+            const el = document.getElementById('online-count');
+            if (el) el.innerText = count;
+        });
+    
         s.on('room_created', (data) => {
             CURRENT_ROOM = data.roomName;
             Game.myRole = data.side;

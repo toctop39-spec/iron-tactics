@@ -3057,10 +3057,29 @@ class Unit {
         let canFight = true;
         if (this.type === 'GRAD' || this.type === 'SENTINEL' || this.type === 'SILO' || this.isBuilder || this.type === 'WAREHOUSE') canFight = false;
         
-        if (canFight) {
-            if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side) {
-                this.targetUnit = null; let min = this.range + 200; let near = null;
-                Game.units.forEach(u => { if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE') { let d = Math.hypot(u.x - this.x, u.y - this.y); if (d < min) { min = d; near = u; } } });
+       if (canFight) {
+            // --- ИСПРАВЛЕНИЕ: СБРОС ДАЛЕКОЙ ЦЕЛИ ---
+            // Считаем дистанцию до текущей цели (если она есть)
+            let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
+
+            // Сбрасываем цель, если:
+            // 1. Цели нет или она мертва
+            // 2. Цель стала "своей" (захватили)
+            // 3. Цель ушла слишком далеко (Радиус + 50 пикселей буфера)
+            if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
+                this.targetUnit = null;                
+                // Ищем НОВУЮ ближайшую цель
+                let min = this.range + 50; // Ищем чуть дальше своего радиуса, чтобы заранее реагировать
+                let near = null;
+                Game.units.forEach(u => {
+                    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE') {
+                        let d = Math.hypot(u.x - this.x, u.y - this.y);
+                        if (d < min) {
+                            min = d;
+                            near = u;
+                        }
+                    }
+                });
                 this.targetUnit = near;
             }
             let busy = false;

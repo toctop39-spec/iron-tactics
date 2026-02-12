@@ -346,7 +346,7 @@ const BUFF_TYPES = {
 };
 
 // --- КОНСТАНТЫ ЭКОНОМИКИ ---
-const RES_LIMIT = 99; 
+const RES_LIMIT = 100; 
 const MAX_MONEY_POCKET = 999999;
 const WAREHOUSE_SLOTS = 8;
 const SLOT_COST = 5000;
@@ -1274,6 +1274,16 @@ setFilter(type) {
         }
     },
 
+    getPlayerResLimit() {
+        const baseLimit = 100; // База без складов
+        const bonusPerWarehouse = 25; // Бонус за каждый склад
+        
+        // Считаем живые склады игрока
+        const count = this.units.filter(u => u.side === this.myRole && u.type === 'WAREHOUSE').length;
+        
+        return baseLimit + (count * bonusPerWarehouse);
+    },
+
    loadedImages: {}, // Сюда мы сохраним загруженные картинки
 
     preloadAssets() {
@@ -1481,12 +1491,16 @@ setFilter(type) {
         }
     },
     
-    hasSpaceForCraft(craftType) {
+hasSpaceForCraft(craftType) {
         const product = UNITS[craftType].producedRes;
         if (!product) return true;
-        if (product.iron && this.resources.iron + product.iron > RES_LIMIT) return false;
-        if (product.chem && this.resources.chem + product.chem > RES_LIMIT) return false;
-        if (product.chips && this.resources.chips + product.chips > RES_LIMIT) return false;
+        
+        // ИСПОЛЬЗУЕМ ДИНАМИЧЕСКИЙ ЛИМИТ
+        const currentLimit = this.getPlayerResLimit(); 
+
+        if (product.iron && this.resources.iron + product.iron > currentLimit) return false;
+        if (product.chem && this.resources.chem + product.chem > currentLimit) return false;
+        if (product.chips && this.resources.chips + product.chips > currentLimit) return false;
         return true;
     },
     
@@ -1968,9 +1982,11 @@ Tutorial.update();
         document.getElementById('res-iron').innerText = Math.floor(this.resources.iron);
         document.getElementById('res-chem').innerText = Math.floor(this.resources.chem);
         document.getElementById('res-chips').innerText = Math.floor(this.resources.chips);
+  const currentLimit = this.getPlayerResLimit(); // Получаем текущий лимит
         ['iron', 'chem', 'chips'].forEach(r => {
             const el = document.getElementById(`res-${r}`);
-            if (this.resources[r] >= RES_LIMIT) el.classList.add('res-full'); else el.classList.remove('res-full');
+            // Сравниваем с динамическим лимитом
+            if (this.resources[r] >= currentLimit) el.classList.add('res-full'); else el.classList.remove('res-full');
         });
 
         // 2. РАСЧЕТ ЭНЕРГИИ
@@ -2355,7 +2371,8 @@ menuAction(type) {
                     else if(this.resources.chips>0) rType='chips'; else if(this.money>0) rType='money';
                     else { this.showError("КАРМАНЫ ПУСТЫ!"); return; }
                 }
-                const limit = (rType==='money')?MAX_MONEY_POCKET:RES_LIMIT;
+               // Если деньги - лимит кошелька, если ресурсы - наш новый динамический лимит
+const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
                 const pocket = (rType==='money')?this.money:this.resources[rType];
                 const transfer = Math.min(limit - slot.count, pocket);
                 

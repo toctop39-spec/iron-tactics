@@ -718,6 +718,14 @@ class BotAI {
     manageBase() {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const builders = myUnits.filter(u => u.isBuilder && !u.constructing && !u.assignedSite);
+
+        // --- ЗАПЛАТКА ДЛЯ НАКОПЛЕНИЯ ---
+        const factories = myUnits.filter(u => u.type === 'FACTORY').length;
+        // Если у нас уже есть завод, но денег меньше 5000 (цена танка) - НЕ СТРОИМ НИЧЕГО
+        // (Исключение: если вообще нет энергии, тогда строим СЭС)
+        if (factories > 0 && this.money < 5000 && this.energyFactor > 1) {
+             return; 
+        }
         
         // АПГРЕЙДЫ
         if (this.energyFactor > 1.3) {
@@ -887,69 +895,74 @@ class BotAI {
     }
 
 manageIndustry() {
-        // Получаем доступные заводы
         const factories = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY' && u.spawnCooldown <= 0 && u.isPowered);
-        
-        // Считаем текущую армию
         const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer);
+        
         const tanks = army.filter(u => u.type === 'TANK').length;
         const helis = army.filter(u => u.type === 'HELICOPTER').length;
         const grads = army.filter(u => u.type === 'GRAD').length;
 
         factories.forEach(f => {
-            // 1. ОПРЕДЕЛЯЕМ ЦЕЛЬ (Что хотим построить?)
+            // 1. ВЫБИРАЕМ ЦЕЛЬ (Что хотим купить?)
             let targetUnit = 'TANK';
-            
-            // Если есть хотя бы 3 танка, начинаем строить вертолеты
             if (tanks >= 3 && helis < tanks / 2) targetUnit = 'HELICOPTER';
-            // Если есть и танки и вертолеты, строим артиллерию
             else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
 
             const uInfo = UNITS[targetUnit];
-            const cost = uInfo.resCost || { iron: 0, chem: 0, chips: 0 };
-
-            // 2. ПРОВЕРКА: Хватает ли всего прямо сейчас?
-            // Если хватает денег И ресурсов — СТРОИМ!
-            if (this.money >= uInfo.cost && this.checkRes(uInfo)) {
-                this.payRes(uInfo);
-                this.craft(f, targetUnit);
-                return; // Успех, переходим к следующему заводу
-            }
-
-            // 3. ЕСЛИ НЕ ХВАТАЕТ — КРАФТИМ НЕДОСТАЮЩЕЕ (Цепочка производства)
             
-            // А) Нужны чипы? (Для Градов и Вертолетов)
-            if (cost.chips > this.resources.chips) {
-                // Для чипа нужно: 15 железа, 15 химии. Проверяем ингридиенты:
-                if (this.resources.iron >= 15 && this.resources.chem >= 15) {
-                    this.craft(f, 'CRAFT_CHIP'); return;
-                }
-                // Если не хватает химии для чипа — делаем химию
-                if (this.resources.chem < 15) {
-                    if (this.resources.iron >= 10) { this.craft(f, 'CRAFT_CHEM'); return; }
-                    else { this.craft(f, 'CRAFT_IRON'); return; } // Нет железа даже на химию
-                }
-            }
+            // Проверяем, хватает ли ресурсов (не денег, а именно материалов)
+            const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
+            const hasChem = this.resources.chem >= (uInfo.resCost.chem || 0);
+            const hasChips = this.resources.chips >= (uInfo.resCost.chips || 0);
+            const hasAllRes = hasIron && hasChem && hasChips;
 
-            // Б) Нужна химия? (Для Танков и Чипов)
-            if (cost.chem > this.resources.chem) {
-                // Для химии нужно 10 железа
-                if (this.resources.iron >= 10) {
-                    this.craft(f, 'CRAFT_CHEM'); return;
+            // СЦЕНАРИЙ А: Ресурсы есть, но денег нет?
+            if (hasAllRes) {
+                if (this.money >= uInfo.cost) {
+                    // Ура! Есть и деньги, и ресурсы -> ПОКУПАЕМ ТАНК
+                    this.payRes(uInfo);
+                    this.craft(f, targetUnit);
+                    return; 
                 } else {
-                    this.craft(f, 'CRAFT_IRON'); return; // Нет железа на химию
+                    // Ресурсы есть, но денег МАЛО -> ЖДЕМ!
+                    // Самое важное: return, чтобы не тратить деньги на мусор
+                    return; 
                 }
             }
 
-            // В) Нужно железо? (Базовый ресурс)
-            // Если железа не хватает на танк ИЛИ его просто мало (< 50) — крафтим
-            if (cost.iron > this.resources.iron || this.resources.iron < 50) {
-                this.craft(f, 'CRAFT_IRON');
-                return;
+            // СЦЕНАРИЙ Б: Чего-то не хватает. Крафтим ТОЛЬКО то, чего нет.
+            
+            // 1. Нужны чипы?
+            if (!hasChips) {
+                // Если есть ингредиенты для чипа - делаем чип
+                if (this.resources.iron >= 15 && this.resources.chem >= 15) {
+                    // Но только если деньги позволяют не уйти в минус
+                    if (this.money > 2000) { this.craft(f, 'CRAFT_CHIP'); return; }
+                }
+                // Если не хватает химии для чипа
+                if (this.resources.chem < 15) {
+                    if (this.resources.iron >= 10 && this.money > 500) { this.craft(f, 'CRAFT_CHEM'); return; }
+                }
+            }
+
+            // 2. Нужна химия? (Или для танка, или для чипа)
+            if (!hasChem) {
+                if (this.resources.iron >= 10 && this.money > 300) { 
+                    this.craft(f, 'CRAFT_CHEM'); return; 
+                }
+            }
+
+            // 3. Нужно железо?
+            if (!hasIron) {
+                // Крафтим железо, только если его реально не хватает для цели
+                // И стараемся оставить хотя бы 100$ на счету
+                if (this.money > 100) { 
+                    this.craft(f, 'CRAFT_IRON'); return; 
+                }
             }
         });
     }
-
+    
     manageHouse() {
         const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
         

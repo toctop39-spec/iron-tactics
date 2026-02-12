@@ -785,24 +785,36 @@ class BotAI {
         }
     }
 
-    placeBuildingSmart(builder, type) {
+  placeBuildingSmart(builder, type) {
         const base = Game.units.find(u => u.side === this.side && u.type === 'HOUSE') || builder;
-        const step = 85; // Шаг застройки
         
-        // Сканируем кругами от центра
-        for (let r = 1; r < 12; r++) { 
-            const points = r * 8; // Больше точек проверки
+        // --- НАСТРОЙКИ ПРОСТОРА ---
+        const step = 150; // Расстояние между кольцами (БЫЛО 85)
+        const spacing = 140; // Расстояние между зданиями (БЫЛО 80)
+        // --------------------------
+
+        // Идем широкими кругами (до 25 кругов, так как база широкая)
+        for (let r = 1; r < 25; r++) { 
+            // Уменьшили количество точек на круг, чтобы не лепили часто
+            const points = Math.floor(r * 4.5); 
+            
             for (let i = 0; i < points; i++) {
                 const angle = (Math.PI * 2 / points) * i;
-                const tx = base.x + Math.cos(angle) * (r * step);
-                const ty = base.y + Math.sin(angle) * (r * step);
+                
+                // Добавляем немного рандома (шума), чтобы не было идеальной сетки роботов
+                const noiseX = (Math.random() - 0.5) * 30;
+                const noiseY = (Math.random() - 0.5) * 30;
 
-                if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
-                if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 50)) continue;
+                const tx = base.x + Math.cos(angle) * (r * step) + noiseX;
+                const ty = base.y + Math.sin(angle) * (r * step) + noiseY;
 
-                // Проверяем место
-                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 80) || 
-                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 80);
+                // Границы карты (отступаем побольше, 200px)
+                if (tx < 200 || tx > MAP_W-200 || ty < 200 || ty > MAP_H-200) continue;
+                if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 60)) continue;
+
+                // ПРОВЕРКА ДИСТАНЦИИ (Самое важное)
+                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < spacing) || 
+                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < spacing);
 
                 if (!busy) {
                     this.money -= UNITS[type].cost;

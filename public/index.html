@@ -109,17 +109,11 @@
         }
         /* Добавляем стили для кнопок фильтра */
 .filter-btn {
-    background: #222; 
-    color: #fff; 
-    border: 1px solid #555; 
-    padding: 5px 8px; 
-    cursor: pointer; 
-    font-size: 1.1em;
-    border-radius: 4px;
-    margin-right: 2px;
-    transition: 0.2s;
+    background: #222; color: #fff; border: 1px solid #555; 
+    padding: 5px 8px; cursor: pointer; font-size: 1.1em;
+    border-radius: 4px; margin-right: 2px;
 }
-.filter-btn:hover { background: #444; border-color: #888; }
+/* Желтая подсветка только для класса active */
 .filter-btn.active { 
     background: #ffaa00; 
     color: #000; 
@@ -241,17 +235,18 @@
             </div>
             
 <div id="speed-controls">
-    <button class="speed-btn active" onclick="Game.setSpeed(1)">1x</button>
-    <button class="speed-btn" onclick="Game.setSpeed(2)">2x</button>
-    <button class="speed-btn" onclick="Game.setSpeed(5)">5x</button>
+    <button class="speed-btn time-btn active" onclick="Game.setSpeed(1)">1x</button>
+    <button class="speed-btn time-btn" onclick="Game.setSpeed(2)">2x</button>
+    <button class="speed-btn time-btn" onclick="Game.setSpeed(5)">5x</button>
+    
     <button class="speed-btn" style="margin-left: 5px; background: #5544aa; color: white;" onclick="Game.toggleTerritoryMode()">🗺️</button>
     
     <div style="width: 2px; height: 20px; background: #555; margin: 0 10px;"></div>
     
-    <button class="filter-btn" title="Только строители" onclick="Game.setFilter('BUILDER')">👷</button>
-    <button class="filter-btn" title="Только армия" onclick="Game.setFilter('ARMY')">⚔️</button>
-    <button class="filter-btn" title="Только дома" onclick="Game.setFilter('HOUSE')">🏠</button>
-    <button class="filter-btn" title="Только заводы" onclick="Game.setFilter('FACTORY')">🏭</button>
+    <button id="btn-filt-build" class="filter-btn" title="Только строители" onclick="Game.setFilter('BUILDER')">👷</button>
+    <button id="btn-filt-army" class="filter-btn" title="Только армия" onclick="Game.setFilter('ARMY')">⚔️</button>
+    <button id="btn-filt-house" class="filter-btn" title="Только дома" onclick="Game.setFilter('HOUSE')">🏠</button>
+    <button id="btn-filt-fact" class="filter-btn" title="Только заводы" onclick="Game.setFilter('FACTORY')">🏭</button>
 </div>
         </div>
         <div id="phase-text" style="color:#aaa">МЕНЮ</div>
@@ -1019,10 +1014,17 @@ setupEvents() {
             document.getElementById('lobby-screen').classList.add('hidden');
         });
 
-        s.on('start_game_signal', () => {
+s.on('start_game_signal', () => {
             document.getElementById('connection-warning').style.display = 'none';
-            // Отключаем кнопки скорости в МП
-            document.getElementById('speed-controls').style.display = 'none';
+            
+            // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+            // Раньше мы скрывали весь speed-controls.
+            // Теперь скрываем ТОЛЬКО кнопки времени (time-btn)
+            document.querySelectorAll('.time-btn').forEach(b => b.style.display = 'none');
+            
+            // Убеждаемся, что сама панель видима (для карты и фильтров)
+            document.getElementById('speed-controls').style.display = 'flex';
+            
             Game.speed = 1;
             Game.loadPvpLevel();
         });
@@ -1248,19 +1250,29 @@ const Game = {
         this.showError(`РЕЖИМ КАРТЫ: ${modes[this.territoryMode]}`);
     },
 
-    setFilter(type) {
+setFilter(type) {
+        // 1. Логика переключения (ВКЛ/ВЫКЛ)
         if (this.selectionFilter === type) {
-            this.selectionFilter = null; // Если нажали ту же кнопку - сброс
+            this.selectionFilter = null; // Отключаем, если нажали ту же кнопку
             this.showError("ФИЛЬТР: ВЫКЛ (ВСЕ)");
         } else {
-            this.selectionFilter = type;
-            let name = "";
-            if(type === 'BUILDER') name = "СТРОИТЕЛИ";
-            if(type === 'ARMY') name = "АРМИЯ";
-            if(type === 'HOUSE') name = "ДОМА";
-            if(type === 'FACTORY') name = "ЗАВОДЫ";
+            this.selectionFilter = type; // Включаем новый
+            let name = (type==='BUILDER')?"СТРОИТЕЛИ":(type==='ARMY')?"АРМИЯ":(type==='HOUSE')?"ДОМА":"ЗАВОДЫ";
             this.showError(`ФИЛЬТР: ТОЛЬКО ${name}`);
         }
+
+        // 2. Логика подсветки (Визуал)
+        // Сначала убираем 'active' со всех кнопок фильтров
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+
+        // Если фильтр включен (не null), подсвечиваем нужную кнопку
+        if (this.selectionFilter) {
+            if (this.selectionFilter === 'BUILDER') document.getElementById('btn-filt-build').classList.add('active');
+            if (this.selectionFilter === 'ARMY') document.getElementById('btn-filt-army').classList.add('active');
+            if (this.selectionFilter === 'HOUSE') document.getElementById('btn-filt-house').classList.add('active');
+            if (this.selectionFilter === 'FACTORY') document.getElementById('btn-filt-fact').classList.add('active');
+        }
+    },
         
         // Обновляем визуальный вид кнопок
         document.querySelectorAll('.filter-btn').forEach(b => {

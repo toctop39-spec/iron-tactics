@@ -715,20 +715,20 @@ class BotAI {
         else this.energyFactor = gen / use;
     }
 
-    manageBase() {
+manageBase() {
         const myUnits = Game.units.filter(u => u.side === this.side);
-        const builders = myUnits.filter(u => u.isBuilder && !u.constructing && !u.assignedSite);
-
-        // --- ЗАПЛАТКА ДЛЯ НАКОПЛЕНИЯ ---
+        
+        // --- ЗАПЛАТКА ДЛЯ НАКОПЛЕНИЯ НА ТАНК ---
         const factories = myUnits.filter(u => u.type === 'FACTORY').length;
-        // Если у нас уже есть завод, но денег меньше 5000 (цена танка) - НЕ СТРОИМ НИЧЕГО
-        // (Исключение: если вообще нет энергии, тогда строим СЭС)
-        if (factories > 0 && this.money < 5000 && this.energyFactor > 1) {
+        // Если уже есть завод, но денег мало для танка - копим (не строим), кроме СЭС
+        if (factories > 0 && this.money < 5000 && this.energyFactor > 1.2) {
              return; 
         }
+
+        const builders = myUnits.filter(u => u.isBuilder && !u.constructing && !u.assignedSite);
         
-        // АПГРЕЙДЫ
-        if (this.energyFactor > 1.3) {
+        // АПГРЕЙДЫ (Оставляем как было, но чуть реже, чтобы деньги шли на экспансию)
+        if (this.energyFactor > 1.5 && this.money > 3000) {
             const houses = myUnits.filter(u => u.type === 'HOUSE' && (u.level || 0) < 5);
             houses.sort((a, b) => (a.level||0) - (b.level||0));
             if (houses.length > 0) {
@@ -743,6 +743,43 @@ class BotAI {
                 }
             }
         }
+
+        if (builders.length === 0) return;
+        const builder = builders[0];
+
+        // 1. ЭНЕРГИЯ (Критично)
+        const unpowered = myUnits.filter(u => !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
+        if ((this.energyFactor < 1.3 || unpowered.length > 0) && this.money >= UNITS.POWER_PLANT.cost) {
+            if (this.placePowerPlantSmart(builder)) return;
+        }
+
+        // 2. СЧИТАЕМ ЗДАНИЯ
+        const houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
+        const whCount = myUnits.filter(u => u.type === 'WAREHOUSE').length;
+        const defenseCount = myUnits.filter(u => u.type === 'SENTINEL' || u.type === 'AA_DEFENSE').length;
+
+        let buildTarget = null;
+
+        // 3. ПРИОРИТЕТЫ (Агрессивная экспансия)
+        
+        // Сначала база: 3 дома -> Завод
+        if (houseCount < 3 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE';
+        else if (factories < 1 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
+        
+        // Если база есть -> Расширяемся!
+        else if (defenseCount < houseCount / 3 && this.money >= UNITS.SENTINEL.cost) buildTarget = 'SENTINEL'; // Немного защиты
+        else if (whCount < factories && this.money >= UNITS.WAREHOUSE.cost) buildTarget = 'WAREHOUSE'; // Склады
+        else if (factories < Math.ceil(houseCount / 6) && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY'; // Новые заводы при росте
+        
+        // БЕСКОНЕЧНАЯ ЭКСПАНСИЯ: Если есть деньги (> 800) и энергия — строим ДОМ, чтобы захватить землю
+        else if (this.money >= UNITS.HOUSE.cost + 500 && this.energyFactor > 1.1) {
+            buildTarget = 'HOUSE';
+        }
+
+        if (buildTarget) {
+            this.placeBuildingGeneral(builder, buildTarget);
+        }
+    }
 
         if (builders.length === 0) return;
         const builder = builders[0];
@@ -852,36 +889,56 @@ class BotAI {
         return this.placeBuildingGeneral(builder, 'POWER_PLANT');
     }
 
-    // Обычная стройка для остальных зданий
-    placeBuildingGeneral(builder, type) {
+  placeBuildingGeneral(builder, type) {
         const myUnits = Game.units.filter(u => u.side === this.side);
         let anchors = [];
 
+        // Для заводов и складов ищем место рядом с другими заводами (индустриальная зона)
         if (type === 'FACTORY' || type === 'WAREHOUSE') {
             anchors = myUnits.filter(u => u.type === 'FACTORY');
-            if (anchors.length === 0) anchors = myUnits.filter(u => u.type === 'HOUSE');
-        }
-        else if (type === 'SENTINEL' || type === 'AA_DEFENSE') {
-            anchors = myUnits.filter(u => u.type === 'HOUSE' || u.type === 'FACTORY' || u.type === 'SILO');
+            if (anchors.length === 0) anchors = myUnits; // Если нет заводов, строим где угодно
         }
         else {
-            anchors = myUnits.filter(u => u.type === 'HOUSE');
+            // Для домов и турелей используем ВСЕ здания как опорные точки
+            anchors = myUnits;
         }
 
-        if (anchors.length === 0) anchors = myUnits.length > 0 ? myUnits : [builder];
+        if (anchors.length === 0) anchors = [builder];
 
-        for (let i = 0; i < 30; i++) {
+        // Центр карты (туда будем стремиться)
+        const centerX = MAP_W / 2;
+        const centerY = MAP_H / 2;
+
+        for (let i = 0; i < 40; i++) {
+            // Берем случайное здание
             const anchor = anchors[Math.floor(Math.random() * anchors.length)];
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 90 + Math.random() * 100;
+            
+            // --- ЭКСПАНСИЯ ---
+            // Увеличиваем радиус поиска! Было 90-100, стало 150-350.
+            // Это заставит бота строить "широко".
+            const dist = 150 + Math.random() * 200; 
+            
+            // Пытаемся слегка направить угол в сторону центра карты (чтобы не жаться по углам)
+            let angle = Math.random() * Math.PI * 2;
+            
+            // С шансом 50% выбираем направление к центру карты + случайное отклонение
+            if (Math.random() > 0.5) {
+                const angleToCenter = Math.atan2(centerY - anchor.y, centerX - anchor.x);
+                angle = angleToCenter + (Math.random() - 0.5); // +/- 30 градусов
+            }
+
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
 
+            // Проверка границ
             if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
+            
+            // Проверка воды и гор
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 60)) continue;
 
-            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 110) || 
-                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 110);
+            // Проверка, что место свободно (радиус проверки тоже чуть увеличим)
+            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 130) || 
+                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 130);
 
             if (!busy) {
                 this.money -= UNITS[type].cost;

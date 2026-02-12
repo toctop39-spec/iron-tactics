@@ -648,37 +648,31 @@ class BotAI {
         this.energyFactor = 1;
         this.timer = 0;
         
-        // Личность бота
         this.personality = {
-            aggression: 0.3 + Math.random() * 0.7, // Агрессивность
-            saveMoney: 2000 + Math.random() * 3000 // Сколько денег держать "на черный день"
+            aggression: 0.3 + Math.random() * 0.7, 
+            saveMoney: 1500 + Math.random() * 2000 
         };
 
-        // Виртуальные ресурсы бота
         this.resources = { iron: 0, chem: 0, chips: 0 };
     }
 
     update() {
         this.timer++;
         
-        // 1. ЭКОНОМИКА (Раз в секунду)
         if (this.timer % 60 === 0) {
             this.calcEnergy();
             this.collectIncome();
         }
 
-        // 2. МОЗГ СТРОИТЕЛЯ (Раз в секунду)
         if (this.timer % 60 === 0) {
             this.manageConstruction(); 
             this.manageUpgrades();     
         }
 
-        // 3. МОЗГ ПРОИЗВОДИТЕЛЯ (Раз в 0.5 сек)
         if (this.timer % 30 === 0) {
             this.manageProduction();   
         }
 
-        // 4. ВОЙНА (Часто)
         if (this.timer % 10 === 0) {
             this.manageCombat();       
         }
@@ -698,21 +692,28 @@ class BotAI {
             }
         });
         this.money += income;
-        if (this.money < 50) this.money += 15; // Пособие по безработице, чтобы совсем не завис
+        if (this.money < 50) this.money += 15;
     }
 
+    // --- ИСПРАВЛЕННЫЙ РАСЧЕТ ЭНЕРГИИ ---
     calcEnergy() {
         let gen = 0, use = 0;
         Game.units.filter(u => u.side === this.side).forEach(u => {
             if (UNITS[u.type].energyGen) gen += UNITS[u.type].energyGen;
-            if (u.isPowered && UNITS[u.type].energyUse) {
-                // Учитываем реальное потребление домов с апгрейдами
-                if (u.type === 'HOUSE') use += HOUSE_UPGRADES[u.level||0].energy;
-                else use += UNITS[u.type].energyUse;
+            
+            // Считаем потребление только если здание включено или пытается работать
+            if (UNITS[u.type].energyUse) {
+                let val = 0;
+                if (u.type === 'HOUSE') val = HOUSE_UPGRADES[u.level||0].energy;
+                else val = UNITS[u.type].energyUse;
+                
+                use += val;
             }
         });
-        this.energyFactor = (use > gen) ? (gen / use) : 1;
-        if (this.energyFactor < 0.1) this.energyFactor = 0.1;
+
+        // ТЕПЕРЬ ФАКТОР МОЖЕТ БЫТЬ БОЛЬШЕ 1 (например 2.5)
+        if (use === 0) this.energyFactor = 10; // Если потребления нет, энергии "бесконечно" много
+        else this.energyFactor = gen / use;
     }
 
     // --- ЛОГИКА СТРОИТЕЛЬСТВА ---
@@ -723,45 +724,44 @@ class BotAI {
 
         const builder = builders[0]; 
 
-        // Считаем наши здания
         const houses = myUnits.filter(u => u.type === 'HOUSE').length;
         const factories = myUnits.filter(u => u.type === 'FACTORY').length;
-        const powerPlants = myUnits.filter(u => u.type === 'POWER_PLANT').length;
         const warehouses = myUnits.filter(u => u.type === 'WAREHOUSE').length;
         const defense = myUnits.filter(u => u.type === 'SENTINEL' || u.type === 'AA_DEFENSE').length;
 
         let targetType = null;
 
-        // ПРАВИЛО №1: ЭНЕРГИЯ ПРЕВЫШЕ ВСЕГО
-        // Если энергии впритык (фактор < 1.2), строим ТОЛЬКО СЭС.
-        // Игнорируем всё остальное.
-        if (this.energyFactor < 1.2 && this.money >= UNITS.POWER_PLANT.cost) {
+        // 1. АВАРИЙНАЯ ЭНЕРГИЯ
+        // Строим СЭС только если энергии меньше 110% (запас 10%)
+        // Раньше тут была ошибка с 1.2
+        if (this.energyFactor < 1.1 && this.money >= UNITS.POWER_PLANT.cost) {
             targetType = 'POWER_PLANT';
         }
-        else if (this.energyFactor >= 1.2) {
-            // Если энергии хватает, думаем дальше:
+        else {
+            // Если с энергией всё ок, строим базу:
 
-            // 1. Нужна база (2 дома минимум)
+            // 1. Нужна база (2 дома)
             if (houses < 2 && this.money >= UNITS.HOUSE.cost) targetType = 'HOUSE';
             
-            // 2. Нужен завод (если есть 2 дома)
+            // 2. Нужен завод 
             else if (houses >= 2 && factories < 1 && this.money >= UNITS.FACTORY.cost) targetType = 'FACTORY';
             
-            // 3. Нужен склад (чтобы копить ресурсы)
+            // 3. Нужен склад
             else if (factories >= 1 && warehouses < 1 && this.money >= UNITS.WAREHOUSE.cost) targetType = 'WAREHOUSE';
             
-            // 4. Оборона (если есть завод)
+            // 4. Оборона
             else if (factories >= 1 && defense < 3 && this.money >= UNITS.SENTINEL.cost) {
                 targetType = (Math.random() > 0.4) ? 'SENTINEL' : 'AA_DEFENSE';
             }
 
-            // 5. Расширение (если денег куры не клюют)
+            // 5. Расширение (если денег много)
             else if (this.money > this.personality.saveMoney) {
                 const roll = Math.random();
-                if (roll < 0.3) targetType = 'HOUSE';
-                else if (roll < 0.5) targetType = 'FACTORY';
-                else if (roll < 0.6) targetType = 'SILO';
-                else targetType = 'POWER_PLANT'; // На всякий случай запас энергии
+                if (roll < 0.4) targetType = 'HOUSE';
+                else if (roll < 0.7) targetType = 'FACTORY';
+                else if (roll < 0.9) targetType = 'SILO';
+                // Иногда строим СЭС на будущее, но редко
+                else if (this.energyFactor < 1.5) targetType = 'POWER_PLANT';
             }
         }
 
@@ -771,21 +771,17 @@ class BotAI {
     }
 
     tryPlaceBuilding(builder, type) {
-        // Ищем "центр" базы (первый дом), чтобы строить вокруг него
         const base = Game.units.find(u => u.side === this.side && u.type === 'HOUSE') || builder;
         
-        for (let i = 0; i < 15; i++) { // 15 попыток найти место
+        for (let i = 0; i < 15; i++) {
             const angle = Math.random() * Math.PI * 2;
-            // Строим плотненько (80-200 пикселей от центра), а не на краю карты
             const dist = 80 + Math.random() * 250; 
             const tx = base.x + Math.cos(angle) * dist;
             const ty = base.y + Math.sin(angle) * dist;
 
-            // Проверки границ и ландшафта
             if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 50)) continue;
 
-            // Проверка: не слишком ли близко к другим
             const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 90) || 
                          Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 90);
 
@@ -800,61 +796,46 @@ class BotAI {
         return false;
     }
 
-    // --- ЛОГИКА ПРОИЗВОДСТВА ---
     manageProduction() {
         const myFactories = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY' && u.spawnCooldown <= 0 && u.isPowered);
         const myHouses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
 
         myFactories.forEach(factory => {
-            // АЛГОРИТМ: Что нам нужно для победы?
-            
-            // 1. Нужны ресурсы? Крафтим.
-            // Железо - база всего. Нужно всегда держать запас ~50.
+            // КРАФТ РЕСУРСОВ
             if (this.resources.iron < 50 && this.money >= UNITS.CRAFT_IRON.cost) {
-                this.produce(factory, 'CRAFT_IRON');
-                return;
+                this.produce(factory, 'CRAFT_IRON'); return;
             }
-            // Химия - нужна для танков. Держим запас ~20.
             if (this.resources.chem < 20 && this.resources.iron >= 10 && this.money >= UNITS.CRAFT_CHEM.cost) {
-                this.produce(factory, 'CRAFT_CHEM');
-                return;
+                this.produce(factory, 'CRAFT_CHEM'); return;
             }
-            // Чипы - нужны для Градов. Держим запас ~10.
             if (this.resources.chips < 10 && this.resources.iron >= 15 && this.resources.chem >= 15) {
-                this.produce(factory, 'CRAFT_CHIP');
-                return;
+                this.produce(factory, 'CRAFT_CHIP'); return;
             }
 
-            // 2. Есть ресурсы? Строим армию!
-            // Танк (Основная сила)
+            // АРМИЯ
             if (this.checkRes(UNITS.TANK) && this.money >= UNITS.TANK.cost) {
                 this.payRes(UNITS.TANK);
                 this.produce(factory, 'TANK');
             }
-            // Град (Артиллерия - если уже есть танки)
             else if (this.checkRes(UNITS.GRAD) && this.money >= UNITS.GRAD.cost) {
                 const tankCount = Game.units.filter(u => u.side === this.side && u.type === 'TANK').length;
-                if (tankCount > 2) { // Строим Грады только под прикрытием танков
+                if (tankCount > 2) {
                     this.payRes(UNITS.GRAD);
                     this.produce(factory, 'GRAD');
                 }
             }
         });
 
-        // Дома строят пехоту и строителей
         myHouses.forEach(house => {
             const builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
             const armySize = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer).length;
 
-            // Всегда нужно 2-3 строителя. Если их убили — срочно рожаем новых.
             if (builders < 3 && this.money >= UNITS.BUILDER.cost) {
                 this.produce(house, 'BUILDER');
             } 
-            // Если армия мала, клепаем пехоту (дешево и сердито)
             else if (armySize < 10 && this.money >= UNITS.SOLDIER.cost) {
                 this.produce(house, 'SOLDIER');
             }
-            // Если есть деньги, делаем снайперов
             else if (this.money >= UNITS.SNIPER.cost * 2) {
                 this.produce(house, 'SNIPER');
             }
@@ -862,13 +843,11 @@ class BotAI {
     }
 
     manageUpgrades() {
-        // УЛУЧШАЕМ ДОМА ТОЛЬКО ЕСЛИ:
-        // 1. У нас много денег (> 4000)
-        // 2. У нас ОГРОМНЫЙ запас энергии (factor > 1.5), так как апгрейд сожрет свет
+        // Улучшаем, только если есть лишние деньги И лишняя энергия (factor > 1.5)
         if (this.money > 4000 && this.energyFactor > 1.5) {
             const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && (u.level || 0) < 3);
             if (houses.length > 0) {
-                const h = houses[Math.floor(Math.random() * houses.length)]; // Случайный дом
+                const h = houses[Math.floor(Math.random() * houses.length)];
                 const nextCost = HOUSE_UPGRADES[(h.level||0)+1].cost;
                 
                 if (this.money >= nextCost) {
@@ -880,27 +859,22 @@ class BotAI {
         }
     }
 
-    // --- БОЕВАЯ СИСТЕМА ---
     manageCombat() {
         const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type !== 'SILO');
         const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0);
 
         if (enemies.length === 0) return;
 
-        // 1. УПРАВЛЕНИЕ АРТИЛЛЕРИЕЙ (ГРАДЫ)
+        // Артиллерия
         const grads = army.filter(u => u.type === 'GRAD' && u.ammo > 0);
         grads.forEach(grad => {
-            // Ищем здания врага в радиусе поражения
             const target = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-grad.x, e.y-grad.y) < grad.range);
-            if (target && !grad.gradSeq) {
-                grad.fireArty(target.x, target.y); // ОГОНЬ!
-            }
+            if (target && !grad.gradSeq) grad.fireArty(target.x, target.y);
         });
 
-        // 2. АВТО-ПЕРЕЗАРЯДКА
+        // Перезарядка
         const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
         emptyUnits.forEach(u => {
-            // Перезаряжаем, если есть деньги и нет врагов прямо перед носом
             const safe = !enemies.some(e => Math.hypot(e.x-u.x, e.y-u.y) < 300);
             if (safe && this.money >= 1000) {
                 this.money -= 1000;
@@ -909,17 +883,14 @@ class BotAI {
             }
         });
 
-        // 3. ОБЩАЯ АТАКА
-        // Если армия достаточно большая (больше 5 юнитов), начинаем искать врага
+        // Атака
         if (army.length > 5 && this.timer % 200 === 0) {
-            // Приоритет целей: 1. База врага 2. Любой враг
             let target = enemies.find(e => e.type === 'HOUSE');
             if (!target) target = enemies[0];
 
             if (target) {
                 army.forEach(u => {
-                    if (!u.target) { // Если юнит стоит без дела
-                        // Посылаем не в одну точку, а с разбросом (чтобы не толпились)
+                    if (!u.target) {
                         u.moveCmd(target.x + (Math.random()-0.5)*150, target.y + (Math.random()-0.5)*150);
                     }
                 });
@@ -927,7 +898,6 @@ class BotAI {
         }
     }
 
-    // Вспомогательные функции для ресурсов
     produce(building, type) {
         if (type.startsWith('CRAFT_')) {
             const info = UNITS[type];
@@ -964,7 +934,6 @@ class BotAI {
     }
     
     checkPanic() {
-        // Если базу бьют - все на защиту!
         const base = Game.units.find(u => u.side === this.side && u.isProducer);
         if (base) {
             const enemiesNear = Game.units.some(u => u.side !== this.side && Math.hypot(u.x - base.x, u.y - base.y) < 400);
@@ -975,7 +944,7 @@ class BotAI {
         }
     }
 }
-
+    
 const Lobby = {
     init() {
         // Скрываем главное меню, показываем лобби

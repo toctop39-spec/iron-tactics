@@ -1273,17 +1273,6 @@ setFilter(type) {
             if (this.selectionFilter === 'FACTORY') document.getElementById('btn-filt-fact').classList.add('active');
         }
     },
-        
-        // Обновляем визуальный вид кнопок
-        document.querySelectorAll('.filter-btn').forEach(b => {
-            b.classList.remove('active');
-            // Простая проверка по иконке внутри кнопки, чтобы подсветить нужную
-            if (type === 'BUILDER' && b.innerText.includes('👷')) b.classList.add('active');
-            if (type === 'ARMY' && b.innerText.includes('⚔️')) b.classList.add('active');
-            if (type === 'HOUSE' && b.innerText.includes('🏠')) b.classList.add('active');
-            if (type === 'FACTORY' && b.innerText.includes('🏭')) b.classList.add('active');
-        });
-    },
 
    loadedImages: {}, // Сюда мы сохраним загруженные картинки
 

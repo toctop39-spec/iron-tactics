@@ -644,29 +644,40 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 999999; 
-        this.energyFactor = 1;
+        this.money = 2000; // Стартовый капитал бота
         this.timer = 0;
-        this.resources = { iron: 50, chem: 50, chips: 50 };
+        
+        // Внутренние ресурсы бота (так как глобальные ресурсы только для игрока)
+        this.resources = { iron: 0, chem: 0, chips: 0 };
+        
+        // Состояние стратегии
+        this.state = 'BUILD'; // BUILD, ATTACK
+        this.baseCenter = null;
     }
 
     update() {
         this.timer++;
 
-        // 1. Считаем экономику (раз в секунду)
-        if (this.timer % 60 === 0) this.calcEconomy();
-
-        // 2. Строим базу (раз в секунду + смещение)
-        if (this.timer % 60 === 30) this.manageBase();
-
-        // 3. Производство (3 раза в секунду - очень быстро, чтобы забивать заводы)
-        if (this.timer % 20 === 0) {
-            this.manageIndustry(); 
-            this.manageHouse();    
+        // 0. Инициализация центра базы (первый дом)
+        if (!this.baseCenter) {
+            const myBase = Game.units.find(u => u.side === this.side && u.type === 'HOUSE');
+            if (myBase) this.baseCenter = { x: myBase.x, y: myBase.y };
+            else return; // Нет базы - нет действий
         }
 
-        // 4. Война (часто)
-        if (this.timer % 15 === 0) this.manageCombat();
+        // 1. Расчет экономики (раз в секунду)
+        if (this.timer % 60 === 0) this.calcEconomy();
+
+        // 2. Строительство зданий (раз в 2 секунды + смещение)
+        if (this.timer % 120 === 15) this.manageConstruction();
+
+        // 3. Производство юнитов и ресурсов (часто)
+        if (this.timer % 30 === 0) {
+            this.manageProduction();
+        }
+
+        // 4. Управление армией (часто)
+        if (this.timer % 20 === 0) this.manageArmy();
     }
 
     // --- ЭКОНОМИКА ---
@@ -678,12 +689,14 @@ class BotAI {
             if (u.side === this.side && u.hp > 0) {
                 // Энергия
                 if (UNITS[u.type].energyGen) gen += UNITS[u.type].energyGen;
+                
                 let cons = 0;
                 if (u.type === 'HOUSE') cons = HOUSE_UPGRADES[u.level||0].energy;
                 else if (UNITS[u.type].energyUse) cons = UNITS[u.type].energyUse;
+                
                 if (u.isPowered || u.type === 'HOUSE') use += cons; 
 
-                // Деньги
+                // Доход
                 if (u.isPowered) {
                     let inc = 0;
                     if (u.type === 'HOUSE') inc = HOUSE_UPGRADES[u.level||0].income;
@@ -696,244 +709,244 @@ class BotAI {
 
         this.money += income;
         
-        // Чтобы бот не умирал в нищете
-        if (this.money < 0) this.money = 0;
-        if (this.money < 100) this.money += 50; 
+        // Чит для ботов, чтобы они не застревали без денег
+        if (this.money < 100) this.money += 20; 
 
-        if (use === 0) this.energyFactor = 100;
-        else this.energyFactor = gen / use;
+        this.energyFactor = (use > gen) ? (gen / use) : 1;
+        if (use === 0) this.energyFactor = 1;
     }
 
-    // --- СТРОЙКА БАЗЫ ---
-    manageBase() {
+    // --- СТРОИТЕЛЬСТВО ---
+    manageConstruction() {
         const myUnits = Game.units.filter(u => u.side === this.side);
-        
-        // 1. Апгрейд домов (если есть энергия и деньги)
-        // Бот будет апать дома до упора, чтобы иметь дикий доход
-        if (this.energyFactor > 1.2) {
-            const houses = myUnits.filter(u => u.type === 'HOUSE' && (u.level || 0) < 5 && !u.productionType);
-            houses.sort((a, b) => (a.level||0) - (b.level||0)); // Сначала слабые
-            
-            if (houses.length > 0) {
-                const h = houses[0];
-                const nextLvl = (h.level||0) + 1;
-                const cost = HOUSE_UPGRADES[nextLvl].cost;
-                if (this.money >= cost) {
-                    this.money -= cost;
-                    h.level = nextLvl;
-                    Game.effects.push({x: h.x, y: h.y, char: '💰', life: 40});
-                    return; 
-                }
+        const factories = myUnits.filter(u => u.type === 'FACTORY').length;
+        const houses = myUnits.filter(u => u.type === 'HOUSE').length;
+        const powerPlants = myUnits.filter(u => u.type === 'POWER_PLANT').length;
+        const turrets = myUnits.filter(u => u.type === 'SENTINEL' || u.type === 'AA_DEFENSE').length;
+
+        let target = null;
+
+        // Приоритеты:
+        // 1. Энергия (критично)
+        if (this.energyFactor < 1.1 && this.money >= UNITS.POWER_PLANT.cost) {
+            target = 'POWER_PLANT';
+        }
+        // 2. Первый завод (нужен для танков)
+        else if (factories < 1 && this.money >= UNITS.FACTORY.cost) {
+            target = 'FACTORY';
+        }
+        // 3. Дома (экономика)
+        else if (houses < 4 && this.money >= UNITS.HOUSE.cost) {
+            target = 'HOUSE';
+        }
+        // 4. Еще заводы (масштабирование)
+        else if (factories < 3 && this.money >= UNITS.FACTORY.cost) {
+            target = 'FACTORY';
+        }
+        // 5. Оборона
+        else if (turrets < 3 && this.money >= UNITS.SENTINEL.cost) {
+            target = Math.random() > 0.5 ? 'SENTINEL' : 'AA_DEFENSE';
+        }
+        // 6. Апгрейд домов (если много денег и энергии)
+        else if (this.money > 2000 && this.energyFactor > 1.5) {
+            this.tryUpgradeHouse(myUnits);
+        }
+
+        if (target) {
+            this.tryBuild(target);
+        }
+    }
+
+    tryUpgradeHouse(myUnits) {
+        const house = myUnits.find(u => u.type === 'HOUSE' && (u.level || 0) < 3);
+        if (house) {
+            const nextLvl = (house.level || 0) + 1;
+            const cost = HOUSE_UPGRADES[nextLvl].cost;
+            if (this.money >= cost) {
+                this.money -= cost;
+                house.level = nextLvl;
+                Game.effects.push({x: house.x, y: house.y, char: '⬆️', life: 40});
             }
         }
+    }
 
-        // 2. Новые здания
-        const houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
-        const factoryCount = myUnits.filter(u => u.type === 'FACTORY').length;
-        const whCount = myUnits.filter(u => u.type === 'WAREHOUSE').length;
+    tryBuild(type) {
+        // Находим свободного строителя
+        const builder = Game.units.find(u => u.side === this.side && u.isBuilder && !u.constructing && !u.assignedSite);
+        if (!builder) return;
+
+        // Ищем место по спирали от центра базы
+        let placeX, placeY;
+        let found = false;
         
-        let buildTarget = null;
+        // Радиус поиска (от 100 до 600 пикселей)
+        for (let r = 120; r < 700; r += 80) {
+            // Пробуем 8 точек на каждом круге
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                const tx = this.baseCenter.x + Math.cos(angle) * r;
+                const ty = this.baseCenter.y + Math.sin(angle) * r;
 
-        // Жесткие приоритеты:
-        if (this.energyFactor < 1.4 && this.money >= UNITS.POWER_PLANT.cost) buildTarget = 'POWER_PLANT';
-        else if (houseCount < 3 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE';
-        else if (factoryCount < 1 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
-        // Масштабирование: 1 завод на 2 дома
-        else if (factoryCount < Math.ceil(houseCount / 2) && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
-        // Склады для ресурсов
-        else if (whCount < Math.ceil(factoryCount / 3) && this.money >= UNITS.WAREHOUSE.cost) buildTarget = 'WAREHOUSE';
-        // Оборона (ПВО и Турели)
-        else if (Math.random() < 0.3 && this.money >= UNITS.SENTINEL.cost) buildTarget = (Math.random()>0.5 ? 'SENTINEL' : 'AA_DEFENSE');
-        // Еще дома
-        else if (houseCount < 25 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE';
-        // Ядерка в лейте
-        else if (this.money > 20000 && !myUnits.some(u => u.type === 'SILO')) buildTarget = 'SILO';
+                // Проверки валидности места
+                if (tx < 100 || tx > MAP_W - 100 || ty < 100 || ty > MAP_H - 100) continue;
+                if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 60)) continue;
+                
+                // Проверка, не занято ли место
+                const busy = Game.units.some(u => Math.hypot(u.x - tx, u.y - ty) < 100) ||
+                             Game.constructions.some(c => Math.hypot(c.x - tx, c.y - ty) < 100);
+                
+                if (!busy) {
+                    placeX = tx; placeY = ty;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
 
-        if (buildTarget) {
-            this.placeBuilding(buildTarget);
+        if (found) {
+            this.money -= UNITS[type].cost;
+            const site = { 
+                id: Date.now() + Math.random(), 
+                type: type, 
+                x: placeX, 
+                y: placeY, 
+                total: UNITS[type].constructTime * 60, 
+                remaining: UNITS[type].constructTime * 60, 
+                owner: this.side 
+            };
+            Game.constructions.push(site);
+            builder.assignSite(site);
         }
     }
 
-    placeBuilding(type) {
-        // Простой спам зданий вокруг существующих
-        const myUnits = Game.units.filter(u => u.side === this.side);
-        // Если зданий нет, ищем строителя
-        let anchors = myUnits.length > 0 ? myUnits : Game.units.filter(u => u.side === this.side && u.isBuilder);
-        
-        if (anchors.length === 0) return;
+    // --- ПРОИЗВОДСТВО ---
+    manageProduction() {
+        const factories = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY' && u.spawnCooldown <= 0 && u.isPowered);
+        const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
+        const armyCount = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer).length;
 
-        for(let i=0; i<30; i++) {
-            const anchor = anchors[Math.floor(Math.random() * anchors.length)];
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 90 + Math.random() * 150; // Строим плотно, но не в упор
+        // 1. Заводы: Баланс ресурсов и юнитов
+        factories.forEach(f => {
+            if (f.productionType) return;
 
-            const tx = anchor.x + Math.cos(angle) * dist;
-            const ty = anchor.y + Math.sin(angle) * dist;
-
-            // Проверка границ
-            if (tx < 100 || tx > MAP_W-100 || ty < 100 || ty > MAP_H-100) continue;
-            if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 50)) continue;
-            
-            // Проверка занятости (радиус 90)
-            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 90) || 
-                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 90);
-            
-            if (!busy) {
-                this.assignBuilderTo(tx, ty, type);
+            // Логика ресурсов: Если мало железа/химии - производим их
+            if (this.resources.iron < 60) {
+                this.orderUnit(f, 'CRAFT_IRON');
                 return;
             }
-        }
-    }
-
-    assignBuilderTo(tx, ty, type) {
-        if (this.money < UNITS[type].cost) return;
-
-        const builders = Game.units.filter(u => u.side === this.side && u.isBuilder && !u.constructing && !u.assignedSite);
-        if (builders.length === 0) return;
-
-        // Берем ближайшего
-        builders.sort((a, b) => Math.hypot(a.x-tx, a.y-ty) - Math.hypot(b.x-tx, b.y-ty));
-        const b = builders[0];
-        
-        const dist = Math.hypot(b.x-tx, b.y-ty);
-        if (dist > 400) {
-            // Если далеко - просто идет
-            b.moveCmd(tx, ty);
-            return;
-        }
-
-        // Если близко - строит
-        this.money -= UNITS[type].cost;
-        const site = { id: Date.now()+Math.random(), type: type, x: tx, y: ty, total: UNITS[type].constructTime*60, remaining: UNITS[type].constructTime*60, owner: this.side };
-        Game.constructions.push(site);
-        b.assignSite(site);
-    }
-
-    // --- ЗАВОДЫ И ПРОИЗВОДСТВО ---
-    manageIndustry() {
-        // Берем только свободные заводы
-        const factories = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY' && u.spawnCooldown <= 0 && u.isPowered && !u.productionType);
-        
-        const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer);
-        const tanks = army.filter(u => u.type === 'TANK').length;
-        const helis = army.filter(u => u.type === 'HELICOPTER').length;
-        const grads = army.filter(u => u.type === 'GRAD').length;
-
-        factories.forEach(f => {
-            // 1. ВЕРТОЛЕТЫ (Нужны чипы и химия)
-            if (helis < tanks/3 + 1 && this.money >= UNITS.HELICOPTER.cost) {
-                if (this.checkRes(UNITS.HELICOPTER)) { this.craft(f, 'HELICOPTER'); return; }
-                else {
-                    // Чего не хватает?
-                    if (this.resources.chips < 20) this.craft(f, 'CRAFT_CHIP');
-                    else if (this.resources.chem < 50) this.craft(f, 'CRAFT_CHEM');
-                    return;
-                }
+            if (this.resources.chem < 20) {
+                this.orderUnit(f, 'CRAFT_CHEM');
+                return;
+            }
+            if (this.resources.chips < 10 && this.resources.iron > 100) {
+                this.orderUnit(f, 'CRAFT_CHIP');
+                return;
             }
 
-            // 2. ГРАДЫ
-            if (grads < tanks/4 + 1 && this.money >= UNITS.GRAD.cost) {
-                 if (this.checkRes(UNITS.GRAD)) { this.craft(f, 'GRAD'); return; }
+            // Если ресурсы есть, строим армию
+            if (Math.random() < 0.3 && this.hasRes(UNITS.HELICOPTER)) {
+                this.orderUnit(f, 'HELICOPTER');
+            } 
+            else if (Math.random() < 0.4 && this.hasRes(UNITS.GRAD)) {
+                this.orderUnit(f, 'GRAD');
             }
-
-            // 3. ТАНКИ (Основное мясо)
-            if (this.money >= UNITS.TANK.cost && this.checkRes(UNITS.TANK)) {
-                this.craft(f, 'TANK'); return;
+            else if (this.hasRes(UNITS.TANK)) {
+                this.orderUnit(f, 'TANK');
+            } 
+            else {
+                // Если не хватает ресурсов на танк, снова делаем ресурсы
+                this.orderUnit(f, 'CRAFT_IRON');
             }
-
-            // 4. ЕСЛИ АРМИЯ НЕ СТРОИТСЯ - КРАФТИМ ЗАПАСЫ
-            if (this.resources.iron < 300) { this.craft(f, 'CRAFT_IRON'); return; }
-            if (this.resources.chem < 150 && this.resources.iron >= 10) { this.craft(f, 'CRAFT_CHEM'); return; }
-            if (this.resources.chips < 80 && this.resources.iron >= 15) { this.craft(f, 'CRAFT_CHIP'); return; }
         });
-    }
 
-    manageHouse() {
-        const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered && !u.productionType);
-        
+        // 2. Дома: Строители и пехота
         houses.forEach(h => {
-            const builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
-            const snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
-            const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer).length;
+            if (h.productionType) return;
 
-            if (builders < 6 && this.money >= UNITS.BUILDER.cost) { this.craft(h, 'BUILDER'); return; }
-            if (snipers < 5 && this.money >= UNITS.SNIPER.cost) { this.craft(h, 'SNIPER'); return; }
-            if (army < 10 && this.money >= UNITS.SOLDIER.cost) { this.craft(h, 'SOLDIER'); }
+            const builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
+            
+            if (builders < 3 && this.money >= UNITS.BUILDER.cost) {
+                this.orderUnit(h, 'BUILDER');
+            } 
+            else if (this.money >= UNITS.SNIPER.cost && Math.random() > 0.5) {
+                this.orderUnit(h, 'SNIPER');
+            }
+            else if (this.money >= UNITS.SOLDIER.cost) {
+                this.orderUnit(h, 'SOLDIER');
+            }
         });
     }
 
-    // --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ КРАФТА ---
-    craft(building, type) {
-        // Двойная защита от кликов
-        if (building.productionType) return false;
-        if (this.money < UNITS[type].cost) return false;
+    hasRes(unitInfo) {
+        if (!unitInfo.resCost) return true;
+        if (this.money < unitInfo.cost) return false;
+        if ((unitInfo.resCost.iron || 0) > this.resources.iron) return false;
+        if ((unitInfo.resCost.chem || 0) > this.resources.chem) return false;
+        if ((unitInfo.resCost.chips || 0) > this.resources.chips) return false;
+        return true;
+    }
 
+    orderUnit(building, type) {
         const info = UNITS[type];
-        
-        // Проверка ресурсов
-        if (!this.checkRes(info)) return false;
+        if (this.money < info.cost) return;
 
         // Списание
         this.money -= info.cost;
         if (info.resCost) {
-            if (info.resCost.iron) this.resources.iron -= info.resCost.iron;
-            if (info.resCost.chem) this.resources.chem -= info.resCost.chem;
-            if (info.resCost.chips) this.resources.chips -= info.resCost.chips;
+            this.resources.iron -= (info.resCost.iron || 0);
+            this.resources.chem -= (info.resCost.chem || 0);
+            this.resources.chips -= (info.resCost.chips || 0);
         }
 
-        // Начисление (если крафт)
+        // Начисление ресурсов (если это крафт)
         if (type.startsWith('CRAFT_') && info.producedRes) {
             if (info.producedRes.iron) this.resources.iron += info.producedRes.iron;
             if (info.producedRes.chem) this.resources.chem += info.producedRes.chem;
             if (info.producedRes.chips) this.resources.chips += info.producedRes.chips;
         }
 
-        building.startProduction(type, !type.startsWith('CRAFT_'));
-        return true;
+        // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ: ПЕРЕДАЕМ FALSE (не visualOnly), чтобы юнит СПАВНИЛСЯ ---
+        const isVisual = type.startsWith('CRAFT_'); 
+        building.startProduction(type, isVisual);
     }
 
-    checkRes(uInfo) {
-        if (!uInfo.resCost) return true;
-        if ((uInfo.resCost.iron||0) > this.resources.iron) return false;
-        if ((uInfo.resCost.chem||0) > this.resources.chem) return false;
-        if ((uInfo.resCost.chips||0) > this.resources.chips) return false;
-        return true;
-    }
-
-    // --- ВОЙНА ---
-    manageCombat() {
-        const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer);
-        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0);
+    // --- АТАКА ---
+    manageArmy() {
+        const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && !u.isArty);
+        const grads = Game.units.filter(u => u.side === this.side && u.type === 'GRAD');
         
-        if (enemies.length === 0) return;
-
-        // Артиллерия
-        army.filter(u => u.type === 'GRAD' && u.ammo > 0).forEach(g => {
-            const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
-            if (t && !g.gradSeq) g.fireArty(t.x, t.y);
+        // Перезарядка
+        army.concat(grads).forEach(u => {
+            if (u.ammo <= 0 && this.money > 1000) {
+                this.money -= 1000;
+                u.ammo = u.maxAmmo;
+                Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30});
+            }
         });
 
-        // Перезарядка
-        if (this.money > 3000) {
-            army.forEach(u => {
-                if (u.maxAmmo && u.ammo <= 0 && this.money >= 1000) {
-                    this.money -= 1000;
-                    u.ammo = u.maxAmmo;
-                    Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30});
-                }
-            });
-        }
+        // Артиллерия стреляет
+        grads.forEach(g => {
+            if (g.ammo > 0) {
+                const enemy = Game.units.find(u => u.side !== this.side && (u.isProducer || u.type === 'SENTINEL') && Math.hypot(u.x-g.x, u.y-g.y) < g.range);
+                if (enemy) g.fireArty(enemy.x, enemy.y);
+            }
+        });
 
-        // Атака толпой
-        if (army.length > 10) {
-            let target = enemies.find(e => e.type === 'HOUSE');
-            if (!target) target = enemies[0];
-            
-            army.forEach(u => {
-                if (!u.target && Math.random() < 0.2) {
-                    u.moveCmd(target.x + (Math.random()-0.5)*200, target.y + (Math.random()-0.5)*200);
-                }
-            });
+        // Атака волнами
+        if (army.length > 8) {
+            // Ищем цель (база врага или ближайший враг)
+            let target = Game.units.find(u => u.side !== this.side && u.type === 'HOUSE'); // Приоритет - база
+            if (!target) target = Game.units.find(u => u.side !== this.side && u.type === 'FACTORY');
+            if (!target) target = Game.units.find(u => u.side !== this.side); // Хоть кто-то
+
+            if (target) {
+                army.forEach(u => {
+                    // Идем в атаку с небольшим разбросом, чтобы не слипались
+                    if (!u.target) {
+                        u.moveCmd(target.x + (Math.random() - 0.5) * 100, target.y + (Math.random() - 0.5) * 100);
+                    }
+                });
+            }
         }
     }
 }

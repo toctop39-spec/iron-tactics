@@ -644,11 +644,11 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 2000; // Стартовый капитал бота
+        this.money = 100000; // Стартовый капитал бота
         this.timer = 0;
         
         // Внутренние ресурсы бота (так как глобальные ресурсы только для игрока)
-        this.resources = { iron: 0, chem: 0, chips: 0 };
+        this.resources = { iron: 100, chem: 100, chips: 100 };
         
         // Состояние стратегии
         this.state = 'BUILD'; // BUILD, ATTACK

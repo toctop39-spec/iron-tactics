@@ -985,24 +985,44 @@ manageIndustry() {
         });
     }
 
-    manageCombat() {
+manageCombat() {
+        // Берем всех боевых юнитов (кроме строителей и заводов)
         const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type !== 'SILO');
+        
         const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0);
         if (enemies.length === 0) return;
 
+        // 1. Стрельба ГРАДов (Артиллерия)
         army.filter(u => u.type === 'GRAD' && u.ammo > 0).forEach(g => {
+            // Ищем важные цели (Заводы, Турели) в радиусе
             const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
             if (t && !g.gradSeq) g.fireArty(t.x, t.y);
         });
 
-        if (this.money > 3000) {
-            army.filter(u => u.ammo <= 0).forEach(u => { this.money -= 1000; u.ammo = u.maxAmmo; Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); });
-        }
+        // 2. ИСПРАВЛЕННАЯ ПЕРЕЗАРЯДКА
+        // Фильтруем тех, у кого кончились патроны, НО ТОЛЬКО ЕСЛИ ОНИ ИХ ИСПОЛЬЗУЮТ (maxAmmo > 0)
+        // Это исключит солдат, снайперов и обычные танки.
+        const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
 
+        emptyUnits.forEach(u => {
+            // Проверяем, есть ли деньги на КАЖДУЮ перезарядку отдельно
+            if (this.money >= 1000) { 
+                this.money -= 1000; 
+                u.ammo = u.maxAmmo; 
+                Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); 
+            }
+        });
+
+        // 3. Атака
         if (army.length > 12) {
             let target = enemies.find(e => e.type === 'HOUSE');
             if (!target) target = enemies[0];
-            army.forEach(u => { if (!u.target) u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250); });
+            army.forEach(u => { 
+                // Не отправляем статичные юниты (Турели) в атаку
+                if (!u.target && u.type !== 'SENTINEL') {
+                    u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250); 
+                }
+            });
         }
     }
 

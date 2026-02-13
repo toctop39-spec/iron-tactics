@@ -3035,12 +3035,15 @@ class Unit {
         }
     }
 
-    checkPower() {
+checkPower() {
         if (!UNITS[this.type].energyUse) { this.isPowered = true; return; }
         const nearPP = Game.units.some(u => u.side === this.side && u.type === 'POWER_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 300);
         let globalPower = false;
-        if (this.side === 'player') globalPower = Game.energyFactor > 0.1;
+        
+        // ИСПРАВЛЕНИЕ ЗДЕСЬ: используем Game.myRole
+        if (this.side === Game.myRole) globalPower = Game.energyFactor > 0.1;
         else { const bot = Game.bots.find(b => b.side === this.side); globalPower = bot ? (bot.energyFactor > 0.1) : true; }
+        
         this.isPowered = nearPP && globalPower;
     }
 
@@ -3189,11 +3192,14 @@ class Unit {
             } else { this.constructing = false; this.target = {x: this.assignedSite.x, y: this.assignedSite.y}; }
         }
 
-        if (this.isProducer && this.spawnCooldown > 0) {
+ if (this.isProducer && this.spawnCooldown > 0) {
             if (!this.isPowered) return;
             let factor = 1;
-            if (this.side === 'player') factor = Game.energyFactor;
+            
+            // ИСПРАВЛЕНИЕ 1: Правильный расчет фактора скорости
+            if (this.side === Game.myRole) factor = Game.energyFactor;
             else { const bot = Game.bots.find(b => b.side === this.side); if (bot) factor = bot.energyFactor; }
+            
             if (this.buffSpeedMult) factor *= this.buffSpeedMult;
             this.spawnCooldown -= factor;
             
@@ -3201,7 +3207,9 @@ class Unit {
                 // --- ЛОГИКА КРАФТА ---
                 if (this.productionType.startsWith('CRAFT_')) {
                     const info = UNITS[this.productionType];
-                    if (this.side === 'player') {
+                    
+                    // ИСПРАВЛЕНИЕ 2: Выдача ресурсов правильному игроку
+                    if (this.side === Game.myRole) {
                         if (info.producedRes) {
                             if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
                             if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
@@ -3211,6 +3219,7 @@ class Unit {
                     }
                     Game.effects.push({x: this.x, y: this.y, char: '✅', life: 40});
                 } 
+ 
                 // --- ЛОГИКА СПАВНА ---
                 else {
                     this.spawnedCount++;

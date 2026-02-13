@@ -742,11 +742,12 @@ manageBase() {
         return this.placeBuildingGeneral(builder, 'POWER_PLANT');
     }
 
-    // Обычная стройка для остальных зданий
+   // Обычная стройка для остальных зданий
     placeBuildingGeneral(builder, type) {
         const myUnits = Game.units.filter(u => u.side === this.side);
         let anchors = [];
 
+        // Выбираем, к чему будем "привязывать" новое здание
         if (type === 'FACTORY' || type === 'WAREHOUSE') {
             anchors = myUnits.filter(u => u.type === 'FACTORY');
             if (anchors.length === 0) anchors = myUnits.filter(u => u.type === 'HOUSE');
@@ -760,19 +761,29 @@ manageBase() {
 
         if (anchors.length === 0) anchors = myUnits.length > 0 ? myUnits : [builder];
 
-        for (let i = 0; i < 30; i++) {
+        const bRadius = UNITS[type].radius;
+
+        // Увеличили количество попыток с 30 до 100 (база теперь будет гигантской)
+        for (let i = 0; i < 100; i++) {
             const anchor = anchors[Math.floor(Math.random() * anchors.length)];
             const angle = Math.random() * Math.PI * 2;
-            const dist = 90 + Math.random() * 100;
+            
+            // Ищем дальше от центра! От 50 до 350 пикселей (база будет разрастаться вширь)
+            const dist = anchor.radius + bRadius + 20 + Math.random() * 300; 
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
 
+            // Проверка: не вылезли ли за края карты
             if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
-            if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 60)) continue;
+            
+            // Проверка: не лезем ли в воду или на горы
+            if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRadius)) continue;
 
-            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 110) || 
-                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 110);
+            // УМНАЯ ПРОВЕРКА КОЛЛИЗИЙ (Вместо жестких 110 пикселей берем реальные радиусы)
+            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 25) || 
+                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 25);
 
+            // Если место свободно — строим!
             if (!busy) {
                 this.money -= UNITS[type].cost;
                 const site = { id: Date.now()+Math.random(), type: type, x: tx, y: ty, total: UNITS[type].constructTime*60, remaining: UNITS[type].constructTime*60, owner: this.side };
@@ -781,7 +792,7 @@ manageBase() {
                 return true;
             }
         }
-        return false;
+        return false; // Место не найдено даже за 100 попыток
     }
 
 manageIndustry() {

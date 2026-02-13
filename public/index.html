@@ -667,39 +667,6 @@ manageBase() {
         }
     }
 
-        if (builders.length === 0) return;
-        const builder = builders[0];
-
-        // --- ПРИОРИТЕТЫ СТРОЙКИ ---
-        
-        // 1. УМНАЯ СЭС (Если энергия падает ИЛИ есть здания без света)
-        const unpowered = myUnits.filter(u => !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
-        
-        if ((this.energyFactor < 1.4 || unpowered.length > 0) && this.money >= UNITS.POWER_PLANT.cost) {
-            // Запускаем новый алгоритм поиска идеального места
-            if (this.placePowerPlantSmart(builder)) return;
-        }
-
-        const houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
-        const factoryCount = myUnits.filter(u => u.type === 'FACTORY').length;
-        const whCount = myUnits.filter(u => u.type === 'WAREHOUSE').length;
-        const defenseCount = myUnits.filter(u => u.type === 'SENTINEL' || u.type === 'AA_DEFENSE').length;
-
-        let buildTarget = null;
-
-        if (houseCount < 3 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE';
-        else if (factoryCount < 1 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
-        else if (defenseCount < (houseCount + factoryCount) / 2.5 && this.money >= UNITS.SENTINEL.cost) buildTarget = (Math.random() > 0.7) ? 'AA_DEFENSE' : 'SENTINEL';
-        else if (factoryCount < Math.ceil(houseCount / 2) && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
-        else if (whCount < Math.ceil(factoryCount / 3) && this.money >= UNITS.WAREHOUSE.cost) buildTarget = 'WAREHOUSE';
-        else if (houseCount < 20 && this.money >= UNITS.HOUSE.cost && this.energyFactor > 1.6) buildTarget = 'HOUSE';
-        else if (this.money > 15000 && !myUnits.some(u => u.type === 'SILO')) buildTarget = 'SILO';
-
-        if (buildTarget) {
-            this.placeBuildingGeneral(builder, buildTarget);
-        }
-    }
-
     // --- НОВАЯ СУПЕР-ФУНКЦИЯ ДЛЯ СЭС ---
     placePowerPlantSmart(builder) {
         const myUnits = Game.units.filter(u => u.side === this.side);

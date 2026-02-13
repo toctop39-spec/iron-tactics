@@ -6,331 +6,216 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #001133; font-family: 'Segoe UI', sans-serif; user-select: none; }
-        canvas { display: block; cursor: crosshair; }
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&display=swap');
 
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .clickable { pointer-events: auto; }
+body { margin: 0; overflow: hidden; background: #050a14; font-family: 'Exo 2', sans-serif; user-select: none; }
+canvas { display: block; cursor: crosshair; }
 
-        #top-bar {
-            position: absolute; top: 0; left: 0; width: 100%; height: 60px;
-            background: rgba(0,0,0,0.9); border-bottom: 1px solid #555;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 20px; box-sizing: border-box; color: #eee;
-            font-size: 0.9em;
-        }
+#ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+.clickable { pointer-events: auto; }
 
-        /* --- НОВЫЕ СТИЛИ ДЛЯ РЕСУРСОВ --- */
-        #player-stats { display: flex; gap: 15px; align-items: center; }
-        .res-group { display: flex; align-items: center; gap: 3px; }
-        .res-icon { font-size: 1.2em; }
-        .res-val { font-weight: bold; color: #fff; }
-        .res-full { color: #ff4444; } /* Красный, если полон */
-
-        #start-btn {
-            position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
-            padding: 15px 60px; font-size: 1.2em; font-weight: bold; 
-            background: #d32f2f; color: white; border: none; border-radius: 50px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.7); cursor: pointer; transition: 0.2s;
-        }
-        #start-btn:hover { background: #ff4444; transform: translateX(-50%) scale(1.02); }
-        .hidden { display: none !important; }
-
-        #build-menu {
-            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-            display: none; gap: 8px; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px;
-            transition: 0.3s; flex-wrap: wrap; justify-content: center; max-width: 95%;
-        }
-        #menu-title {
-            position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%);
-            color: #4f4; font-weight: bold; text-shadow: 0 0 5px #000; display: none;
-            background: rgba(0,0,0,0.7); padding: 4px 15px; border-radius: 4px; border: 1px solid #0f0;
-        }
-
-        .unit-card {
-            width: 80px; height: 110px; background: #333; border: 2px solid #555; border-radius: 8px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; color: white; transition: 0.2s; position: relative; text-align: center;
-        }
-        .unit-card:hover { background: #444; border-color: #fff; transform: translateY(-5px); }
-        .unit-card.active { border-color: #0f0; background: #003300; }
-        .unit-card * { pointer-events: none; }
-        .card-price { font-size: 0.65em; color: #ffeb3b; line-height: 1.1; margin-top: 4px; }
-
-        #right-controls {
-            position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; align-items: center;
-        }
-
-        .action-circle-btn {
-            width: 90px; height: 90px; border-radius: 50%; border: 4px solid #fff;
-            color: white; font-weight: bold; cursor: pointer; 
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            font-size: 0.85em; text-align: center; transition: 0.2s;
-        }
-        
-        #arty-btn { background: radial-gradient(#ff6600, #aa0000); box-shadow: 0 0 20px #ff0000; }
-        #arty-btn:hover { transform: scale(1.05); }
-
-        #reload-btn { background: radial-gradient(#00aaff, #004488); box-shadow: 0 0 20px #00aaff; width: 70px; height: 70px; font-size: 0.7em; }
-        #reload-btn:hover { transform: scale(1.05); }
-
-        .screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10,10,10,0.95); z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;
-        }
-        .menu-btn {
-            padding: 20px 50px; font-size: 1.5em; background: #444; color: #fff; border: 2px solid #fff;
-            cursor: pointer; margin-top: 20px; min-width: 350px; text-align: center;
-        }
-        .menu-btn:hover { background: #666; }
-        
-        #msg-toast {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,0,0,0.8); color: white; padding: 10px 20px; border-radius: 5px;
-            opacity: 0; transition: opacity 0.5s; font-weight: bold; pointer-events: none; z-index: 999;
-        }
-
-        #connection-warning {
-            position: absolute; top: 0; left: 0; width: 100%; height: 25px;
-            background: #004488; display: none; z-index: 200; box-shadow: 0 0 10px #000;
-            text-align: center; line-height: 25px; font-weight: bold; color: #fff;
-        }
-        
-        .energy-stat { font-weight: bold; margin: 0 15px; }
-        .energy-ok { color: #0f0; }
-        .energy-low { color: #ff0; }
-        .energy-bad { color: #f00; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
-
-        #speed-controls { display: flex; gap: 5px; margin-left: 20px; }
-        .speed-btn {
-            background: #333; color: #aaa; border: 1px solid #555; padding: 5px 10px; cursor: pointer; font-weight: bold;
-        }
-        /* Добавляем стили для кнопок фильтра */
-.filter-btn {
-    background: #222; color: #fff; border: 1px solid #555; 
-    padding: 5px 8px; cursor: pointer; font-size: 1.1em;
-    border-radius: 4px; margin-right: 2px;
+/* --- ЖЕЛЕЗНЫЕ ДВЕРИ (ПЕРЕХОДЫ) --- */
+#transition-layer {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 9999; pointer-events: none; display: flex; overflow: hidden;
 }
-/* Желтая подсветка только для класса active */
-.filter-btn.active { 
-    background: #ffaa00; 
-    color: #000; 
-    border-color: #ffeb3b; 
-    box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+.iron-door {
+    width: 50%; height: 100%;
+    background: repeating-linear-gradient(45deg, #151515, #151515 10px, #1a1a1a 10px, #1a1a1a 20px);
+    position: relative; transition: transform 0.6s cubic-bezier(0.5, 0, 0.2, 1);
+    box-shadow: inset 0 0 50px #000; border-bottom: 5px solid #000;
 }
-        .speed-btn:hover { background: #444; color: #fff; }
-        .speed-btn.active { background: #0088cc; color: #fff; border-color: #0af; }
+.iron-door::before { content: ''; position: absolute; top: 0; bottom: 0; width: 20px; background: linear-gradient(to right, #000, #333, #000); }
+#door-left { transform: translateX(-105%); border-right: 4px solid #333; }
+#door-left::before { right: 0; }
+#door-right { transform: translateX(105%); border-left: 4px solid #333; }
+#door-right::before { left: 0; }
+.door-edge {
+    position: absolute; top: 0; bottom: 0; width: 40px;
+    background: repeating-linear-gradient(-45deg, #ffaa00, #ffaa00 20px, #222 20px, #222 40px);
+    box-shadow: 0 0 10px #000;
+}
+#door-left .door-edge { right: 0; border-left: 2px solid #000; }
+#door-right .door-edge { left: 0; border-right: 2px solid #000; }
+.transition-active { pointer-events: auto !important; }
+.transition-active #door-left, .transition-active #door-right { transform: translateX(0); }
+.transition-active #loading-gear { transform: translate(-50%, -50%) scale(1); animation: spin 2s linear infinite; }
+#loading-gear { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 80px; color: #ffaa00; text-shadow: 0 0 20px #ff5500; z-index: 10000; transition: 0.3s; }
+@keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        .spec-settings {
-            background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; margin-top: 20px; border: 1px solid #555; text-align: center;
-        }
-        .spec-row { margin: 10px 0; font-size: 1.2em; }
-        input[type=range] { width: 200px; vertical-align: middle; }
+/* --- ВЕРХНЯЯ ПАНЕЛЬ РЕСУРСОВ --- */
+#top-bar {
+    position: absolute; top: 0; left: 0; width: 100%; height: 65px;
+    background: linear-gradient(180deg, rgba(12, 20, 31, 0.95) 0%, rgba(5, 10, 15, 0.8) 100%);
+    border-bottom: 1px solid #00aaff; box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 25px; box-sizing: border-box; color: #eef; font-size: 0.95em; backdrop-filter: blur(5px);
+}
+#player-stats { display: flex; gap: 20px; align-items: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+.res-group { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; }
+.res-icon { font-size: 1.2em; filter: drop-shadow(0 0 2px rgba(255,255,255,0.5)); }
+.res-val { font-weight: bold; color: #fff; font-family: monospace; font-size: 1.1em; }
+.res-full { color: #ff5555; text-shadow: 0 0 5px red; }
+.energy-stat { font-weight: bold; margin: 0 15px; display: flex; align-items: center; gap: 5px; }
+.energy-ok { color: #44ff44; text-shadow: 0 0 5px #0f0; }
+.energy-low { color: #ffff00; text-shadow: 0 0 5px #ff0; }
+.energy-bad { color: #ff0000; animation: blink 1s infinite; text-shadow: 0 0 10px red; }
+@keyframes blink { 50% { opacity: 0.5; } }
 
-        #spectator-hud {
-            position: absolute; top: 70px; left: 20px;
-            background: rgba(0,0,0,0.7); border: 1px solid #555; border-radius: 8px;
-            padding: 10px; display: none; flex-direction: column; gap: 5px; pointer-events: none;
-            color: #fff; font-family: monospace; font-size: 14px; min-width: 250px;
-        }
-        .hud-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 3px 0; }
-        
-        .lobby-input {
-            background: rgba(0,0,0,0.5); border: 1px solid #0af; color: white;
-            padding: 10px; margin: 5px; width: 200px; font-size: 1em; text-align: center;
-        }
-/* --- ТОЧНЫЕ СТИЛИ ТУТОРИАЛА --- */
-        #tutorial-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 500; display: none;
-            background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.6) 90%); /* Затемнение краев */
-        }
-        .tutorial-box {
-            position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%);
-            background: rgba(10, 20, 35, 0.95); 
-            border: 1px solid #00aaff;
-            box-shadow: 0 0 30px rgba(0, 170, 255, 0.2), inset 0 0 50px rgba(0,0,0,0.5);
-            padding: 25px; border-radius: 4px; text-align: center; color: #fff;
-            pointer-events: auto; max-width: 500px; min-width: 300px;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-        }
-        .tutorial-box h3 { margin-top: 0; color: #44aaff; letter-spacing: 2px; text-transform: uppercase; font-size: 1.2em; }
-        .tutorial-box p { font-size: 1em; line-height: 1.5; color: #ccc; margin-bottom: 20px; }
-        
-        .tutorial-highlight-ring {
-            position: absolute; border-radius: 50%;
-            border: 2px dashed #ffeb3b;
-            box-shadow: 0 0 15px #ffeb3b, inset 0 0 10px #ffeb3b;
-            animation: rotate-ring 4s linear infinite;
-            pointer-events: none; z-index: 400;
-        }
-        @keyframes rotate-ring { 
-            0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
-            50% { transform: rotate(180deg) scale(1.1); opacity: 1; } 
-            100% { transform: rotate(360deg) scale(1); opacity: 0.8; }
-        }
+/* --- КНОПКИ УПРАВЛЕНИЯ И ФИЛЬТРЫ --- */
+#speed-controls { display: flex; gap: 5px; margin-left: 20px; }
+.speed-btn, .filter-btn {
+    background: rgba(255,255,255,0.1); color: #aaa; border: 1px solid rgba(255,255,255,0.2); 
+    padding: 6px 12px; cursor: pointer; font-weight: bold; transition: 0.2s; border-radius: 3px;
+}
+.filter-btn { font-size: 1.2em; padding: 4px 8px; }
+.speed-btn:hover, .filter-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.speed-btn.active { background: #0088cc; color: #fff; border-color: #0af; box-shadow: 0 0 10px #0088cc; }
+.filter-btn.active { background: #ffaa00; color: #000; border-color: #ffeb3b; box-shadow: 0 0 10px rgba(255, 170, 0, 0.6); transform: scale(1.1); }
 
-        #tut-btn {
-            background: linear-gradient(to bottom, #0088cc, #005599);
-            border: 1px solid #00aaff; padding: 8px 40px; font-size: 14px;
-            text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
-            margin-top: 10px; display: inline-block;
-        }
-        #tut-btn:hover { background: #00aaff; box-shadow: 0 0 15px #00aaff; }
+/* --- МЕНЮ СТРОИТЕЛЬСТВА --- */
+#build-menu {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 10px; background: rgba(10, 15, 25, 0.9); border: 1px solid #4466aa;
+    padding: 15px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.8); transition: 0.3s; flex-wrap: wrap; justify-content: center; max-width: 95%;
+}
+#menu-title {
+    position: absolute; bottom: 155px; left: 50%; transform: translateX(-50%); color: #4f4; font-weight: bold; text-shadow: 0 0 8px #0f0; display: none; background: rgba(0, 20, 0, 0.8); padding: 5px 20px; border-radius: 4px; border: 1px solid #0f0; text-transform: uppercase; letter-spacing: 1px;
+}
+.unit-card {
+    width: 85px; height: 115px; background: linear-gradient(135deg, #2a2a2a, #1a1a1a); border: 1px solid #555; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; position: relative; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+.unit-card:hover { background: #3a3a3a; border-color: #fff; transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+.unit-card.active { border-color: #0f0; background: #002200; box-shadow: 0 0 10px #0f0; }
+.unit-card * { pointer-events: none; }
+.card-price { font-size: 0.7em; color: #ffd700; line-height: 1.1; margin-top: 5px; font-weight: bold; }
 
-        /* Точки прогресса */
-        #tut-progress { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px; }
-        .tut-dot { width: 8px; height: 8px; background: #333; border-radius: 50%; border: 1px solid #555; }
-        .tut-dot.active { background: #00aaff; box-shadow: 0 0 5px #00aaff; border-color: #fff; transform: scale(1.2); }
-        .tut-dot.done { background: #444; border-color: #888; }
-    </style>
+/* --- БОЕВЫЕ КНОПКИ СПРАВА --- */
+#right-controls { position: absolute; right: 25px; bottom: 25px; display: flex; flex-direction: column; gap: 15px; align-items: center; }
+.action-circle-btn { width: 90px; height: 90px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); color: white; font-weight: bold; cursor: pointer; display: none; flex-direction: column; align-items: center; justify-content: center; font-size: 0.85em; text-align: center; transition: 0.2s; text-shadow: 0 2px 4px #000; }
+#arty-btn { background: radial-gradient(circle at 30% 30%, #ff8800, #aa0000); box-shadow: 0 0 25px rgba(255, 60, 0, 0.6); }
+#reload-btn { background: radial-gradient(circle at 30% 30%, #00ccff, #004488); box-shadow: 0 0 25px rgba(0, 150, 255, 0.6); width: 75px; height: 75px; font-size: 0.7em; }
+.action-circle-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
+#start-btn { position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%); padding: 15px 70px; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; background: linear-gradient(to bottom, #d32f2f, #9a0007); color: white; border: 2px solid #ff5555; border-radius: 4px; box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); cursor: pointer; transition: 0.2s; }
+#start-btn:hover { background: #ff4444; transform: translateX(-50%) scale(1.05); }
+
+/* --- ЭКРАНЫ И МЕНЮ --- */
+.screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, rgba(20,25,35,0.95), rgba(5,5,10,0.98)); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+.menu-btn { padding: 20px 50px; font-size: 1.3em; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; margin-top: 15px; min-width: 350px; text-align: center; transition: all 0.3s; clip-path: polygon(10% 0, 100% 0, 100% 80%, 90% 100%, 0 100%, 0 20%); }
+.menu-btn:hover { background: rgba(255,255,255,0.15); border-color: #fff; letter-spacing: 2px; }
+.hidden { display: none !important; }
+.spec-settings { background: rgba(0,0,0,0.6); padding: 25px; border-radius: 8px; margin-top: 20px; border: 1px solid #4466aa; text-align: center; }
+.lobby-input { background: rgba(0,0,0,0.5); border: 1px solid #0af; color: white; padding: 10px; margin: 5px; width: 220px; font-size: 1em; text-align: center; border-radius: 4px; }
+#spectator-hud { position: absolute; top: 75px; left: 20px; background: rgba(0,0,0,0.8); border: 1px solid #4466aa; border-radius: 4px; padding: 10px; display: none; flex-direction: column; gap: 5px; pointer-events: none; color: #fff; font-family: monospace; font-size: 14px; min-width: 250px; }
+.hud-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 3px 0; }
+#msg-toast { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(200, 0, 0, 0.8); color: white; padding: 12px 30px; border-radius: 4px; opacity: 0; transition: opacity 0.5s; font-weight: bold; pointer-events: none; z-index: 999; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border: 1px solid #ff5555; }
+#connection-warning { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #004488; display: none; z-index: 200; box-shadow: 0 0 10px #000; text-align: center; line-height: 30px; font-weight: bold; color: #fff; font-size: 0.9em; }
+
+/* --- ТУТОРИАЛ --- */
+#tutorial-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 500; display: none; background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 90%); }
+.tutorial-box { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); background: rgba(10, 20, 35, 0.95); border: 1px solid #00aaff; box-shadow: 0 0 30px rgba(0, 170, 255, 0.3), inset 0 0 50px rgba(0,0,0,0.5); padding: 25px; border-radius: 4px; text-align: center; color: #fff; pointer-events: auto; max-width: 500px; min-width: 300px; backdrop-filter: blur(5px); }
+.tutorial-box h3 { margin-top: 0; color: #44aaff; letter-spacing: 2px; text-transform: uppercase; }
+.tutorial-highlight-ring { position: absolute; border-radius: 50%; border: 3px dashed #ffeb3b; box-shadow: 0 0 20px #ffeb3b, inset 0 0 10px #ffeb3b; animation: rotate-ring 4s linear infinite; pointer-events: none; z-index: 400; }
+@keyframes rotate-ring { 0% { transform: rotate(0deg) scale(1); opacity: 0.8; } 50% { transform: rotate(180deg) scale(1.1); opacity: 1; } 100% { transform: rotate(360deg) scale(1); opacity: 0.8; } }
+#tut-progress { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px; }
+.tut-dot { width: 8px; height: 8px; background: #333; border-radius: 50%; border: 1px solid #555; }
+.tut-dot.active { background: #00aaff; box-shadow: 0 0 5px #00aaff; transform: scale(1.3); }
+.tut-dot.done { background: #446688; }
+           </style>
 </head>
 <body>
+<div id="transition-layer">
+    <div id="door-left" class="iron-door"><div class="door-edge"></div></div>
+    <div id="door-right" class="iron-door"><div class="door-edge"></div></div>
+    <div id="loading-gear">⚙️</div>
+</div>
 
 <canvas id="gameCanvas"></canvas>
 <div id="connection-warning">Ожидание...</div>
 
 <div id="ui-layer">
     <div id="spectator-hud"></div>
-<div id="tutorial-overlay">
+    <div id="tutorial-overlay">
         <div id="tut-highlight" class="tutorial-highlight-ring" style="display:none;"></div>
-        
-      <div id="tutorial-msg" class="tutorial-box">
-            <div onclick="Tutorial.stop()" style="position:absolute; top:10px; right:15px; cursor:pointer; font-weight:bold; color:#555; font-size:1.2em;" title="Пропустить обучение">✖</div>
-            
+        <div id="tutorial-msg" class="tutorial-box">
+            <div onclick="Tutorial.stop()" style="position:absolute; top:10px; right:15px; cursor:pointer; font-weight:bold; color:#555; font-size:1.2em;" title="Пропустить">✖</div>
             <h3 id="tut-title">ОБУЧЕНИЕ</h3>
             <p id="tut-text">Текст обучения...</p>
-            
             <div id="tut-progress"></div>
-            
-            <button id="tut-btn" class="menu-btn" onclick="Tutorial.nextStep()">ДАЛЕЕ</button>
+            <button id="tut-btn" class="menu-btn" onclick="Tutorial.nextStep()" style="min-width: 150px; padding: 10px; font-size: 1em;">ДАЛЕЕ</button>
         </div>
     </div>
-    </div>
-    <div id="top-bar" class="clickable">
+
+    <div id="top-bar" class="clickable" style="display: none;">
         <div style="display: flex; align-items: center;">
             <div id="player-stats">
-                <div class="res-group" title="Деньги">
-                    💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span>
-                </div>
-                <div style="color: #666;">|</div>
-                
-                <div class="res-group" title="Железо">
-                    <span class="res-icon">🔩</span> <span id="res-iron" class="res-val">0</span>
-                </div>
-                <div class="res-group" title="Химия">
-                    <span class="res-icon">🧪</span> <span id="res-chem" class="res-val">0</span>
-                </div>
-                <div class="res-group" title="Микросхемы">
-                    <span class="res-icon">💾</span> <span id="res-chips" class="res-val">0</span>
-                </div>
-
-                <div style="color: #666;">|</div>
+                <div class="res-group" title="Деньги">💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span></div>
+                <div class="res-group" title="Железо"><span class="res-icon">🔩</span> <span id="res-iron" class="res-val">0</span></div>
+                <div class="res-group" title="Химия"><span class="res-icon">🧪</span> <span id="res-chem" class="res-val">0</span></div>
+                <div class="res-group" title="Микросхемы"><span class="res-icon">💾</span> <span id="res-chips" class="res-val">0</span></div>
                 <span id="energy-container" class="energy-stat">⚡ <span id="energy-val">0</span></span>
-                <div style="color: #666;">|</div>
-                <span>🚩 Ур. <span id="level">1</span></span>
+                <span style="color:#aaa; font-size:0.8em; margin-left:10px;">LVL <span id="level" style="color:#fff; font-size:1.2em;">1</span></span>
             </div>
             
-<div id="speed-controls">
-    <button class="speed-btn time-btn active" onclick="Game.setSpeed(1)">1x</button>
-    <button class="speed-btn time-btn" onclick="Game.setSpeed(2)">2x</button>
-    <button class="speed-btn time-btn" onclick="Game.setSpeed(5)">5x</button>
-    
-    <button class="speed-btn" style="margin-left: 5px; background: #5544aa; color: white;" onclick="Game.toggleTerritoryMode()">🗺️</button>
-    
-    <div style="width: 2px; height: 20px; background: #555; margin: 0 10px;"></div>
-    
-    <button id="btn-filt-build" class="filter-btn" title="Только строители" onclick="Game.setFilter('BUILDER')">👷</button>
-    <button id="btn-filt-army" class="filter-btn" title="Только армия" onclick="Game.setFilter('ARMY')">⚔️</button>
-    <button id="btn-filt-house" class="filter-btn" title="Только дома" onclick="Game.setFilter('HOUSE')">🏠</button>
-    <button id="btn-filt-fact" class="filter-btn" title="Только заводы" onclick="Game.setFilter('FACTORY')">🏭</button>
-</div>
+            <div id="speed-controls">
+                <button class="speed-btn time-btn active" onclick="Game.setSpeed(1)">1x</button>
+                <button class="speed-btn time-btn" onclick="Game.setSpeed(2)">2x</button>
+                <button class="speed-btn time-btn" onclick="Game.setSpeed(5)">5x</button>
+                <button class="speed-btn" style="margin-left: 5px; background: rgba(85, 68, 170, 0.6); color: white;" onclick="Game.toggleTerritoryMode()">🗺️</button>
+                <div style="width: 1px; height: 20px; background: #555; margin: 0 10px;"></div>
+                <button id="btn-filt-build" class="filter-btn" title="Только строители" onclick="Game.setFilter('BUILDER')">👷</button>
+                <button id="btn-filt-army" class="filter-btn" title="Только армия" onclick="Game.setFilter('ARMY')">⚔️</button>
+                <button id="btn-filt-house" class="filter-btn" title="Только дома" onclick="Game.setFilter('HOUSE')">🏠</button>
+                <button id="btn-filt-fact" class="filter-btn" title="Только заводы" onclick="Game.setFilter('FACTORY')">🏭</button>
+            </div>
         </div>
-        <div id="phase-text" style="color:#aaa">МЕНЮ</div>
+        <div id="phase-text" style="color:#aaa; letter-spacing: 2px;">МЕНЮ</div>
         <div id="role-display" style="font-size: 0.8em; color: #aaa; margin-left: 20px;"></div>
     </div>
 
     <div id="msg-toast">ОШИБКА</div>
-
-    <button id="start-btn" class="clickable hidden" onclick="Game.startBattle()">В БОЙ</button>
-    
+    <button id="start-btn" class="clickable hidden" onclick="Game.transition(() => Game.startBattle())">В БОЙ</button>
     <div id="menu-title">МЕНЮ</div>
     <div id="build-menu" class="clickable"></div>
     
     <div id="right-controls" class="clickable">
-        <button id="reload-btn" class="action-circle-btn" onclick="Game.reloadGrads()">
-             <span>♻️</span><br>ПЕРЕЗАРЯД<br><span style="color:#ff0">1000$</span>
-        </button>
-        <button id="arty-btn" class="action-circle-btn" onclick="Game.toggleArty()">
-            <span>🚀 ЗАЛП</span>
-            <span style="font-size:0.8em; color:#ffff00">200$</span>
-        </button>
+        <button id="reload-btn" class="action-circle-btn" onclick="Game.reloadGrads()"><span>♻️</span><span style="font-size:0.8em">RELOAD</span><span style="color:#ff0; font-size:0.9em">1000$</span></button>
+        <button id="arty-btn" class="action-circle-btn" onclick="Game.toggleArty()"><span>🚀</span><span>ARTY</span><span style="font-size:0.8em; color:#ffff00">200$</span></button>
     </div>
 </div>
 
 <div id="menu-screen" class="screen clickable">
-    <h1 style="color:#4f4; text-shadow: 0 0 20px #0f0; font-size: 3em;">IRON TACTICS MP</h1>
-    <h3 style="color:#aaa; margin-top:-20px;">v51: Industrial Era (Resources & Warehouses)</h3>
+    <h1 style="color:#4f4; text-shadow: 0 0 30px #0f0; font-size: 4em; letter-spacing: 5px; margin-bottom: 0;">IRON TACTICS</h1>
+    <h3 style="color:#aaa; margin-top: 5px; font-weight: normal; letter-spacing: 2px;">MP v52: Enhanced UI</h3>
     
-    <div style="display:flex; gap: 30px; margin-top: 30px;">
+    <div style="display:flex; gap: 30px; margin-top: 40px;">
         <div style="display:flex; flex-direction:column; gap:15px;">
-            <button class="menu-btn" onclick="Game.loadLevel(1)">👤 ОДИНОЧНАЯ КАМПАНИЯ</button>
-            <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.loadAdvancedMode()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
-            <button class="menu-btn" style="background:#004488; border-color:#0af;" onclick="Lobby.init()">🌐 ГЛОБАЛЬНЫЙ МУЛЬТИПЛЕЕР</button>
+            <button class="menu-btn" onclick="Game.transitToLevel(1)">👤 ОДИНОЧНАЯ КАМПАНИЯ</button>
+            <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.transitToAdvanced()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
+            <button class="menu-btn" style="background:rgba(0, 68, 136, 0.4); border-color:#0af;" onclick="Lobby.initTransition()">🌐 ГЛОБАЛЬНЫЙ МУЛЬТИПЛЕЕР</button>
         </div>
         
         <div class="spec-settings">
             <h3 style="color:#0af; margin-top:0;">НАСТРОЙКИ СИМУЛЯЦИИ</h3>
-            <div class="spec-row">
-                Карта: <span id="map-size-val">4000</span> м
-                <br>
-                <input type="range" min="2000" max="6000" step="500" value="4000" oninput="document.getElementById('map-size-val').innerText = this.value">
-            </div>
-            <div class="spec-row">
-                 Боты: <span id="bot-count-val">4</span> шт
-                <br>
-                <input type="range" min="2" max="8" step="1" value="4" oninput="document.getElementById('bot-count-val').innerText = this.value">
-            </div>
-            <button class="menu-btn" style="background:#442266; border-color:#d0f; font-size: 1em; padding: 10px 30px;" onclick="Game.startSpectator()">📺 ЗАПУСТИТЬ СИМУЛЯЦИЮ</button>
+            <div class="spec-row">Карта: <span id="map-size-val">4000</span> м<br><input type="range" min="2000" max="6000" step="500" value="4000" oninput="document.getElementById('map-size-val').innerText = this.value"></div>
+            <div class="spec-row">Боты: <span id="bot-count-val">4</span> шт<br><input type="range" min="2" max="8" step="1" value="4" oninput="document.getElementById('bot-count-val').innerText = this.value"></div>
+            <button class="menu-btn" style="background:rgba(68, 34, 102, 0.4); border-color:#d0f; font-size: 1em; padding: 10px 30px;" onclick="Game.transitToSpectator()">📺 ЗАПУСТИТЬ СИМУЛЯЦИЮ</button>
         </div>
     </div>
-    
     <h3 id="lobby-status" style="color: #aaa; margin-top: 20px;"></h3>
 </div>
 
 <div id="lobby-screen" class="screen clickable hidden">
-    <h1 style="color:#4f4;">
-        СЕТЕВАЯ ИГРА 
-        <span style="font-size: 0.5em; color: #aaa; margin-left: 15px;">
-            (Онлайн: <span id="online-count" style="color: #fff;">0</span>)
-        </span>
-    </h1>
+    <h1 style="color:#4f4; text-shadow: 0 0 20px #0f0;">СЕТЕВОЙ ЦЕНТР <span style="font-size: 0.5em; color: #aaa; margin-left: 15px; vertical-align: middle;">(Онлайн: <span id="online-count" style="color: #fff;">0</span>)</span></h1>
     <div style="display:flex; gap: 40px;">
-        <div class="spec-settings">
-            <h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3>
-            <input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты">
-            <br>
-            <input type="password" id="create-pass" class="lobby-input" placeholder="Пароль">
-            <br>
-            <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button>
-        </div>
-        <div class="spec-settings">
-            <h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3>
-            <input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты">
-            <br>
-            <input type="password" id="join-pass" class="lobby-input" placeholder="Пароль">
-            <br>
-            <button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.join()">ВОЙТИ</button>
-        </div>
+        <div class="spec-settings"><h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3><input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты"><br><input type="password" id="create-pass" class="lobby-input" placeholder="Пароль"><br><button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button></div>
+        <div class="spec-settings"><h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3><input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты"><br><input type="password" id="join-pass" class="lobby-input" placeholder="Пароль"><br><button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.join()">ВОЙТИ</button></div>
     </div>
-    <button class="menu-btn" style="margin-top:50px;" onclick="document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('menu-screen').classList.remove('hidden')">НАЗАД</button>
+    <button class="menu-btn" style="margin-top:50px;" onclick="Game.backToMenu()">НАЗАД</button>
 </div>
 
 <div id="end-screen" class="screen hidden clickable">
-    <h1 id="end-title">ПОБЕДА</h1>
+    <h1 id="end-title" style="font-size: 5em; text-shadow: 0 0 50px currentColor;">ПОБЕДА</h1>
     <button id="end-btn" class="menu-btn">ДАЛЕЕ</button>
 </div>
 
@@ -1042,6 +927,7 @@ manageCombat() {
 }
     
 const Lobby = {
+initTransition() { Game.transition(() => this.init()); },
     init() {
         // Скрываем главное меню, показываем лобби
         document.getElementById('menu-screen').classList.add('hidden');
@@ -1600,6 +1486,28 @@ hasSpaceForCraft(craftType) {
                 }
             }
             menu.appendChild(div);
+        });
+    },
+
+waterOffset: 0,
+    transition(callback) {
+        const layer = document.getElementById('transition-layer');
+        layer.classList.add('transition-active');
+        setTimeout(() => {
+            if(callback) callback();
+            setTimeout(() => { layer.classList.remove('transition-active'); }, 800);
+        }, 800);
+    },
+    transitToLevel(l) { this.transition(() => this.loadLevel(l)); },
+    transitToAdvanced() { this.transition(() => this.loadAdvancedMode()); },
+    transitToSpectator() { this.transition(() => this.startSpectator()); },
+    backToMenu() {
+        this.transition(() => {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            this.state = 'MENU';
+            document.getElementById('top-bar').style.display='none';
+            document.getElementById('build-menu').style.display='none';
         });
     },
     // --- КОНЕЦ ЛОГИКИ РЕСУРСОВ ---
@@ -2827,19 +2735,54 @@ else {
     },
 
     draw() {
+
+// 1. Анимированный фон (вода / космос)
         if (this.isIslandMode) {
-             ctx.fillStyle = '#004488';
+             ctx.fillStyle = '#0a1525';
              ctx.fillRect(0, 0, canvas.width, canvas.height);
+             
+             // Двигаем волны
+             this.waterOffset = (this.waterOffset || 0) + 0.5;
+             if (this.waterOffset > 50) this.waterOffset = 0;
+
+             ctx.save();
+             // Легкий параллакс
+             ctx.translate(-this.camera.x * 0.2, -this.camera.y * 0.2);
+             ctx.strokeStyle = 'rgba(50, 100, 200, 0.1)';
+             ctx.lineWidth = 2;
+             ctx.beginPath();
+             for(let i=-100; i<canvas.width+100; i+=50) {
+                 ctx.moveTo(i + this.waterOffset, 0); ctx.lineTo(i - 50 + this.waterOffset, canvas.height);
+             }
+             ctx.stroke();
+             ctx.restore();
         } else {
-             ctx.fillStyle = '#222';
+             ctx.fillStyle = '#050a14';
              ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         ctx.save(); ctx.translate(-this.camera.x, -this.camera.y);
+
+        // 2. Отрисовка "объемного" края Острова (если режим острова)
         if (this.isIslandMode) {
-            ctx.fillStyle = '#1a1a1a'; 
-            ctx.beginPath();
             const cx = MAP_W/2, cy = MAP_H/2;
+            
+           // Темная скала внизу (эффект высоты)
+            ctx.fillStyle = '#151c25'; 
+            for(let h=0; h<15; h+=5) { 
+                ctx.beginPath();
+                for (let a = 0; a <= Math.PI * 2.1; a += 0.1) {
+                    const r = MapUtils.getIslandRadius(a);
+                    const px = cx + Math.cos(a) * r;
+                    const py = cy + Math.sin(a) * r + h; // Смещаем вниз
+                    if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.fill();
+            }
+
+            // Сама земля
+            ctx.fillStyle = '#1a222d'; 
+            ctx.beginPath();
             for (let a = 0; a <= Math.PI * 2.1; a += 0.1) {
                 const r = MapUtils.getIslandRadius(a);
                 const px = cx + Math.cos(a) * r;
@@ -2847,7 +2790,7 @@ else {
                 if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
             }
             ctx.fill();
-            ctx.strokeStyle = '#4466aa'; ctx.lineWidth = 10; ctx.stroke();
+            ctx.strokeStyle = '#4466aa'; ctx.lineWidth = 3; ctx.stroke();
         }
 
         // --- РИСУЕМ ЛАНДШАФТ ---

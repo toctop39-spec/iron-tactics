@@ -259,6 +259,13 @@ const UNITS = {
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.4, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
+
+FPV: { 
+        type:'unit', name: 'FPV Дрон', emoji: '🛩️', imageSrc: 'FPV.png', 
+        cost: 300, resCost: { iron: 20, chips: 1 }, 
+        hp: 30, dmg: 400, range: 400, speed: 2.2, color: '#ff3300', 
+        radius: 12, buildTime: 10, isFlying: true, isKamikaze: true, splash: 80 
+    },
     
     HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
                   resCost: { iron: 80, chips: 4, chem: 8 }, // <--- НОВАЯ ЦЕНА
@@ -271,9 +278,8 @@ SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artille
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 50000, hp: 99999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
     HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 200, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
     
-    // --- ЗАВОД ТЕПЕРЬ ПРОИЗВОДИТ РЕСУРСЫ ---
-    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
-               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HELICOPTER'], 
+FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
+               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HELICOPTER', 'FPV'], 
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 20, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
@@ -293,7 +299,7 @@ SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artille
     // --- ВИРТУАЛЬНЫЕ КНОПКИ КРАФТА ---
     CRAFT_IRON: { type: 'action', name: 'Железо x1', emoji: '🔩', cost: 15, producedRes: { iron: 1 }, buildTime: 2 },
     CRAFT_CHEM: { type: 'action', name: 'Химия x1', emoji: '🧪', cost: 150, resCost: { iron: 10 }, producedRes: { chem: 1 }, buildTime: 5 },
-    CRAFT_CHIP: { type: 'action', name: 'Чип x1', emoji: '💾', cost: 1000, resCost: { iron: 15, chem: 15 }, producedRes: { chips: 1 }, buildTime: 10 },
+    CRAFT_CHIP: { type: 'action', name: 'Чип x1', emoji: '💾', cost: 1000, resCost: { iron: 15, chem: 1 }, producedRes: { chips: 1 }, buildTime: 10 },
     
     // --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
@@ -550,7 +556,7 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 100000; 
+        this.money = 10000; 
         this.energyFactor = 1;
         this.timer = 0;
         this.resources = { iron: 0, chem: 0, chips: 0 };
@@ -3000,6 +3006,9 @@ class Unit {
         this.isProducer = !!p.spawnList; this.isBuilder = !!p.isBuilder;
         this.isArty = !!p.isArty; this.isFlying = !!p.isFlying;
         this.flyState = 0; this.flyHeight = 0; this.flyTimer = 0;
+        this.isFlying = !!p.isFlying;
+        this.isKamikaze = !!p.isKamikaze; // <--- НОВОЕ
+        this.splashRadius = p.splash || 0; // <--- НОВОЕ
         this.spawnCooldown = 0; this.spawnMax = 0; this.maxAmmo = p.maxAmmo || 0; this.ammo = this.maxAmmo;
         this.assignedSite = null; this.constructing = false; this.gradSeq = 0;
         this.gradTarget = null; this.visualOnly = false;
@@ -3299,9 +3308,24 @@ class Unit {
                 this.targetUnit = near;
             }
             let busy = false;
-            if (this.targetUnit) {
+if (this.targetUnit) {
                 let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
-                if (d <= this.range) {
+                
+                // --- ЛОГИКА FPV-КАМИКАДЗЕ ---
+                if (this.isKamikaze) {
+                    if (d <= 30) { // Дистанция детонации
+                        this.hp = 0; // Дрон уничтожается
+                        // Моментально создаем взрыв в координатах дрона
+                        let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
+                        explosion.hit(); 
+                        return; // Прерываем код, юнит мертв
+                    } else {
+                        // Продолжаем лететь прямо в цель
+                        this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                    }
+                } 
+                // --- ОБЫЧНАЯ СТРЕЛЬБА ---
+                else if (d <= this.range) {
                     if (!this.isFlying) busy = true;
                     if (this.reload <= 0) {
                         this.reload = this.reloadMax;

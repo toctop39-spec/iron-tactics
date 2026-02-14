@@ -1050,7 +1050,7 @@ const Lobby = {
         }
     },
 
-    setupEvents() {
+setupEvents() {
         const s = Game.socket;
         
         // 1. Обновление онлайна
@@ -1162,72 +1162,6 @@ const Lobby = {
         }
 
         Game.socket.emit('create_room', { name, password: pass, settings });
-    }
-};
-
-setupEvents() {
-        const s = Game.socket;
-        
-        // --- НОВЫЙ КОД: СЧЕТЧИК ОНЛАЙНА ---
-        s.on('update_online', (count) => {
-            const el = document.getElementById('online-count');
-            if (el) el.innerText = count;
-        });
-    
-        s.on('room_created', (data) => {
-            CURRENT_ROOM = data.roomName;
-            Game.myRole = data.side;
-            document.getElementById('lobby-screen').classList.add('hidden');
-            const warn = document.getElementById('connection-warning');
-            warn.style.display = 'block';
-            warn.style.background = '#004488';
-            warn.innerText = `КОМНАТА: ${CURRENT_ROOM}. ЖДЕМ ИГРОКА...`;
-        });
-
-        s.on('room_joined', (data) => {
-            CURRENT_ROOM = data.roomName;
-            Game.myRole = data.side;
-            document.getElementById('lobby-screen').classList.add('hidden');
-        });
-
-s.on('start_game_signal', () => {
-            document.getElementById('connection-warning').style.display = 'none';
-            
-            // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
-            // Раньше мы скрывали весь speed-controls.
-            // Теперь скрываем ТОЛЬКО кнопки времени (time-btn)
-            document.querySelectorAll('.time-btn').forEach(b => b.style.display = 'none');
-            
-            // Убеждаемся, что сама панель видима (для карты и фильтров)
-            document.getElementById('speed-controls').style.display = 'flex';
-            
-            Game.speed = 1;
-            Game.loadPvpLevel();
-        });
-
-        s.on('error_msg', (msg) => {
-            alert(msg);
-        });
-        
-        s.on('remoteCommand', (data) => { Game.executeCommand(data); });
-        s.on('playerLeft', () => { 
-            alert("Соперник покинул игру."); 
-            location.reload(); 
-        });
-    },
-
-    create() {
-        const name = document.getElementById('create-name').value;
-        const pass = document.getElementById('create-pass').value;
-        if(!name) return alert("Введите имя комнаты!");
-        Game.socket.emit('create_room', { name, password: pass });
-    },
-
-    join() {
-        const name = document.getElementById('join-name').value;
-        const pass = document.getElementById('join-pass').value;
-        if(!name) return alert("Введите имя комнаты!");
-        Game.socket.emit('join_room', { name, password: pass });
     }
 };
 

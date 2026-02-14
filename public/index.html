@@ -25,6 +25,27 @@ canvas { display: block; cursor: crosshair; }
     position: relative; transition: transform 0.6s cubic-bezier(0.5, 0, 0.2, 1);
     box-shadow: inset 0 0 50px #000; border-bottom: 5px solid #000;
 }
+
+/* Стили для списка серверов */
+.room-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.05); border: 1px solid #4466aa;
+    padding: 10px; margin-bottom: 8px; border-radius: 4px; transition: 0.2s;
+}
+.room-item:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+.room-info { text-align: left; }
+.room-name { font-weight: bold; color: #fff; font-size: 1.1em; }
+.room-meta { font-size: 0.8em; color: #aaa; }
+.room-join-btn {
+    background: #008800; color: #fff; border: 1px solid #0f0;
+    padding: 5px 15px; cursor: pointer; font-weight: bold; border-radius: 3px;
+}
+.room-join-btn:hover { background: #00aa00; box-shadow: 0 0 10px #0f0; }
+.room-locked { color: #ff5555; margin-right: 5px; }
+.mode-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.7em; margin-right: 5px; font-weight: bold; }
+.badge-std { background: #444; color: #ccc; }
+.badge-isl { background: #004488; color: #0af; }
+.badge-giant { background: #440044; color: #f0f; }
 .iron-door::before { content: ''; position: absolute; top: 0; bottom: 0; width: 20px; background: linear-gradient(to right, #000, #333, #000); }
 #door-left { transform: translateX(-105%); border-right: 4px solid #333; }
 #door-left::before { right: 0; }
@@ -206,12 +227,43 @@ canvas { display: block; cursor: crosshair; }
 </div>
 
 <div id="lobby-screen" class="screen clickable hidden">
-    <h1 style="color:#4f4; text-shadow: 0 0 20px #0f0;">СЕТЕВОЙ ЦЕНТР <span style="font-size: 0.5em; color: #aaa; margin-left: 15px; vertical-align: middle;">(Онлайн: <span id="online-count" style="color: #fff;">0</span>)</span></h1>
-    <div style="display:flex; gap: 40px;">
-        <div class="spec-settings"><h3 style="color:#0af;">СОЗДАТЬ КОМНАТУ</h3><input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты"><br><input type="password" id="create-pass" class="lobby-input" placeholder="Пароль"><br><button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.create()">СОЗДАТЬ</button></div>
-        <div class="spec-settings"><h3 style="color:#ffaa00;">ВОЙТИ В КОМНАТУ</h3><input type="text" id="join-name" class="lobby-input" placeholder="Название комнаты"><br><input type="password" id="join-pass" class="lobby-input" placeholder="Пароль"><br><button class="menu-btn" style="font-size:1em; padding:10px 30px;" onclick="Lobby.join()">ВОЙТИ</button></div>
+    <h1 style="color:#4f4; text-shadow: 0 0 20px #0f0;">СЕТЕВОЙ ЦЕНТР <span style="font-size: 0.5em; color: #aaa;">(Онлайн: <span id="online-count">0</span>)</span></h1>
+    
+    <div style="display:flex; gap: 40px; width: 90%; max-width: 1000px; height: 60vh;">
+        
+        <div class="spec-settings" style="flex: 1; display:flex; flex-direction:column; justify-content:flex-start;">
+            <h3 style="color:#0af; margin-bottom: 20px;">СОЗДАТЬ КОМНАТУ</h3>
+            
+            <input type="text" id="create-name" class="lobby-input" placeholder="Название комнаты" style="width: 90%;">
+            <input type="password" id="create-pass" class="lobby-input" placeholder="Пароль (пусто = без пароля)" style="width: 90%;">
+            
+            <div style="margin: 20px 0; text-align: left; padding-left: 20px;">
+                <label style="display:block; margin-bottom:10px; cursor:pointer;">
+                    <input type="radio" name="gameMode" value="standard" checked> 👤 <b>СТАНДАРТ</b> (Карта 4000, до 4 чел)
+                </label>
+                <label style="display:block; margin-bottom:10px; cursor:pointer; color: #0af;">
+                    <input type="radio" name="gameMode" value="island"> 🏝️ <b>ОСТРОВНОЙ</b> (Карта 3000, до 5 чел)
+                </label>
+                <label style="display:block; margin-bottom:10px; cursor:pointer; color: #f0f;">
+                    <input type="radio" name="gameMode" value="giant"> 🌍 <b>ГИГАНТСКИЙ</b> (Карта 10000, до 8 чел)
+                </label>
+            </div>
+
+            <button class="menu-btn" style="font-size:1em; padding:10px 30px; margin-top: auto;" onclick="Lobby.create()">СОЗДАТЬ ИГРУ</button>
+        </div>
+
+        <div class="spec-settings" style="flex: 1.5; display:flex; flex-direction:column; padding: 0;">
+            <div style="padding: 15px; border-bottom: 1px solid #4466aa; background: rgba(0,0,0,0.3);">
+                <h3 style="margin:0; color:#ffaa00;">СПИСОК СЕРВЕРОВ <button onclick="Lobby.refreshList()" style="cursor:pointer; background:none; border:none; color:#fff;">↻</button></h3>
+            </div>
+            
+            <div id="server-list-container" style="flex: 1; overflow-y: auto; padding: 10px;">
+                <div style="color: #aaa;">Поиск комнат...</div>
+            </div>
+        </div>
     </div>
-    <button class="menu-btn" style="margin-top:50px;" onclick="Game.backToMenu()">НАЗАД</button>
+
+    <button class="menu-btn" style="margin-top:20px;" onclick="Game.backToMenu()">НАЗАД В МЕНЮ</button>
 </div>
 
 <div id="end-screen" class="screen hidden clickable">
@@ -258,7 +310,7 @@ const UNITS = {
     
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
-               hp: 150, dmg: 200, range: 1200, speed: 0.4, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
+               hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
 
 FPV: { 
         type:'unit', name: 'FPV Дрон', emoji: '🛩️', imageSrc: 'FPV.png', 
@@ -274,7 +326,7 @@ FPV: {
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.8, color: '#e6c200', radius: 15, buildTime: 5, isBuilder: true },
     
     POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 25, color: '#ffd700', constructTime: 10, energyGen: 50 },
-SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 150, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
+SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 50000, hp: 99999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
     HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 200, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
     
@@ -357,73 +409,103 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const MapUtils = {
-    seed: 0,
+    islands: [], // Теперь массив пустой, мы его заполним в init()
+    seed: Math.random() * 100,
     lakes: [],
     mountains: [],
 
     init() { 
-        this.seed = Math.random() * 100; 
         this.lakes = [];
         this.mountains = [];
+        this.islands = [];
 
-// 1. ГЕНЕРАЦИЯ ОЗЕР (Вода)
-        // БЫЛО: 18 -> СТАЛО: 6 (Меньше воды)
-        for (let i = 0; i < 0; i++) {
-            this.lakes.push({
-                x: Math.random() * MAP_W,
-                y: Math.random() * MAP_H,
-                radius: 80 + Math.random() * 120, // Чуть уменьшил размер тоже
-                color: `rgba(0, 100, 200, ${0.4 + Math.random()*0.2})` 
-            });
-        }
+        // --- ГЕНЕРАЦИЯ АДАПТИВНЫХ ОСТРОВОВ ---
+        // Размеры зависят от текущего MAP_W и MAP_H
+        
+        // 1. Большой левый (Материк)
+        this.islands.push({
+            x: MAP_W * 0.35,  // 35% от ширины
+            y: MAP_H * 0.5,   // Центр по высоте
+            rx: MAP_W * 0.3,  // Радиус по X
+            ry: MAP_H * 0.45, // Радиус по Y
+            noise: 80
+        });
 
-        // 2. ГЕНЕРАЦИЯ ГОР (Стены)
-        // БЫЛО: 12 -> СТАЛО: 5 (Меньше стен)
-        for (let i = 0; i < 0; i++) {
-            const r = 70 + Math.random() * 90; // Горы тоже чуть компактнее
-            const x = Math.random() * (MAP_W - 400) + 200;
-            const y = Math.random() * (MAP_H - 400) + 200;
+        // 2. Верхний правый
+        this.islands.push({
+            x: MAP_W * 0.78, 
+            y: MAP_H * 0.30,
+            rx: MAP_W * 0.15, 
+            ry: MAP_H * 0.15,
+            noise: 50
+        });
 
-            if (Math.hypot(x - MAP_W/2, y - MAP_H/2) < 500) continue;
+        // 3. Нижний правый
+        this.islands.push({
+            x: MAP_W * 0.78,
+            y: MAP_H * 0.70,
+            rx: MAP_W * 0.15,
+            ry: MAP_H * 0.18,
+            noise: 60
+        });
 
-            this.mountains.push({
-                x: x, y: y, radius: r,
-                height: r * 1.5 
-            });
+        // --- ГЕНЕРАЦИЯ ГОР ---
+        let attempts = 0;
+        while (this.mountains.length < 15 && attempts < 1000) {
+            attempts++;
+            const x = Math.random() * MAP_W;
+            const y = Math.random() * MAP_H;
+            // Размер горы тоже немного зависит от карты, но не сильно
+            const radius = 60 + Math.random() * 60;
+            const margin = radius + 80; 
+
+            if (this.getTerrain(x, y) !== 'LAND') continue;
+            if (this.getTerrain(x + margin, y) !== 'LAND') continue;
+            if (this.getTerrain(x - margin, y) !== 'LAND') continue;
+            if (this.getTerrain(x, y + margin) !== 'LAND') continue;
+            if (this.getTerrain(x, y - margin) !== 'LAND') continue;
+
+            let overlap = false;
+            for (let m of this.mountains) {
+                if (Math.hypot(x - m.x, y - m.y) < radius + m.radius + 100) { overlap = true; break; }
+            }
+            
+            if (!overlap) {
+                this.mountains.push({ x: x, y: y, radius: radius });
+            }
         }
     },
 
-    getIslandRadius(angle) {
-        return ISLAND_RADIUS + Math.sin(angle * 5 + this.seed) * 100 + Math.cos(angle * 12) * 50;
+    getTerrain(x, y) {
+        if (!Game.isIslandMode) return 'LAND';
+        let isShallow = false;
+        for (let isl of this.islands) {
+            const dx = x - isl.x;
+            const dy = y - isl.y;
+            // Формула эллипса
+            const distSq = (dx*dx)/(isl.rx*isl.rx) + (dy*dy)/(isl.ry*isl.ry);
+            
+            if (distSq <= 0.85) return 'LAND';   
+            if (distSq <= 1.2) isShallow = true; 
+        }
+        return isShallow ? 'SHALLOW' : 'DEEP';
     },
 
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-    // Переименовали обратно в isWater, чтобы старый код не ломался
-    isWater(x, y) {
-        // Если режим острова - проверяем океан вокруг
+   // Эта функция отвечает за то, где НЕЛЬЗЯ строить
+    isWater(x, y) { 
         if (Game.isIslandMode) {
-            const cx = MAP_W / 2; const cy = MAP_H / 2;
-            const dist = Math.hypot(x - cx, y - cy);
-            if (dist > this.getIslandRadius(Math.atan2(y - cy, x - cx))) return true;
+            // Строить можно ТОЛЬКО на 'LAND'. 
+            // 'SHALLOW' (мелководье) и 'DEEP' (глубина) считаются водой для зданий.
+            return this.getTerrain(x, y) !== 'LAND';
         }
-        // Проверяем внутренние озера
-        for (let lake of this.lakes) {
-            if (Math.hypot(x - lake.x, y - lake.y) < lake.radius) return true;
-        }
-        return false;
+        return false; 
     },
-
-    // Добавляем checkWater для совместимости с новым кодом движения
-    checkWater(x, y) {
-        return this.isWater(x, y);
-    },
-
-    // Проверка: врезался ли в гору (возвращает гору или null)
+    
+    checkWater(x, y) { return this.isWater(x, y); },
+    
     checkMountain(x, y, radius) {
         for (let m of this.mountains) {
-            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) {
-                return m;
-            }
+            if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
         }
         return null;
     }
@@ -556,7 +638,7 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 10000; 
+        this.money = 4000; 
         this.energyFactor = 1;
         this.timer = 0;
         this.resources = { iron: 0, chem: 0, chips: 0 };
@@ -949,24 +1031,139 @@ manageCombat() {
 }
     
 const Lobby = {
-initTransition() { Game.transition(() => this.init()); },
+    initTransition() { Game.transition(() => this.init()); },
     init() {
-        // Скрываем главное меню, показываем лобби
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('lobby-screen').classList.remove('hidden');
         
-        // Подключаемся к сокету
         if (typeof io !== 'undefined') {
             if (!Game.socket) {
                 Game.socket = io();
                 this.setupEvents();
+            } else {
+                // Если сокет уже был, просто просим список комнат
+                Game.socket.emit('get_rooms');
             }
         } else {
-            alert("Ошибка: Сервер не найден (запустите node server.js). Доступен только одиночный режим.");
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('menu-screen').classList.remove('hidden');
+            alert("Ошибка: Сервер не найден.");
+            Game.backToMenu();
         }
     },
+
+    setupEvents() {
+        const s = Game.socket;
+        
+        // 1. Обновление онлайна
+        s.on('update_online', (count) => {
+            const el = document.getElementById('online-count');
+            if (el) el.innerText = count;
+        });
+
+        // 2. Получение списка комнат
+        s.on('update_room_list', (rooms) => {
+            this.renderRoomList(rooms);
+        });
+    
+        // 3. Успешное создание/вход
+        s.on('room_joined', (data) => {
+            CURRENT_ROOM = data.roomName;
+            Game.myRole = data.side;
+            document.getElementById('lobby-screen').classList.add('hidden');
+            const warn = document.getElementById('connection-warning');
+            warn.style.display = 'block';
+            warn.style.background = '#004488';
+            warn.innerText = `КОМНАТА: ${CURRENT_ROOM} (${data.side}). ОЖИДАНИЕ...`;
+        });
+
+        // 4. Старт игры (с настройками!)
+        s.on('start_game_signal', (settings) => {
+            document.getElementById('connection-warning').style.display = 'none';
+            document.querySelectorAll('.time-btn').forEach(b => b.style.display = 'none');
+            document.getElementById('speed-controls').style.display = 'flex';
+            
+            Game.speed = 1;
+            // Передаем настройки режима (острова, размер)
+            Game.loadPvpLevel(settings);
+        });
+
+        s.on('error_msg', (msg) => alert(msg));
+        s.on('remoteCommand', (data) => Game.executeCommand(data));
+        s.on('playerLeft', () => { alert("Соперник вышел."); location.reload(); });
+        
+        // Сразу просим список при подключении
+        s.emit('get_rooms');
+    },
+
+    // Отрисовка списка комнат
+    renderRoomList(rooms) {
+        const container = document.getElementById('server-list-container');
+        container.innerHTML = '';
+
+        if (rooms.length === 0) {
+            container.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Нет активных комнат.<br>Создайте свою!</div>';
+            return;
+        }
+
+        rooms.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'room-item';
+            
+            // Определение бейджика режима
+            let badge = '<span class="mode-badge badge-std">STD</span>';
+            if (r.settings.isIsland) badge = '<span class="mode-badge badge-isl">ISLAND</span>';
+            else if (r.settings.mapSize > 5000) badge = '<span class="mode-badge badge-giant">GIANT</span>';
+
+            const lockIcon = r.hasPass ? '<span class="room-locked">🔒</span>' : '';
+            const mapInfo = `${r.settings.mapSize/1000}k`;
+
+            div.innerHTML = `
+                <div class="room-info">
+                    <div class="room-name">${lockIcon}${r.name}</div>
+                    <div class="room-meta">${badge} Карта: ${mapInfo} | Игроков: ${r.players}/${r.maxPlayers}</div>
+                </div>
+                <button class="room-join-btn">JOIN</button>
+            `;
+            
+            // Клик по кнопке JOIN
+            div.querySelector('button').onclick = () => {
+                const pass = r.hasPass ? prompt("Введите пароль от комнаты:") : "";
+                if (r.hasPass && !pass) return; // Нажал отмену
+                Game.socket.emit('join_room', { name: r.name, password: pass });
+            };
+
+            container.appendChild(div);
+        });
+    },
+
+    refreshList() {
+        if(Game.socket) Game.socket.emit('get_rooms');
+    },
+
+    create() {
+        const name = document.getElementById('create-name').value;
+        const pass = document.getElementById('create-pass').value;
+        
+        if(!name) return alert("Введите имя комнаты!");
+
+        // Считываем режим
+        const mode = document.querySelector('input[name="gameMode"]:checked').value;
+        
+        // Настройки по умолчанию (Standard)
+        let settings = { mapSize: 4000, isIsland: false, maxPlayers: 4 };
+
+        if (mode === 'island') {
+            settings.mapSize = 3000;
+            settings.isIsland = true;
+            settings.maxPlayers = 5;
+        } else if (mode === 'giant') {
+            settings.mapSize = 10000;
+            settings.isIsland = false;
+            settings.maxPlayers = 8;
+        }
+
+        Game.socket.emit('create_room', { name, password: pass, settings });
+    }
+};
 
 setupEvents() {
         const s = Game.socket;
@@ -1574,7 +1771,7 @@ waterOffset: 0,
         return owner;
     },
 
-    startSpectator() {
+ startSpectator() {
         const botCount = parseInt(document.querySelector('input[type=range][max="8"]').value);
         const mapSize = parseInt(document.querySelector('input[type=range][max="6000"]').value);
         
@@ -1583,9 +1780,12 @@ waterOffset: 0,
         this.isSpectator = true;
         this.myRole = 'spectator';
         this.state = 'BATTLE';
+        
+        // Устанавливаем размер карты
         MAP_W = mapSize; 
         MAP_H = mapSize;
-        ISLAND_RADIUS = mapSize * 0.4;
+        
+        // Генерируем острова ПОД НОВЫЙ РАЗМЕР
         MapUtils.init();
         
         this.resetGameData();
@@ -1595,17 +1795,50 @@ waterOffset: 0,
 
         const factions = [];
         for(let i=1; i<=botCount; i++) factions.push('bot'+i);
-        const cx = MAP_W/2, cy = MAP_H/2;
-        const radius = ISLAND_RADIUS - 400;
+
+        // --- БЕЗОПАСНЫЙ СПАВН БОТОВ ---
         factions.forEach((side, i) => {
-            const angle = (Math.PI * 2 / factions.length) * i - Math.PI/2;
-            const sx = cx + Math.cos(angle) * radius;
-            const sy = cy + Math.sin(angle) * radius;
+            let spawned = false;
+            let attempts = 0;
             
-            this.units.push(new Unit('HOUSE', sx, sy, side));
-            this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
-            this.bots.push(new BotAI(side));
+            // Пытаемся найти место 100 раз
+            while (!spawned && attempts < 100) {
+                attempts++;
+                
+                // 1. Выбираем остров по очереди (чтобы раскидать ботов)
+                const island = MapUtils.islands[i % MapUtils.islands.length];
+                
+                // 2. Берем случайную точку внутри этого острова
+                // (умножаем на 0.7, чтобы не спавнить на самом пляже)
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random()) * 0.7; 
+                
+                const sx = island.x + Math.cos(angle) * (island.rx * r);
+                const sy = island.y + Math.sin(angle) * (island.ry * r);
+                
+                // 3. ПРОВЕРКА: Это точно суша? И нет ли горы?
+                if (MapUtils.getTerrain(sx, sy) === 'LAND' && !MapUtils.checkMountain(sx, sy, 50)) {
+                    // Проверка, чтобы не спавниться друг на друге
+                    const tooClose = this.units.some(u => Math.hypot(u.x - sx, u.y - sy) < 300);
+                    
+                    if (!tooClose) {
+                        this.units.push(new Unit('HOUSE', sx, sy, side));
+                        this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
+                        this.bots.push(new BotAI(side));
+                        spawned = true;
+                    }
+                }
+            }
+            
+            // Если за 100 попыток место не нашлось (вряд ли), ставим в центр острова
+            if (!spawned) {
+                const island = MapUtils.islands[i % MapUtils.islands.length];
+                this.units.push(new Unit('HOUSE', island.x, island.y, side));
+                this.units.push(new Unit('BUILDER', island.x + 20, island.y + 20, side));
+                this.bots.push(new BotAI(side));
+            }
         });
+
         this.generateBuffs();
 
         this.startGameUI("РЕЖИМ НАБЛЮДЕНИЯ");
@@ -1616,72 +1849,115 @@ waterOffset: 0,
         this.updateUI(Object.keys(UNITS));
     },
 
-    loadPvpLevel() {
-        this.isMultiplayer = true; this.isIslandMode = false;
+loadPvpLevel(settings) {
+        // Настройки по умолчанию, если сервер их не прислал (старая совместимость)
+        const cfg = settings || { mapSize: 4000, isIsland: false };
+
+        this.isMultiplayer = true;
+        this.isIslandMode = cfg.isIsland; // ВКЛ/ВЫКЛ Острова
         this.isSpectator = false;
-        this.state = 'BATTLE'; this.money = 5000;
-        MAP_W = 3500; MAP_H = 2000;
+        this.state = 'BATTLE'; 
+        this.money = 5000;
+        
+        // Применяем размер карты
+        MAP_W = cfg.mapSize;
+        MAP_H = cfg.mapSize; // Делаем квадратную карту
+        
         this.resetGameData();
-        this.units.push(new Unit('HOUSE', 300, MAP_H/2, 'player', 'base_p1'));
-        this.units.push(new Unit('BUILDER', 400, MAP_H/2, 'player', 'builder_p1'));
-        this.units.push(new Unit('HOUSE', MAP_W - 300, MAP_H/2, 'enemy', 'base_p2'));
-        this.units.push(new Unit('BUILDER', MAP_W - 400, MAP_H/2, 'enemy', 'builder_p2'));
-        this.camera.x = this.myRole === 'enemy' ? MAP_W - canvas.width : 0;
-        this.camera.y = (MAP_H/2) - (canvas.height/2);
-        this.startGameUI("PVP БОЙ");
+        
+        if (this.isIslandMode) {
+            // Если режим Островной - генерируем острова
+            MapUtils.init();
+            
+            // Спавн для Островов (Ищем безопасное место)
+            const side = this.myRole;
+            let sx=1000, sy=1000;
+            
+            // Простая логика спавна для PVP островов:
+            // Если я player (хост) - левый остров, enemy (гость) - правый
+            if (side === 'player') { sx = MapUtils.islands[0].x; sy = MapUtils.islands[0].y; }
+            else { 
+                // Берем второй остров или первый, если второго нет
+                const isl = MapUtils.islands[1] || MapUtils.islands[0];
+                sx = isl.x; sy = isl.y; 
+            }
+            
+            this.units.push(new Unit('HOUSE', sx, sy, side));
+            this.units.push(new Unit('BUILDER', sx+20, sy+20, side));
+            
+        } else {
+            // Режим СТАНДАРТ или ГИГАНТ (Плоская земля)
+            // Игрок слева, Враг справа (для 2 игроков)
+            // Для Гиганта можно усложнить спавн, но пока оставим классику
+            this.units.push(new Unit('HOUSE', 300, MAP_H/2, 'player', 'base_p1'));
+            this.units.push(new Unit('BUILDER', 400, MAP_H/2, 'player', 'builder_p1'));
+            
+            // Врага спавним зеркально
+            this.units.push(new Unit('HOUSE', MAP_W - 300, MAP_H/2, 'enemy', 'base_p2'));
+            this.units.push(new Unit('BUILDER', MAP_W - 400, MAP_H/2, 'enemy', 'builder_p2'));
+        }
+
+        // Центрируем камеру на своем юните
+        const myBase = this.units.find(u => u.side === this.myRole && u.type === 'HOUSE');
+        if (myBase) {
+            this.camera.x = myBase.x - canvas.width/2;
+            this.camera.y = myBase.y - canvas.height/2;
+        }
+
+        this.startGameUI(this.isIslandMode ? "PVP: АРХИПЕЛАГ" : "PVP: БИТВА");
     },
     
-    loadAdvancedMode() {
+ loadAdvancedMode() {
         this.isMultiplayer = false;
         this.isIslandMode = true; this.isSpectator = false;
         this.myRole = 'player';
         this.state = 'BATTLE';
         this.money = 4000;
         
-        MAP_W = 3500;
+        MAP_W = 3800;
         MAP_H = 4000;
-        ISLAND_RADIUS = 1600;
         MapUtils.init();
         
         this.resetGameData(); 
 
-        const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4'];
-        const cx = MAP_W/2, cy = MAP_H/2;
-        const radius = ISLAND_RADIUS - 400;
-        factions.forEach((side, i) => {
-            const angle = (Math.PI * 2 / factions.length) * i - Math.PI/2;
-            const sx = cx + Math.cos(angle) * radius;
-            const sy = cy + Math.sin(angle) * radius;
+  // --- ИСПРАВЛЕННЫЕ ТОЧКИ СПАВНА ---
+        const spawnPoints = [
+            // ИГРОК: В самом центре левого острова
+            { side: 'player', x: 1400, y: 2000 }, 
             
-            this.units.push(new Unit('HOUSE', sx, sy, side));
-            this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
+            // БОТ 1 и 2: На том же большом острове, но строго по вертикальной оси
+            // (1400 - это центр X острова, так что они точно не свалятся влево/вправо)
+            { side: 'bot1',   x: 1400, y: 800 },  // Север
+            { side: 'bot2',   x: 1400, y: 3200 }, // Юг
             
-            if (side !== 'player') {
-                this.bots.push(new BotAI(side));
+            // БОТ 3: Прямо в центре правого верхнего острова (x=3100, y=1400)
+            { side: 'bot3',   x: 3100, y: 1400 }, 
+            
+            // БОТ 4: Прямо в центре правого нижнего острова (x=3100, y=2600)
+            { side: 'bot4',   x: 3100, y: 2600 }  
+        ];
+
+        spawnPoints.forEach(sp => {
+            this.units.push(new Unit('HOUSE', sp.x, sp.y, sp.side));
+            this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, sp.side));
+            
+            if (sp.side !== 'player') {
+                this.bots.push(new BotAI(sp.side));
             } else {
-                this.camera.x = sx - canvas.width/2;
-                this.camera.y = sy - canvas.height/2;
+                this.camera.x = sp.x - canvas.width/2;
+                this.camera.y = sp.y - canvas.height/2;
             }
         });
+        
         this.generateBuffs();
-
-        this.startGameUI("ВЫЖИВАНИЕ (ВСЕ ПРОТИВ ВСЕХ)");
+        this.startGameUI("АРХИПЕЛАГ (ВЫЖИВАНИЕ)");
         document.getElementById('start-btn').classList.add('hidden');
         document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(Object.keys(UNITS));
-this.startGameUI("ВЫЖИВАНИЕ (ВСЕ ПРОТИВ ВСЕХ)");
-        document.getElementById('start-btn').classList.add('hidden');
-        document.getElementById('speed-controls').style.display = 'flex';
-        this.updateUI(Object.keys(UNITS));
-
-        // --- НОВОЕ МЕСТО ДЛЯ ТУТОРИАЛА ---
-        // Запускаем только в продвинутом режиме, где есть строители
+        
+        // --- ТУТОРИАЛ (Правильное место - внутри функции) ---
         if (typeof Tutorial !== 'undefined') {
-            // Небольшая задержка, чтобы карта успела прогрузиться
-            setTimeout(() => {
-                Tutorial.init(); 
-                Tutorial.start();
-            }, 1000);
+            setTimeout(() => { Tutorial.init(); Tutorial.start(); }, 1000);
         }
     },
 
@@ -1733,7 +2009,7 @@ loadLevel(lvlId) {
     }, // <--- ЭТА ЗАПЯТАЯ И СКОБКА ОЧЕНЬ ВАЖНЫ!
 
 
-    resetGameData() {
+ resetGameData() {
         this.units = []; this.bullets = [];
         this.selection = []; this.constructions = []; this.effects = []; this.bots = [];
         this.buffs = [];
@@ -1748,21 +2024,35 @@ loadLevel(lvlId) {
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
         
+        // --- ГЕНЕРАЦИЯ ДЕКОРА (ИСПРАВЛЕННАЯ) ---
         const emojis = ['🌲', '🌲', '🌳', '🪨', '🌿', '🪵'];
         const gridSize = 50; 
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
+        
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                if (Math.random() > 0.3) continue;
+                if (Math.random() > 0.3) continue; // 30% шанс спавна
+                
                 let dx = c * gridSize + Math.random() * gridSize;
                 let dy = r * gridSize + Math.random() * gridSize;
+                
+                // ПРОВЕРКА 1: Не вода (использует обновленный isWater, который запрещает мелководье)
                 if (!this.isIslandMode || !MapUtils.isWater(dx, dy)) {
-                    this.decor.push({x: dx, y: dy, char: emojis[Math.floor(Math.random()*emojis.length)]});
+                    
+                    // ПРОВЕРКА 2: НЕТ ЛИ ТУТ ГОРЫ? (Радиус проверки 30px)
+                    // Если MapUtils.checkMountain вернет true (гора есть), мы НЕ спавним декор
+                    if (!MapUtils.checkMountain(dx, dy, 30)) {
+                        this.decor.push({
+                            x: dx, 
+                            y: dy, 
+                            char: emojis[Math.floor(Math.random()*emojis.length)]
+                        });
+                    }
                 }
             }
         }
-    },
+    }, // <--- ОБЯЗАТЕЛЬНО ПРОВЕРЬ ЭТУ ЗАПЯТУЮ!
 
     startGameUI(title) {
         document.getElementById('menu-screen').classList.add('hidden');
@@ -2728,11 +3018,15 @@ else {
     },
 
     onRight(e) {
-        if (this.state !== 'BATTLE' || this.isSpectator) return;
+if (this.state !== 'BATTLE' || this.isSpectator) return;
         const m = this.getMouse(e);
         this.artyMode = false; this.pendingConstruction = null; document.body.style.cursor = 'default';
-        if (MapUtils.isWater(m.x, m.y) && !this.selection.every(u => u.isFlying)) {
-            this.showError("НЕЛЬЗЯ ИДТИ В ВОДУ! 🚫");
+
+        // ИСПРАВЛЕНИЕ: Проверяем именно ГЛУБИНУ (DEEP), а не просто воду
+        // Если летим - можно везде. Если идем - нельзя только в DEEP.
+        const terrain = MapUtils.getTerrain(m.x, m.y);
+        if (terrain === 'DEEP' && !this.selection.every(u => u.isFlying)) {
+            this.showError("СЛИШКОМ ГЛУБОКО! 🚫");
             return;
         }
 
@@ -2757,64 +3051,86 @@ else {
     },
 
     draw() {
+        // Очистка экрана и сохранение контекста (ОБЯЗАТЕЛЬНО)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(-this.camera.x, -this.camera.y);
 
-// 1. Анимированный фон (вода / космос)
+        // 1. Анимированный фон (вода / космос)
+        const time = this.frameCount * 0.002;
+        const gradient = ctx.createRadialGradient(
+            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
+            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
+        );
+        gradient.addColorStop(0, '#050a14');
+        gradient.addColorStop(1, '#020408');
+        ctx.fillStyle = gradient;
+        // Заливаем весь мир фоном воды
+        ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
+
+// 2. Отрисовка ОСТРОВОВ и ВОДЫ
         if (this.isIslandMode) {
-             ctx.fillStyle = '#0a1525';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
-             
-             // Двигаем волны
-             this.waterOffset = (this.waterOffset || 0) + 0.5;
-             if (this.waterOffset > 50) this.waterOffset = 0;
-
-             ctx.save();
-             // Легкий параллакс
-             ctx.translate(-this.camera.x * 0.2, -this.camera.y * 0.2);
-             ctx.strokeStyle = 'rgba(50, 100, 200, 0.1)';
-             ctx.lineWidth = 2;
-             ctx.beginPath();
-             for(let i=-100; i<canvas.width+100; i+=50) {
-                 ctx.moveTo(i + this.waterOffset, 0); ctx.lineTo(i - 50 + this.waterOffset, canvas.height);
-             }
-             ctx.stroke();
-             ctx.restore();
-        } else {
-             ctx.fillStyle = '#050a14';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        ctx.save(); ctx.translate(-this.camera.x, -this.camera.y);
-
-        // 2. Отрисовка "объемного" края Острова (если режим острова)
-        if (this.isIslandMode) {
-            const cx = MAP_W/2, cy = MAP_H/2;
-            
-           // Темная скала внизу (эффект высоты)
-            ctx.fillStyle = '#151c25'; 
-            for(let h=0; h<15; h+=5) { 
-                ctx.beginPath();
-                for (let a = 0; a <= Math.PI * 2.1; a += 0.1) {
-                    const r = MapUtils.getIslandRadius(a);
-                    const px = cx + Math.cos(a) * r;
-                    const py = cy + Math.sin(a) * r + h; // Смещаем вниз
-                    if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            // Вспомогательная функция, которая добавляет путь к текущему контексту
+            const tracePoly = (isl, scale, offsetY) => {
+                const steps = 100;
+                for (let i = 0; i <= steps; i++) {
+                    const angle = (Math.PI * 2 * i) / steps;
+                    const noise = 1 + Math.sin(angle * 10 + MapUtils.seed) * 0.03 + Math.cos(angle * 25) * 0.02;
+                    
+                    const rX = isl.rx * noise * scale;
+                    const rY = isl.ry * noise * scale;
+                    
+                    const px = isl.x + Math.cos(angle) * rX;
+                    const py = isl.y + Math.sin(angle) * rY + offsetY;
+                    
+                    // ВАЖНО: Используем moveTo для первой точки, чтобы не соединять острова линиями
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
                 }
-                ctx.fill();
-            }
+            };
 
-            // Сама земля
-            ctx.fillStyle = '#1a222d'; 
+            // --- СЛОЙ 1: АНИМИРОВАННЫЕ ВОЛНЫ (ДЕКОР) ---
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            const waveOffset = (Game.frameCount * 0.5) % 100;
+            MapUtils.islands.forEach(isl => {
+                ctx.beginPath();
+                ctx.arc(isl.x, isl.y, isl.rx + 200 - waveOffset, 0, Math.PI*2);
+                ctx.stroke();
+            });
+            ctx.restore();
+
+// --- СЛОЙ 2: МЕЛКОВОДЬЕ (СЛИЯНИЕ) ---
             ctx.beginPath();
-            for (let a = 0; a <= Math.PI * 2.1; a += 0.1) {
-                const r = MapUtils.getIslandRadius(a);
-                const px = cx + Math.cos(a) * r;
-                const py = cy + Math.sin(a) * r;
-                if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-            }
+            MapUtils.islands.forEach(isl => {
+                tracePoly(isl, 1.15, 0); // Рисуем контуры
+            });
+            
+            // 1. Заливаем цветом (стыков не будет видно, так как цвет один)
+            ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; 
             ctx.fill();
-            ctx.strokeStyle = '#4466aa'; ctx.lineWidth = 3; ctx.stroke();
-        }
+            // 3. Заливаем ОДИН РАЗ (теперь наложения не будет!)
+            ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; // Красивая бирюза
+            ctx.fill();
 
+            // --- СЛОЙ 3: СУША ---
+            // Скалы (тень) - рисуем отдельно каждый, тут наложение не страшно (они непрозрачные)
+            ctx.fillStyle = '#151c25'; 
+            ctx.beginPath();
+            MapUtils.islands.forEach(isl => tracePoly(isl, 0.95, 15));
+            ctx.fill();
+
+            // Трава (верх)
+            ctx.fillStyle = '#1a222d'; 
+            ctx.strokeStyle = '#4466aa'; 
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            MapUtils.islands.forEach(isl => tracePoly(isl, 0.95, 0));
+            ctx.fill();
+            ctx.stroke();
+        }
+        
         // --- РИСУЕМ ЛАНДШАФТ ---
         MapUtils.lakes.forEach(l => {
             if (l.x + l.radius < this.camera.x || l.x - l.radius > this.camera.x + canvas.width ||
@@ -2888,20 +3204,57 @@ else {
         buildings.forEach(u => u.draw(ctx)); mobile.forEach(u => u.draw(ctx));
         this.bullets.forEach(b => b.draw(ctx));
         
-        for (let i = this.effects.length - 1; i >= 0; i--) {
+      for (let i = this.effects.length - 1; i >= 0; i--) {
             const e = this.effects[i];
+            
+            // --- СТАРЫЕ ЭФФЕКТЫ ---
             if (e.type === 'smoke') {
                 ctx.fillStyle = `rgba(200,200,200,${e.life/40})`; ctx.beginPath(); ctx.arc(e.x, e.y, 5 + (20-e.life/2), 0, Math.PI*2); ctx.fill(); e.life--;
-            } else if (e.type === 'shockwave') {
+            } 
+            else if (e.type === 'shockwave') {
                 ctx.strokeStyle = (e.color) ? e.color : `rgba(255, 50, 0, ${e.life/20})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.stroke();
                 if (e.maxRadius) { if (e.radius < e.maxRadius) e.radius += 2; } else e.radius += 3;
                 e.life--;
-            } else if (e.type === 'ripple') {
-                ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.radius, e.radius * 0.6, 0, 0, Math.PI*2); ctx.stroke();
-                e.radius += 0.5; e.life--;
-            } else {
+            } 
+            // --- НОВЫЕ ЭФФЕКТЫ ВОДЫ ---
+            else if (e.type === 'ripple' || e.type === 'wind_ripple' || e.type === 'splash_ring') {
+                ctx.save();
+                // Растягиваем по вертикали (перспектива)
+                ctx.translate(e.x, e.y);
+                ctx.scale(1, 0.6); 
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, e.radius, 0, Math.PI*2);
+                
+                // Настраиваем прозрачность в зависимости от времени жизни
+                let alpha = (e.life / 50);
+                if (e.type === 'wind_ripple') alpha = (e.life / 30) * 0.5; // Ветер прозрачнее
+                
+                ctx.strokeStyle = e.color || `rgba(255, 255, 255, ${alpha})`;
+                ctx.lineWidth = (e.type === 'splash_ring') ? 3 : 2;
+                ctx.stroke();
+                
+                ctx.restore();
+
+                // Увеличение радиуса
+                e.radius += (e.growSpeed || 1.5);
+                if (e.maxRadius && e.radius > e.maxRadius) e.life -= 5; // Быстро исчезает, если достиг максимума
+                e.life--;
+            }
+            else if (e.type === 'water_particle') {
+                // Частицы брызг (летят и падают)
+                ctx.fillStyle = 'rgba(150, 230, 255, 0.8)';
+                ctx.beginPath(); ctx.arc(e.x, e.y, 2, 0, Math.PI*2); ctx.fill();
+                e.x += e.vx;
+                e.y += e.vy;
+                e.vy += 0.2; // Гравитация
+                e.life--;
+            }
+            // --- ТЕКСТОВЫЕ ЭФФЕКТЫ ---
+            else {
                 ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.fillText(e.char, e.x, e.y); e.life--; e.y -= 0.5;
             }
+            
             if (e.life <= 0) this.effects.splice(i, 1);
         }
 
@@ -3105,11 +3458,16 @@ checkPower() {
                  }
             }
         });
+
+
         if (Game.isIslandMode && !this.isFlying) {
-            if (MapUtils.checkWater(this.x, this.y)) {
+            // Проверяем именно DEEP (Глубина), а не просто воду
+            if (MapUtils.getTerrain(this.x, this.y) === 'DEEP') {
                 const cx = MAP_W/2, cy = MAP_H/2;
                 const angle = Math.atan2(this.y - cy, this.x - cx);
-                this.x -= Math.cos(angle) * 5; this.y -= Math.sin(angle) * 5;
+                // Толкаем чуть сильнее, чтобы точно вылезти
+                this.x -= Math.cos(angle) * 8; 
+                this.y -= Math.sin(angle) * 8;
             }
         }
     }
@@ -3164,6 +3522,24 @@ checkPower() {
         }
 
         if (this.isFlying) {
+// --- ЭФФЕКТ ВЕРТОЛЕТА НАД ВОДОЙ ---
+        if (this.type === 'HELICOPTER' && this.flyHeight > 0.8) {
+            // Если под вертолетом вода (любая)
+            if (MapUtils.isWater(this.x, this.y)) {
+                // Генерируем активные круги от винтов
+                if (Math.random() < 0.2) { 
+                    Game.effects.push({ 
+                        type: 'wind_ripple', // Новый тип эффекта
+                        x: this.x + (Math.random()-0.5)*20, 
+                        y: this.y + (Math.random()-0.5)*20, 
+                        radius: 10, 
+                        maxRadius: 35, 
+                        life: 30, 
+                        color: 'rgba(255, 255, 255, 0.2)' 
+                    });
+                }
+            }
+        }
             if (this.flyState === 1) { this.flyTimer--; this.flyHeight = 1 - (this.flyTimer / 180); if (this.flyTimer <= 0) { this.flyState = 2; this.flyHeight = 1; } return; } 
             else if (this.flyState === 3) { this.flyTimer--; this.flyHeight = this.flyTimer / 60; if (this.flyTimer <= 0) { this.flyState = 0; this.flyHeight = 0; } return; }
         }
@@ -3363,22 +3739,69 @@ if (this.targetUnit) {
         this.resolveCollision();
     }
 
-    _movePhysics() {
+_movePhysics() {
         let currentSpeed = this.speed;
-        const inWater = MapUtils.checkWater(this.x, this.y);
-        if (!this.isFlying && inWater) {
-            currentSpeed *= 0.5;
-            if (Game.frameCount % 15 === 0 && (this.target || this.pathQueue.length > 0)) {
-                Game.effects.push({ type: 'ripple', x: this.x, y: this.y + 5, radius: 1, life: 30, color: 'rgba(255, 255, 255, 0.5)' });
+        let onWater = false;
+        
+        // --- ЛОГИКА ВОДЫ ---
+        if (!this.isFlying) {
+            const terrain = MapUtils.getTerrain(this.x, this.y);
+            
+            if (terrain === 'SHALLOW') {
+                currentSpeed *= 0.5; // Замедление
+                onWater = true;
             }
         }
-        let dx = this.target.x - this.x, dy = this.target.y - this.y;
+
+        // --- РЕАЛИСТИЧНЫЕ ВОЛНЫ (FIX для 5x скорости) ---
+        // Генерируем волну не по таймеру, а по рандому при движении
+        // Чем быстрее движется юнит, тем чаще волны, но без "спама"
+        if (onWater && (this.target || this.pathQueue.length > 0)) {
+            // Шанс 15% каждый кадр при движении - выглядит органичнее, чем % 10
+            if (Math.random() < 0.15) {
+                Game.effects.push({ 
+                    type: 'ripple', 
+                    x: this.x, 
+                    y: this.y + 5, 
+                    radius: 2,      // Начинаем с маленького радиуса
+                    maxRadius: 15,  // Растут до 15
+                    life: 50, 
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    growSpeed: 0.5
+                });
+            }
+        }
+
+        // Движение к цели
+        let dx = this.target.x - this.x;
+        let dy = this.target.y - this.y;
         let dist = Math.hypot(dx, dy);
+
+        // Проверка глубины
+        if (!this.isFlying && dist > currentSpeed) {
+            const nextX = this.x + (dx / dist) * currentSpeed * 2; 
+            const nextY = this.y + (dy / dist) * currentSpeed * 2;
+            
+            if (MapUtils.getTerrain(nextX, nextY) === 'DEEP') {
+                this.target = null;
+                this.pathQueue = [];
+                return; 
+            }
+        }
+
         if (dist < 15) { 
-            this.x = this.target.x; this.y = this.target.y;
-            if (this.pathQueue.length > 0) { const next = this.pathQueue.shift(); this.target = {x: next.x, y: next.y}; } 
-            else { if (!this.isFlying) this.target = null; }
-        } else { this.x += (dx / dist) * currentSpeed; this.y += (dy / dist) * currentSpeed; }
+            this.x = this.target.x; 
+            this.y = this.target.y;
+            if (this.pathQueue.length > 0) { 
+                const next = this.pathQueue.shift(); 
+                this.target = {x: next.x, y: next.y}; 
+            } else { 
+                if (!this.isFlying) this.target = null; 
+            }
+        } else { 
+            this.x += (dx / dist) * currentSpeed; 
+            this.y += (dy / dist) * currentSpeed; 
+        }
     }
 
     draw(ctx) {
@@ -3473,15 +3896,45 @@ class Bullet {
         if (this.arty && Game.frameCount % 5 === 0) { Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }
     }
-    hit() {
+hit() {
         this.dead = true;
+        
+        // Проверяем, попал ли снаряд в воду
+        const isWaterHit = MapUtils.isWater(this.x, this.y);
+
         if (this.isNuke) {
             Game.effects.push({x: this.x, y: this.y, char: '☢️', life: 100});
             Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: 10, maxRadius: 400, life: 100, color: 'rgba(255, 100, 0, 0.5)'});
         } else {
-            if (this.arty || this.splashRadius > 0) Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
-            Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});
+            if (isWaterHit) {
+                // --- РЕАЛИСТИЧНЫЙ ВСПЛЕСК ВОДЫ ---
+                // 1. Белый круг (пена)
+                Game.effects.push({
+                    type: 'splash_ring', 
+                    x: this.x, y: this.y, 
+                    radius: 5, maxRadius: this.splashRadius || 20, 
+                    life: 40, color: 'rgba(200, 255, 255, 0.8)'
+                });
+                // 2. Брызги (частицы)
+                for(let k=0; k<5; k++) {
+                     Game.effects.push({
+                        type: 'water_particle',
+                        x: this.x, y: this.y,
+                        vx: (Math.random()-0.5)*3,
+                        vy: (Math.random()-0.5)*3,
+                        life: 30
+                    });
+                }
+                // Звуковой эффект текстом (опционально)
+                // Game.effects.push({x: this.x, y: this.y, char: '💦', life: 20});
+            } else {
+                // Обычный взрыв на земле
+                if (this.arty || this.splashRadius > 0) Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
+                Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});
+            }
         }
+        
+        // ... (дальше код урона остается прежним) ...
         let range = this.arty ? (UNITS.GRAD.splash || 100) : (this.splashRadius || 15);
         if (this.isNuke) range = 450; if (this.splashRadius > 100) range = 150;
         Game.units.forEach(u => {

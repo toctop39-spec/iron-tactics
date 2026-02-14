@@ -387,16 +387,19 @@ const LEVELS = [
 { id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
 ];
 const FACTIONS = {
-    'player': { color: '#44aaff', name: 'СИНИЕ' },
-    'enemy':  { color: '#e53935', name: 'КРАСНЫЕ' },
-    'bot1':   { color: '#ff3333', name: 'КРАСНЫЕ' },
-    'bot2':   { color: '#00cc00', name: 'ЗЕЛЕНЫЕ' },
-    'bot3':   { color: '#ffaa00', name: 'ОРАНЖЕВЫЕ' },
-    'bot4':   { color: '#aa00ff', name: 'ФИОЛЕТОВЫЕ' },
-    'bot5':   { color: '#00ffff', name: 'БИРЮЗОВЫЕ' },
-    'bot6':   { color: '#ff00ff', name: 'РОЗОВЫЕ' },
+    'player': { color: '#44aaff', name: 'СИНИЕ' },     // Игрок 1 (Хост)
+    'enemy':  { color: '#e53935', name: 'КРАСНЫЕ' },   // Игрок 2
+    
+    // ИСПРАВЛЕНИЕ: Теперь bot1 - ЖЕЛТЫЙ, а не красный
+    'bot1':   { color: '#ffd700', name: 'ЖЕЛТЫЕ' },    // Игрок 3
+    
+    'bot2':   { color: '#00cc00', name: 'ЗЕЛЕНЫЕ' },   // Игрок 4
+    'bot3':   { color: '#ff8800', name: 'ОРАНЖЕВЫЕ' }, // Игрок 5
+    'bot4':   { color: '#aa00ff', name: 'ФИОЛЕТОВЫЕ' },// Игрок 6
+    'bot5':   { color: '#00ffff', name: 'БИРЮЗОВЫЕ' }, // Игрок 7
+    'bot6':   { color: '#ff00ff', name: 'РОЗОВЫЕ' },   // Игрок 8
     'bot7':   { color: '#ffffff', name: 'БЕЛЫЕ' },
-    'bot8':   { color: '#888888', name: 'СЕРЫЕ' }
+    'bot8':   { color: '#555555', name: 'ЧЕРНЫЕ' }
 };
 const ARTY_COST = 200;
 const RELOAD_COST = 1000;

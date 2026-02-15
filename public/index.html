@@ -4012,7 +4012,7 @@ const MobileControls = {
             if (tapLength < 200 && e.changedTouches.length === 1) { // Это был быстрый тап
                 const touch = e.changedTouches[0];
                 
-                if (currentTime - this.lastTapTime < 300) {
+                if (currentTime - this.lastTapTime < 600) {
                     // === ДВОЙНОЙ ТАП (ПРАВЫЙ КЛИК) ===
                     // Вызываем onRight вручную
                     const fakeEvent = { 

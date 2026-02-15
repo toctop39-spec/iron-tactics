@@ -103,6 +103,15 @@ canvas { display: block; cursor: crosshair; }
 #menu-title {
     position: absolute; bottom: 155px; left: 50%; transform: translateX(-50%); color: #4f4; font-weight: bold; text-shadow: 0 0 8px #0f0; display: none; background: rgba(0, 20, 0, 0.8); padding: 5px 20px; border-radius: 4px; border: 1px solid #0f0; text-transform: uppercase; letter-spacing: 1px;
 }
+
+/* Адаптация под телефоны */
+@media (max-width: 800px) {
+    #top-bar { padding: 0 5px; height: auto; flex-wrap: wrap; }
+    #player-stats { flex-wrap: wrap; gap: 5px; font-size: 0.8em; }
+    .unit-card { width: 60px; height: 80px; } /* Карточки меньше */
+    .menu-btn { min-width: 200px; padding: 15px; }
+    #build-menu { bottom: 10px; width: 100%; justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; }
+}
 .unit-card {
     width: 85px; height: 115px; background: linear-gradient(135deg, #2a2a2a, #1a1a1a); border: 1px solid #555; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: white; transition: 0.2s; position: relative; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
 }
@@ -119,6 +128,14 @@ canvas { display: block; cursor: crosshair; }
 .action-circle-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
 #start-btn { position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%); padding: 15px 70px; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; background: linear-gradient(to bottom, #d32f2f, #9a0007); color: white; border: 2px solid #ff5555; border-radius: 4px; box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); cursor: pointer; transition: 0.2s; }
 #start-btn:hover { background: #ff4444; transform: translateX(-50%) scale(1.05); }
+    
+    <div id="mobile-controls" style="display:none; pointer-events:none;">
+        <div id="joystick-zone" style="position:absolute; bottom:50px; left:50px; width:150px; height:150px; background:rgba(255,255,255,0.1); border:2px solid rgba(255,255,255,0.3); border-radius:50%; pointer-events:auto; touch-action:none;">
+            <div id="joystick-stick" style="position:absolute; top:50%; left:50%; width:60px; height:60px; background:rgba(0, 170, 255, 0.5); border-radius:50%; transform:translate(-50%, -50%); box-shadow: 0 0 10px #0af;"></div>
+        </div>
+        
+        <div onclick="Game.selection=[]; Game.updateUI([]);" style="position:absolute; bottom:180px; right:20px; width:60px; height:60px; background:rgba(255,0,0,0.3); border:2px solid #f00; border-radius:50%; color:#fff; display:flex; justify-content:center; align-items:center; font-size:30px; pointer-events:auto;">✖</div>
+    </div>
 
 /* --- ЭКРАНЫ И МЕНЮ --- */
 .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, rgba(20,25,35,0.95), rgba(5,5,10,0.98)); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
@@ -155,6 +172,15 @@ canvas { display: block; cursor: crosshair; }
 <div id="connection-warning">Ожидание...</div>
 
 <div id="ui-layer">
+<button id="mobile-toggle-btn" class="clickable" onclick="MobileControls.toggle()" style="position:absolute; top:70px; right:10px; z-index:999; padding:5px; background:#333; color:#fff; border:1px solid #fff; opacity:0.7;">📱</button>
+    
+    <div id="mobile-controls" style="display:none; pointer-events:none;">
+        <div id="joystick-zone" style="position:absolute; bottom:50px; left:50px; width:150px; height:150px; background:rgba(255,255,255,0.1); border:2px solid rgba(255,255,255,0.3); border-radius:50%; pointer-events:auto; touch-action:none;">
+            <div id="joystick-stick" style="position:absolute; top:50%; left:50%; width:60px; height:60px; background:rgba(0, 170, 255, 0.5); border-radius:50%; transform:translate(-50%, -50%); box-shadow: 0 0 10px #0af;"></div>
+        </div>
+        
+        <div onclick="Game.selection=[]; Game.updateUI([]);" style="position:absolute; bottom:180px; right:20px; width:60px; height:60px; background:rgba(255,0,0,0.3); border:2px solid #f00; border-radius:50%; color:#fff; display:flex; justify-content:center; align-items:center; font-size:30px; pointer-events:auto;">✖</div>
+    </div>
     <div id="spectator-hud"></div>
     <div id="tutorial-overlay">
         <div id="tut-highlight" class="tutorial-highlight-ring" style="display:none;"></div>
@@ -2139,10 +2165,16 @@ else if (cmd.type === 'build_start') {
         }
     }, 
 
-    update() {
+update() {
         if (this.clickDelay > 0) this.clickDelay--;
         this.frameCount++;
         const speed = 15;
+        
+        // --- ДОБАВЛЕНО: УПРАВЛЕНИЕ С ДЖОЙСТИКА ---
+        if (MobileControls.active) {
+            this.camera.x += MobileControls.joystickData.x * speed;
+            this.camera.y += MobileControls.joystickData.y * speed;
+        }
 Tutorial.update();
         if (this.keys['KeyW']) this.camera.y -= speed;
         if (this.keys['KeyS']) this.camera.y += speed;
@@ -3928,8 +3960,161 @@ hit() {
     }
 }
 
+// --- МОБИЛЬНОЕ УПРАВЛЕНИЕ ---
+const MobileControls = {
+    active: false,
+    joystickData: { x: 0, y: 0 },
+    touchStartTime: 0,
+    lastTapTime: 0,
+    
+    init() {
+        // Авто-определение мобилки
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            this.toggle(true);
+        }
+
+        const zone = document.getElementById('joystick-zone');
+        const stick = document.getElementById('joystick-stick');
+        
+        // Логика джойстика
+        zone.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Чтобы не скроллить экран
+            this.handleJoystick(e, zone, stick);
+        }, {passive: false});
+
+        zone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            this.handleJoystick(e, zone, stick);
+        }, {passive: false});
+
+        zone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.joystickData = { x: 0, y: 0 };
+            stick.style.transform = `translate(-50%, -50%)`; // Возврат в центр
+        });
+
+        // Обработка тапов по самому канвасу (Эмуляция мыши)
+        const canvas = document.getElementById('gameCanvas');
+        
+        canvas.addEventListener('touchstart', (e) => {
+            if (!this.active) return;
+            // e.preventDefault(); // Не блокируем, чтобы работал мультитач зум (если будет)
+            if (e.touches.length === 1) {
+                this.touchStartTime = Date.now();
+                // Эмулируем onDown
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    button: 0 // Левая кнопка
+                });
+                Game.onDown(mouseEvent);
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (!this.active) return;
+            // Логика Двойного тапа = Правый клик
+            const currentTime = Date.now();
+            const tapLength = currentTime - this.touchStartTime;
+            
+            if (tapLength < 200 && e.changedTouches.length === 1) { // Это был быстрый тап
+                const touch = e.changedTouches[0];
+                
+                if (currentTime - this.lastTapTime < 300) {
+                    // === ДВОЙНОЙ ТАП (ПРАВЫЙ КЛИК) ===
+                    // Вызываем onRight вручную
+                    const fakeEvent = { 
+                        clientX: touch.clientX, 
+                        clientY: touch.clientY,
+                        preventDefault: () => {} 
+                    };
+                    Game.onRight(fakeEvent);
+                    
+                    // Эффект нажатия
+                    Game.effects.push({x: touch.clientX + Game.camera.x, y: touch.clientY + Game.camera.y, char: '🎯', life: 20});
+                } else {
+                    // === ОДИНАРНЫЙ ТАП (ЛЕВЫЙ КЛИК / ВЫБОР) ===
+                    // В Game.onUp уже есть логика для клика
+                    const mouseEvent = new MouseEvent('mouseup', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        button: 0
+                    });
+                    Game.onUp(mouseEvent);
+                }
+                this.lastTapTime = currentTime;
+            } else {
+                // Если это был драг или долгое нажатие - просто отпускаем левую кнопку
+                if (e.changedTouches.length > 0) {
+                    const t = e.changedTouches[0];
+                    Game.onUp({ clientX: t.clientX, clientY: t.clientY });
+                }
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!this.active) return;
+            if (e.touches.length === 1) {
+                const t = e.touches[0];
+                Game.onMove({ clientX: t.clientX, clientY: t.clientY });
+            }
+        });
+    },
+
+    handleJoystick(e, zone, stick) {
+        const touch = e.touches[0];
+        const rect = zone.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        
+        const dist = Math.hypot(dx, dy);
+        const maxDist = rect.width / 2; // Радиус зоны
+        
+        // Ограничиваем движение стика кругом
+        if (dist > maxDist) {
+            dx = (dx / dist) * maxDist;
+            dy = (dy / dist) * maxDist;
+        }
+        
+        // Двигаем стик визуально
+        stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        // Нормализуем данные для камеры (-1 ... 1)
+        this.joystickData = {
+            x: dx / maxDist,
+            y: dy / maxDist
+        };
+    },
+
+    toggle(forceState) {
+        this.active = (forceState !== undefined) ? forceState : !this.active;
+        const panel = document.getElementById('mobile-controls');
+        const btn = document.getElementById('mobile-toggle-btn');
+        
+        if (this.active) {
+            panel.style.display = 'block';
+            btn.style.background = '#0f0';
+            btn.style.color = '#000';
+            Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВКЛ");
+        } else {
+            panel.style.display = 'none';
+            btn.style.background = '#333';
+            btn.style.color = '#fff';
+            Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВЫКЛ");
+        }
+    }
+};
+
+// Инициализируем при загрузке
+setTimeout(() => MobileControls.init(), 1000);
+
 Game.init();
 </script>
 </body>
 </html>
 ``````html
+

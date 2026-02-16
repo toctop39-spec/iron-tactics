@@ -329,6 +329,18 @@ const UNITS = {
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
 
+HIMARS: { 
+       type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png', 
+       cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
+       hp: 200, dmg: 300, range: 1200, speed: 0.65, reload: 180, // 3 секунды = 180 кадров
+       color: '#004400', radius: 22, buildTime: 20, maxAmmo: 6, 
+       isArty: true, // Чтобы не лез в ближний бой
+       isHIMARS: true // Специальный флаг для логики
+    },
+
+    // Кнопка для меню завода
+    BTN_AUTO: { type: 'action', name: 'АВТО-ПРОИЗВ.', emoji: '🔄', cost: 0 },
+
 FPV: { 
         type:'unit', name: 'FPV Дрон', emoji: '🛩️', imageSrc: 'FPV.png', 
         cost: 300, resCost: { iron: 20, chips: 1 }, 
@@ -348,7 +360,8 @@ SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artille
     HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 700, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
-               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HELICOPTER', 'FPV'], 
+             
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
@@ -386,9 +399,9 @@ FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600,
 ];
     
 const SILO_AMMO = {
-    ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1500,   damage: 300,  speed: 6,   radius: 60,  hp: 10 },
-    HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 5000,  damage: 600,  speed: 3,   radius: 300, hp: 300 },
-    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '☢️', cost: 12000, damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
+    ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 15000,   damage: 300,  speed: 6,   radius: 60,  hp: 10 },
+    HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 20000,  damage: 600,  speed: 3,   radius: 300, hp: 300 },
+    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '☢️', cost: 50000, damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
 };
 const LEVELS = [
 { id:1,  budget:5000,  unlock:['SOLDIER'], enemies:{ SOLDIER:6 }, note:'Базовое управление' },
@@ -506,7 +519,7 @@ const MapUtils = {
             const distSq = (dx*dx)/(isl.rx*isl.rx) + (dy*dy)/(isl.ry*isl.ry);
             
             if (distSq <= 0.85) return 'LAND';   
-            if (distSq <= 1.2) isShallow = true; 
+            if (distSq <= 1.5) isShallow = true; 
         }
         return isShallow ? 'SHALLOW' : 'DEEP';
     },
@@ -2606,14 +2619,73 @@ Tutorial.update();
 menuAction(type) {
         this.clickDelay = 20;
 
-        // Защита: если ничего не выбрано, выходим, чтобы не было ошибки
-        if (!this.selection || this.selection.length === 0) {
-            // Пытаемся восстановить selection через selectedProducer (для старой совместимости)
-            if (this.selectedProducer) {
-                this.selection = [this.selectedProducer];
-            } else {
-                return;
+       // 1. ОПРЕДЕЛЯЕМ ЗАВОД
+        let factory = null;
+        if (this.selection.length > 0) factory = this.selection[0];
+        else if (this.selectedProducer) factory = this.selectedProducer;
+
+        // --- БЛОК 1: ЛОГИКА НАЖАТИЯ НА КНОПКУ "АВТО" ---
+        if (type === 'BTN_AUTO') {
+            if (!factory) return; 
+
+            // Если уже включено — выключаем
+            if (factory.autoTarget) {
+                factory.autoTarget = null;
+                this.showError("АВТО: ОТКЛЮЧЕНО ⏹️");
+                Game.effects.push({x: factory.x, y: factory.y, char: '⏹️', life: 30});
+            } 
+            // Если мы уже выбираем — отмена
+            else if (Game.pendingAutoSelect === factory) {
+                Game.pendingAutoSelect = null;
+                document.body.style.cursor = 'default';
+                this.showError("ОТМЕНА");
+            } 
+            // Иначе — включаем режим выбора
+            else {
+                Game.pendingAutoSelect = factory;
+                this.showError("ВЫБЕРИТЕ ЮНИТА...");
+                document.body.style.cursor = 'help';
             }
+            return; // ВАЖНО: Выходим из функции
+        } // <--- ВОТ ЭТОЙ ЗАКРЫВАЮЩЕЙ СКОБКИ У ТЕБЯ НЕ БЫЛО В НУЖНОМ МЕСТЕ
+
+        // --- БЛОК 2: ЛОГИКА ВЫБОРА ЦЕЛИ (Когда выбираешь танк/солдата) ---
+        if (Game.pendingAutoSelect) {
+            const targetFactory = Game.pendingAutoSelect;
+            
+            // Проверяем, что это не левая кнопка
+            if (UNITS[targetFactory.type].spawnList && 
+                UNITS[targetFactory.type].spawnList.includes(type) && 
+                type !== 'BTN_AUTO' && 
+                type !== 'UPGRADE_HOUSE') {
+                
+                // 1. Запоминаем выбор
+                targetFactory.autoTarget = type;
+                
+                // 2. МГНОВЕННЫЙ ЗАПУСК
+                const started = targetFactory.attemptAutoProduction();
+
+                // 3. Сообщение игроку
+                if (started) {
+                    this.showError(`АВТО: ${UNITS[type].name} ЗАПУЩЕН! 🚀`);
+                } else {
+                    this.showError(`АВТО: ${UNITS[type].name} (ЖДЕМ РЕСУРСЫ) ⏳`);
+                }
+
+                // Сброс режима выбора
+                Game.pendingAutoSelect = null;
+                document.body.style.cursor = 'default';
+                this.updateUI(UNITS[targetFactory.type].spawnList, true, 'МЕНЮ ЗАВОДА');
+                
+            } else {
+                this.showError("ЭТО НЕЛЬЗЯ");
+            }
+            return; // ВАЖНО: Блокируем обычную покупку, чтобы не купилось 2 раза
+        }
+
+        if (!this.selection || this.selection.length === 0) {
+             if (this.selectedProducer) this.selection = [this.selectedProducer];
+             else return;
         }
 
         // --- ЛОГИКА СКЛАДА ---
@@ -3083,7 +3155,7 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
 // --- СЛОЙ 2: МЕЛКОВОДЬЕ (СЛИЯНИЕ) ---
             ctx.beginPath();
             MapUtils.islands.forEach(isl => {
-                tracePoly(isl, 1.15, 0); // Рисуем контуры
+                tracePoly(isl, 1.55, 0); // Рисуем контуры
             });
             
             // 1. Заливаем цветом (стыков не будет видно, так как цвет один)
@@ -3331,6 +3403,7 @@ class Unit {
         this.type = type; this.x = x; this.y = y; this.side = side;
         this.hp = p.hp; this.maxHp = p.hp; this.pathQueue = [];
         this.loyalty = p.hp; this.maxLoyalty = p.hp;
+        this.autoTarget = null;
         this.range = p.range || 0; this.damage = p.dmg || 0; this.speed = p.speed || 0;
         this.color = FACTIONS[side] ? FACTIONS[side].color : '#999';
         this.radius = p.radius; this.emoji = p.emoji; this.reloadMax = p.reload || 0;
@@ -3348,6 +3421,7 @@ class Unit {
         this.buffSpeedMult = 1; this.buffIncomeMult = 1; this.buffEnergyMult = 1; this.buffRangeMult = 1;
         this.nukeTimer = 0; this.spawnedCount = 0; this.level = 0; this.nukeTarget = null;
         this.prevX = x; this.prevY = y; this.stuckTimer = 0;
+        this.autoTarget = null;
 
         // --- ИНИЦИАЛИЗАЦИЯ СКЛАДА ---
         if (this.type === 'WAREHOUSE') {
@@ -3451,22 +3525,51 @@ checkPower() {
         }
     }
 
-    update() {
+attemptAutoProduction() {
+        // Проверяем: это завод? он наш? включен авто-режим? он свободен? есть ток?
+        if (this.isProducer && this.side === Game.myRole && this.autoTarget && this.spawnCooldown <= 0 && this.isPowered) {
+            
+            // 1. Пробуем купить
+            if (Game.checkCost(this.autoTarget) && Game.hasSpaceForCraft(this.autoTarget)) {
+                Game.payCost(this.autoTarget);
+                this.startProduction(this.autoTarget);
+                
+                // Эффект старта
+                Game.effects.push({x: this.x, y: this.y, char: '⚙️', life: 30});
+                return true; // Успех!
+            } 
+            // 2. Если денег/ресов нет — показываем "ЖДУ" (раз в секунду)
+            else {
+                if (Game.frameCount % 60 === 0) {
+                    Game.effects.push({x: this.x, y: this.y - 30, char: '⏳', life: 40});
+                }
+                return false; // Не вышло
+            }
+        }
+        return false;
+    }
+
+   update() {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
         this.checkPower();
 
+        // --- ЛОГИКА СТРОИТЕЛЯ (ЗАСТРЕВАНИЕ) ---
         if (this.isBuilder && this.assignedSite) {
             if (this.constructing) this.stuckTimer = 0;
             else {
-                if (Math.hypot(this.x - this.prevX, this.y - this.prevY) < 1) this.stuckTimer++; else this.stuckTimer = 0;
+                // Если строитель двигается слишком медленно к цели, считаем, что застрял
+                if (Math.hypot(this.x - this.prevX, this.y - this.prevY) < 1) this.stuckTimer++; 
+                else this.stuckTimer = 0;
             }
-            if (this.stuckTimer > 1200) {
-                this.hp = 0; Game.effects.push({x: this.x, y: this.y, char: '☠️', life: 60});
+            if (this.stuckTimer > 1200) { // 20 секунд тупняка = смерть
+                this.hp = 0; 
+                Game.effects.push({x: this.x, y: this.y, char: '☠️', life: 60});
                 if(this.assignedSite) Game.constructions = Game.constructions.filter(s => s !== this.assignedSite);
             }
             this.prevX = this.x; this.prevY = this.y;
         }
         
+        // --- ЛОГИКА БУНКЕРА (SILO) ---
         if (this.type === 'SILO') {
             if (this.nukeTimer > 0) {
                 if (!this.isPowered) return;
@@ -3477,56 +3580,67 @@ checkPower() {
                     this.nukeTarget = null;
                 }
             }
-            return;
+            return; // Бункер больше ничего не делает
         }
 
+        // --- ЛОГИКА ТУРЕЛИ (SENTINEL) ---
         if (this.type === 'SENTINEL') {
             if (!this.isPowered) return;
             if (this.reload > 0) this.reload--;
             if (this.ammo > 0 && this.reload <= 0) {
                 const target = Game.units.find(u => u.side !== this.side && !u.isFlying && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
                 if (target) {
-                    this.ammo--; this.reload = this.reloadMax;
+                    this.ammo--; 
+                    this.reload = this.reloadMax;
                     Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, 100, this.side, true, target, this, 50, false, 1, 8));
                 }
             }
             return;
         }
 
+        // --- ЛОГИКА ГРАДА (ЗАЛП) ---
         if (this.type === 'GRAD' && this.gradSeq > 0) {
             this.gradSeq--;
-            if (this.gradSeq > 180) { if (Game.frameCount % 10 === 0) Game.effects.push({type: 'smoke', x: this.x + (Math.random()*20-10), y: this.y, life: 40}); }
-            else if (this.gradSeq === 180 && this.gradTarget) this.fireArty(this.gradTarget.x, this.gradTarget.y);
-            return; 
+            // Дым перед выстрелом
+            if (this.gradSeq > 180) { 
+                if (Game.frameCount % 10 === 0) Game.effects.push({type: 'smoke', x: this.x + (Math.random()*20-10), y: this.y, life: 40}); 
+            }
+            // Сам выстрел
+            else if (this.gradSeq === 180 && this.gradTarget) {
+                this.fireArty(this.gradTarget.x, this.gradTarget.y);
+            }
+            return; // Град не двигается во время залпа
         }
 
+        // --- ЛОГИКА АВИАЦИИ (ВЗЛЕТ/ПОСАДКА) ---
         if (this.isFlying) {
-// --- ЭФФЕКТ ВЕРТОЛЕТА НАД ВОДОЙ ---
-        if (this.type === 'HELICOPTER' && this.flyHeight > 0.8) {
-            // Если под вертолетом вода (любая)
-            if (MapUtils.isWater(this.x, this.y)) {
-                // Генерируем активные круги от винтов
+            // Эффект воды под вертолетом
+            if (this.type === 'HELICOPTER' && this.flyHeight > 0.8 && MapUtils.isWater(this.x, this.y)) {
                 if (Math.random() < 0.2) { 
-                    Game.effects.push({ 
-                        type: 'wind_ripple', // Новый тип эффекта
-                        x: this.x + (Math.random()-0.5)*20, 
-                        y: this.y + (Math.random()-0.5)*20, 
-                        radius: 10, 
-                        maxRadius: 35, 
-                        life: 30, 
-                        color: 'rgba(255, 255, 255, 0.2)' 
-                    });
+                    Game.effects.push({ type: 'wind_ripple', x: this.x + (Math.random()-0.5)*20, y: this.y + (Math.random()-0.5)*20, radius: 10, maxRadius: 35, life: 30, color: 'rgba(255, 255, 255, 0.2)' });
                 }
             }
-        }
-            if (this.flyState === 1) { this.flyTimer--; this.flyHeight = 1 - (this.flyTimer / 180); if (this.flyTimer <= 0) { this.flyState = 2; this.flyHeight = 1; } return; } 
-            else if (this.flyState === 3) { this.flyTimer--; this.flyHeight = this.flyTimer / 60; if (this.flyTimer <= 0) { this.flyState = 0; this.flyHeight = 0; } return; }
+            // Состояния полета
+            if (this.flyState === 1) { // Взлет
+                this.flyTimer--; 
+                this.flyHeight = 1 - (this.flyTimer / 180); 
+                if (this.flyTimer <= 0) { this.flyState = 2; this.flyHeight = 1; } 
+                return; 
+            } 
+            else if (this.flyState === 3) { // Посадка
+                this.flyTimer--; 
+                this.flyHeight = this.flyTimer / 60; 
+                if (this.flyTimer <= 0) { this.flyState = 0; this.flyHeight = 0; } 
+                return; 
+            }
         }
 
+        // --- ЛОГИКА СТРОИТЕЛЬСТВА (BUILDER) ---
         if (this.isBuilder && this.assignedSite) {
             let d = Math.hypot(this.assignedSite.x - this.x, this.assignedSite.y - this.y);
             if (d < 55) {
-                this.target = null; this.constructing = true;
+                this.target = null; 
+                this.constructing = true;
                 if (this.assignedSite.remaining > 0) {
                     this.assignedSite.remaining = Math.max(0, this.assignedSite.remaining - 1);
                     if (Game.frameCount % 8 === 0) Game.effects.push({x: this.x + (Math.random()*20-10), y: this.y - 20, char: '🔨', life: 20});
@@ -3544,89 +3658,171 @@ checkPower() {
                     this.assignedSite = null; this.constructing = false;
                 }
                 return;
-            } else { this.constructing = false; this.target = {x: this.assignedSite.x, y: this.assignedSite.y}; }
+            } else { 
+                this.constructing = false; 
+                this.target = {x: this.assignedSite.x, y: this.assignedSite.y}; 
+            }
         }
 
- if (this.isProducer && this.spawnCooldown > 0) {
+        // --- ЛОГИКА HIMARS ---
+        if (this.isHIMARS && this.side === Game.myRole) {
+             if (this.reload > 0) this.reload--;
+             if (this.reload <= 0 && this.ammo > 0) {
+                 let target = null;
+                 // 1. Ищем ядерки
+                 const nukes = Game.bullets.filter(b => b.isNuke && b.side !== this.side && !b.dead);
+                 if (nukes.length > 0) {
+                     nukes.sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
+                     if (Math.hypot(nukes[0].x - this.x, nukes[0].y - this.y) < this.range) target = nukes[0];
+                 }
+                 // 2. Ищем воздух
+                 if (!target) {
+                     const air = Game.units.filter(u => u.side !== this.side && u.isFlying && u.hp > 0 && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
+                     if (air.length > 0) target = air[0];
+                 }
+                 // 3. Огонь
+                 if (target) {
+                     this.ammo--;
+                     this.reload = this.reloadMax;
+                     Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, this.damage, this.side, false, target, this, 30, false, 1, 10));
+                     Game.effects.push({x: this.x, y: this.y - 40, char: '🚀', life: 30});
+                 }
+             }
+        }
+
+        // --- ГЛАВНАЯ ЛОГИКА ПРОИЗВОДСТВА (ИСПРАВЛЕННАЯ) ---
+        if (this.isProducer && this.spawnCooldown > 0) {
             if (!this.isPowered) return;
-            let factor = 1;
             
-            // ИСПРАВЛЕНИЕ 1: Правильный расчет фактора скорости
+            // Расчет скорости (Энергия + Баффы)
+            let factor = 1;
             if (this.side === Game.myRole) factor = Game.energyFactor;
             else { const bot = Game.bots.find(b => b.side === this.side); if (bot) factor = bot.energyFactor; }
-            
             if (this.buffSpeedMult) factor *= this.buffSpeedMult;
+            
             this.spawnCooldown -= factor;
             
+            // === МОМЕНТ ЗАВЕРШЕНИЯ ===
             if (this.spawnCooldown <= 0) {
-                // --- ЛОГИКА КРАФТА ---
+                this.spawnCooldown = 0;
+
+                // 1. ВЫДАЧА ПРОДУКЦИИ
                 if (this.productionType.startsWith('CRAFT_')) {
+                    // Ресурсы
                     const info = UNITS[this.productionType];
-                    
-                    // ИСПРАВЛЕНИЕ 2: Выдача ресурсов правильному игроку
-                    if (this.side === Game.myRole) {
-                        if (info.producedRes) {
-                            if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
-                            if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
-                            if (info.producedRes.chips) Game.resources.chips += info.producedRes.chips;
-                            Game.showError(`ИЗГОТОВЛЕНО: ${info.name}`);
-                        }
+                    if (this.side === Game.myRole && info.producedRes) {
+                        if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
+                        if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
+                        if (info.producedRes.chips) Game.resources.chips += info.producedRes.chips;
+                        Game.showError(`ИЗГОТОВЛЕНО: ${info.name}`);
                     }
                     Game.effects.push({x: this.x, y: this.y, char: '✅', life: 40});
                 } 
- 
-                // --- ЛОГИКА СПАВНА ---
                 else {
+                    // Юниты (Танки и т.д.)
                     this.spawnedCount++;
                     if (!this.visualOnly) {
                         const angle = Math.random() * Math.PI * 2;
-                        const dist = this.radius + 30;
+                        const dist = this.radius + 35;
                         const spawnX = this.x + Math.cos(angle)*dist;
                         const spawnY = this.y + Math.sin(angle)*dist;
+                        
+                        // Если место валидное (не вода)
                         if (!MapUtils.isWater(spawnX, spawnY)) {
                             const newUnit = new Unit(this.productionType, spawnX, spawnY, this.side);
+                            newUnit.applyBuffs(); 
                             Game.units.push(newUnit);
                             Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
+                            
                             if (Game.isMultiplayer && CURRENT_ROOM) {
                                 Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'spawn', unitType: this.productionType, side: this.side, x: spawnX, y: spawnY, id: newUnit.id });
                             }
+                        } else {
+                            // Если вода — спавним под заводом (аварийный вариант)
+                            const newUnit = new Unit(this.productionType, this.x, this.y + this.radius + 10, this.side);
+                            Game.units.push(newUnit);
                         }
                     }
                 }
+
+                // 2. ЗАПУСК АВТО-ПРОИЗВОДСТВА (Строго после выдачи)
+                this.attemptAutoProduction();
             }
         }
+        
+        // Если завод простаивает — тоже пробуем авто-запуск (на случай включения кнопки)
+        else if (this.isProducer && this.spawnCooldown <= 0) {
+            this.attemptAutoProduction();
+        }
+
+        // Если это чисто производитель (завод), дальше код не идет
         if (this.isProducer) return;
+
+        // --- ЛОГИКА ПВО (AA_DEFENSE) ---
         if (this.type === 'AA_DEFENSE') {
             if (!this.isPowered) { this.aaTarget = null; this.aaCharge = 0; return; } 
-            if (this.aaTarget && (this.aaTarget.hp <= 0 || (this.aaTarget instanceof Bullet && this.aaTarget.dead) || Math.hypot(this.aaTarget.x - this.x, this.aaTarget.y - this.y) > this.range * this.buffRangeMult)) { this.aaTarget = null; this.aaCharge = 0; }
+            
+            // Проверка цели
+            if (this.aaTarget && (this.aaTarget.hp <= 0 || (this.aaTarget instanceof Bullet && this.aaTarget.dead) || Math.hypot(this.aaTarget.x - this.x, this.aaTarget.y - this.y) > this.range * this.buffRangeMult)) { 
+                this.aaTarget = null; this.aaCharge = 0; 
+            }
+            
+            // Поиск новой цели
             if (!this.aaTarget && this.reload <= 0) {
+                // Сначала ищем ракеты
                 const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
                 if (rockets.length > 0) this.aaTarget = rockets[0];
-                else { const helis = Game.units.filter(u => u.isFlying && u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < this.range * this.buffRangeMult); if (helis.length > 0) this.aaTarget = helis[0]; }
+                else { 
+                    // Потом вертолеты
+                    const helis = Game.units.filter(u => u.isFlying && u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < this.range * this.buffRangeMult); 
+                    if (helis.length > 0) this.aaTarget = helis[0]; 
+                }
             }
+            
+            // Атака
             if (this.aaTarget) {
                 this.aaCharge++;
                 if (this.aaCharge > 20) { 
-                    if (this.aaTarget instanceof Bullet) { this.aaTarget.hp -= 200; if (this.aaTarget.hp <= 0) { this.aaTarget.dead = true; Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '💥', life: 20}); } } 
-                    else { this.aaTarget.hp -= 200; Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '⚡', life: 20}); }
+                    if (this.aaTarget instanceof Bullet) { 
+                        this.aaTarget.hp -= 200; 
+                        if (this.aaTarget.hp <= 0) { this.aaTarget.dead = true; Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '💥', life: 20}); } 
+                    } 
+                    else { 
+                        this.aaTarget.hp -= 200; 
+                        Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '⚡', life: 20}); 
+                    }
                     this.reload = this.reloadMax; this.aaTarget = null; this.aaCharge = 0;
                 }
-            } else { if (this.reload > 0) this.reload--; }
+            } else { 
+                if (this.reload > 0) this.reload--; 
+            }
             return;
         }
 
+        // --- ОБНОВЛЕНИЕ ПЕРЕЗАРЯДКИ ---
         if (this.reload > 0) this.reload--;
+
+        // --- ИИ ДЛЯ БОТОВ (АГРЕССИЯ) ---
         if (!Game.isMultiplayer && this.side !== 'player') {
-            if (this.isBuilder) { } 
-            else {
+            if (!this.isBuilder) {
+                // Вертолет бота
                 if (this.type === 'HELICOPTER') {
                      if (this.ammo > 0) {
                           if (!this.aggro) {
                              let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 800);
-                             if (nearestEnemy) { this.aggro = true; Game.effects.push({x: this.x, y: this.y - 30, char: '❗', life: 40}); this.target = {x: nearestEnemy.x, y: nearestEnemy.y}; if (this.flyState === 0) { this.flyState = 1; this.flyTimer = 180; } }
+                             if (nearestEnemy) { 
+                                 this.aggro = true; 
+                                 Game.effects.push({x: this.x, y: this.y - 30, char: '❗', life: 40}); 
+                                 this.target = {x: nearestEnemy.x, y: nearestEnemy.y}; 
+                                 if (this.flyState === 0) { this.flyState = 1; this.flyTimer = 180; } 
+                             }
                          }
-                     } else { this.target = null; this.aggro = false; if (this.flyState === 2) { this.flyState = 3; this.flyTimer = 60; } }
+                     } else { 
+                         this.target = null; this.aggro = false; 
+                         if (this.flyState === 2) { this.flyState = 3; this.flyTimer = 60; } 
+                     }
                 }
+                // Град бота (попытка отъехать)
                 if (this.type === 'GRAD') {
                     let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 400);
                     if (nearestEnemy) {
@@ -3635,86 +3831,102 @@ checkPower() {
                         if (!MapUtils.isWater(runX, runY)) this.moveCmd(runX, runY);
                     }
                 }
+                // Обычные юниты бота
                 if (!this.aggro && this.type !== 'HELICOPTER' && this.type !== 'GRAD') {
                     let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 700);
-                    if (nearestEnemy) { this.aggro = true; Game.effects.push({x: this.x, y: this.y - 30, char: '❗', life: 40}); this.target = {x: nearestEnemy.x, y: nearestEnemy.y}; } 
-                    else { this.resolveCollision(); return; }
+                    if (nearestEnemy) { 
+                        this.aggro = true; 
+                        Game.effects.push({x: this.x, y: this.y - 30, char: '❗', life: 40}); 
+                        this.target = {x: nearestEnemy.x, y: nearestEnemy.y}; 
+                    } 
+                    else { 
+                        this.resolveCollision(); return; 
+                    }
                 }
             }
         }
 
+        // --- БОЕВАЯ ЛОГИКА (ВЫБОР ЦЕЛИ И СТРЕЛЬБА) ---
         let canFight = true;
-        if (this.type === 'GRAD' || this.type === 'SENTINEL' || this.type === 'SILO' || this.isBuilder || this.type === 'WAREHOUSE') canFight = false;
+        if (this.type === 'GRAD' || this.type === 'HIMARS' || this.type === 'SENTINEL' || this.type === 'SILO' || this.isBuilder || this.type === 'WAREHOUSE') canFight = false;
         
-       if (canFight) {
-            // --- ИСПРАВЛЕНИЕ: СБРОС ДАЛЕКОЙ ЦЕЛИ ---
-            // Считаем дистанцию до текущей цели (если она есть)
+        if (canFight) {
+            // Дистанция до текущей цели
             let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
 
-            // Сбрасываем цель, если:
-            // 1. Цели нет или она мертва
-            // 2. Цель стала "своей" (захватили)
-            // 3. Цель ушла слишком далеко (Радиус + 50 пикселей буфера)
+            // Сброс цели, если она далеко или умерла
             if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
                 this.targetUnit = null;                
-                // Ищем НОВУЮ ближайшую цель
-                let min = this.range + 50; // Ищем чуть дальше своего радиуса, чтобы заранее реагировать
+                let min = this.range + 50; 
                 let near = null;
+                // Ищем новую цель
                 Game.units.forEach(u => {
                     if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE') {
                         let d = Math.hypot(u.x - this.x, u.y - this.y);
-                        if (d < min) {
-                            min = d;
-                            near = u;
-                        }
+                        if (d < min) { min = d; near = u; }
                     }
                 });
                 this.targetUnit = near;
             }
+
             let busy = false;
-if (this.targetUnit) {
+            
+            // Если цель есть - действуем
+            if (this.targetUnit) {
                 let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
                 
-                // --- ЛОГИКА FPV-КАМИКАДЗЕ ---
+                // Камикадзе (FPV)
                 if (this.isKamikaze) {
-                    if (d <= 30) { // Дистанция детонации
-                        this.hp = 0; // Дрон уничтожается
-                        // Моментально создаем взрыв в координатах дрона
+                    if (d <= 30) { 
+                        this.hp = 0; 
                         let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
                         explosion.hit(); 
-                        return; // Прерываем код, юнит мертв
+                        return; // Юнит уничтожен
                     } else {
-                        // Продолжаем лететь прямо в цель
                         this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
                     }
                 } 
-                // --- ОБЫЧНАЯ СТРЕЛЬБА ---
+                // Стрельба
                 else if (d <= this.range) {
                     if (!this.isFlying) busy = true;
                     if (this.reload <= 0) {
                         this.reload = this.reloadMax;
+                        // Вертолет стреляет двойными
                         if (this.type === 'HELICOPTER') {
                             if (this.ammo > 0) {
                                 this.ammo--;
                                 Game.bullets.push(new Bullet(this.x - 10, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
                                 Game.bullets.push(new Bullet(this.x + 10, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
                             }
-                        } else {
+                        } 
+                        // Остальные
+                        else {
                             let splashR = (this.type === 'TANK') ? 60 : 0;
                             Game.bullets.push(new Bullet(this.x, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
                     }
-                } else if (!Game.isMultiplayer && this.side !== 'player') {
-                    if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                } 
+                // Преследование (только для ботов или если не мультиплеер)
+                else if (!Game.isMultiplayer && this.side !== 'player') {
+                    if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
+                    else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
                 }
             }
+            
+            // Физика движения к цели
             if (this.target) {
                 if (this.isFlying && this.flyState === 2) {
                      let d = Math.hypot(this.target.x - this.x, this.target.y - this.y);
-                     if (d < 10) { this.flyState = 3; this.flyTimer = 60; this.target = null; } else this._movePhysics();
+                     if (d < 10) { this.flyState = 3; this.flyTimer = 60; this.target = null; } 
+                     else this._movePhysics();
                 } else if (!busy) this._movePhysics();
             }
-        } else { if (this.target) this._movePhysics(); }
+        } 
+        // Просто движение
+        else { 
+            if (this.target) this._movePhysics(); 
+        }
+        
         this.resolveCollision();
     }
 
@@ -3843,6 +4055,40 @@ _movePhysics() {
             ctx.fillStyle = '#0af'; ctx.fillRect(this.x-15, this.y - hpOffset - 6, 30 * (1 - this.spawnCooldown/this.spawnMax), 4);
         }
         
+// --- ВСТАВИТЬ В КОНЕЦ Unit.draw (перед закрывающей скобкой функции) ---
+        if (this.autoTarget && this.side === Game.myRole) {
+            const uInfo = UNITS[this.autoTarget];
+            if (uInfo) {
+                // Анимация парения
+                const floatY = Math.sin(Game.frameCount * 0.1) * 5;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y - this.radius - 25 + floatY);
+                
+                // Кружочек фона
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Зеленая обводка (значит включено)
+                ctx.strokeStyle = '#0f0';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Иконка
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🔄', 8, -8); 
+                ctx.font = '16px Arial';
+                ctx.fillText(uInfo.emoji, 0, 0); 
+                
+                ctx.restore();
+            }
+        }
+
         ctx.globalAlpha = 1.0;
         if (Game.selection.includes(this)) {
             if (this.range > 0 && !this.isProducer) {
@@ -4108,4 +4354,3 @@ Game.init();
 </body>
 </html>
 ``````html
-

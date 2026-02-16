@@ -337,21 +337,21 @@ FPV: {
     },
     
     HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
-                  resCost: { iron: 80, chips: 4, chem: 8 }, // <--- НОВАЯ ЦЕНА
-                  hp: 800, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 20 },
+                  resCost: { iron: 80, chips: 4, chem: 8 }, 
+                  hp: 700, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 30 },
     
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.8, color: '#e6c200', radius: 15, buildTime: 5, isBuilder: true },
     
     POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 25, color: '#ffd700', constructTime: 10, energyGen: 50 },
 SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
-    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 50000, hp: 99999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
-    HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 200, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
+    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
+    HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 700, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
                spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HELICOPTER', 'FPV'], 
                constructTime: 40, energyUse: 15 },
                
-    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 20, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
+    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
     HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 40, constructTime: 30, color: '#ef5350', energyUse: 5 },
     
     // --- НОВОЕ ЗДАНИЕ: СКЛАД ---
@@ -378,17 +378,17 @@ FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600,
 
     const HOUSE_UPGRADES = [
     { name: 'Дом',     emoji: '🏠', cost: 0,      income: 3,    maxSpawn: 3,   energy: 10 }, // Ур 0
-    { name: 'Магазин', emoji: '🏪', cost: 1000,   income: 8,    maxSpawn: 8,   energy: 10 }, // Ур 1 (1000/100 = 10)
-    { name: 'ТЦ',      emoji: '🏬', cost: 3500,   income: 25,   maxSpawn: 25,  energy: 35 }, // Ур 2 (3500/100 = 35)
-    { name: 'Офис',    emoji: '🏢', cost: 12000,  income: 80,   maxSpawn: 80,  energy: 120 },// Ур 3
-    { name: 'Отель',   emoji: '🏨', cost: 35000,  income: 250,  maxSpawn: 250, energy: 200 },// Ур 4 (35000/100 = 350 -> макс 200)
-    { name: 'Банк',    emoji: '🏦', cost: 100000, income: 1000, maxSpawn: 0,   energy: 200 } // Ур 5 (Только доход)
+    { name: 'Магазин', emoji: '🏪', cost: 1000,   income: 6,    maxSpawn: 8,   energy: 10 }, // Ур 1 (1000/100 = 10)
+    { name: 'ТЦ',      emoji: '🏬', cost: 3500,   income: 22,   maxSpawn: 25,  energy: 35 }, // Ур 2 (3500/100 = 35)
+    { name: 'Офис',    emoji: '🏢', cost: 12000,  income: 70,   maxSpawn: 80,  energy: 120 },// Ур 3
+    { name: 'Отель',   emoji: '🏨', cost: 35000,  income: 200,  maxSpawn: 250, energy: 140 },// Ур 4 (35000/100 = 350 -> макс 200)
+    { name: 'Банк',    emoji: '🏦', cost: 100000, income: 500, maxSpawn: 0,   energy: 100 } // Ур 5 (Только доход)
 ];
     
 const SILO_AMMO = {
     ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1500,   damage: 300,  speed: 6,   radius: 60,  hp: 10 },
     HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 5000,  damage: 600,  speed: 3,   radius: 300, hp: 300 },
-    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '☢️', cost: 12000, damage: 9999, speed: 1.5, radius: 2000, hp: 3500, prep: 10 }
+    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '☢️', cost: 12000, damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
 };
 const LEVELS = [
 { id:1,  budget:5000,  unlock:['SOLDIER'], enemies:{ SOLDIER:6 }, note:'Базовое управление' },

@@ -329,14 +329,15 @@ const UNITS = {
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
 
-HIMARS: { 
-       type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png', 
-       cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
-       hp: 200, dmg: 300, range: 1200, speed: 0.65, reload: 180, // 3 секунды = 180 кадров
-       color: '#004400', radius: 22, buildTime: 20, maxAmmo: 6, 
-       isArty: true, // Чтобы не лез в ближний бой
-       isHIMARS: true // Специальный флаг для логики
-    },
+HIMARS: {
+   type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png',
+   cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
+   hp: 200, dmg: 600, range: 1200, speed: 0.65, reload: 180,
+   color: '#004400', radius: 22, buildTime: 20,
+   maxAmmo: 3, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
+   isArty: true,
+   isHIMARS: true
+},
 
     // Кнопка для меню завода
     BTN_AUTO: { type: 'action', name: 'АВТО-ПРОИЗВ.', emoji: '🔄', cost: 0 },
@@ -2072,16 +2073,18 @@ loadLevel(lvlId) {
         this.clickDelay = 20;
     },
 
-    reloadGrads() {
-        this.clickDelay = 20;
-        const mySelection = this.selection.filter(u => u.side === this.myRole);
-        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
-        if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
-        if (this.money >= targets.length * RELOAD_COST) {
-            this.money -= targets.length * RELOAD_COST;
-            targets.forEach(u => { u.ammo = u.maxAmmo; this.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40}); });
-        } else this.showError("НЕТ ДЕНЕГ!");
-    },
+reloadGrads() {
+    this.clickDelay = 20;
+    const mySelection = this.selection.filter(u => u.side === this.myRole);
+    // ДОБАВЛЕНО: u.type === 'HIMARS'
+    const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
+
+    if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
+    if (this.money >= targets.length * RELOAD_COST) {
+        this.money -= targets.length * RELOAD_COST;
+        targets.forEach(u => { u.ammo = u.maxAmmo; this.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40}); });
+    } else this.showError("НЕТ ДЕНЕГ!");
+},
 
     showError(msg) {
         const t = document.getElementById('msg-toast'); t.innerText = msg;
@@ -2136,11 +2139,20 @@ else if (cmd.type === 'path_move') {
             }
         }
 else if (cmd.type === 'build_start') {
+    // Проверяем, нет ли уже такой стройки
+    if (this.constructions.some(c => c.id === cmd.id)) return;
+
     const site = { id: cmd.id, type: cmd.bType, x: cmd.x, y: cmd.y, total: UNITS[cmd.bType].constructTime * 60, remaining: UNITS[cmd.bType].constructTime * 60, owner: cmd.side };
     this.constructions.push(site);
+
+    // Визуальный эффект для всех
+    Game.effects.push({x: cmd.x, y: cmd.y, char: '🏗️', life: 40});
+
+    // Пытаемся назначить анимацию строителя (визуально)
     let builder = this.units.find(u => u.id === cmd.builderId);
-    if (!builder) builder = this.units.find(u => u.side === cmd.side && u.isBuilder);
-    if (builder) builder.assignSite(site);
+    if (builder) {
+        builder.assignSite(site); // Пусть бежит строить визуально
+    }
 }
         else if (cmd.type === 'help_build') { 
             const builder = this.units.find(u => u.id === cmd.builderId);
@@ -2156,18 +2168,41 @@ else if (cmd.type === 'build_start') {
             const shooter = this.units.find(u => u.id === cmd.id);
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
         }
-        else if (cmd.type === 'sync_units') {
-            if (cmd.side !== this.myRole) { 
-                cmd.data.forEach(srvUnit => {
-                    const localUnit = this.units.find(u => u.id === srvUnit.id);
-                    if (localUnit && Math.hypot(localUnit.x - srvUnit.x, localUnit.y - srvUnit.y) > 15) {
-                        localUnit.x = srvUnit.x; localUnit.y = srvUnit.y; localUnit.hp = srvUnit.hp;
-                        if(srvUnit.loyalty !== undefined) localUnit.loyalty = srvUnit.loyalty;
-                    }
-                });
-            }
-        }
-    }, 
+
+else if (cmd.type === 'sync_units') {
+    if (cmd.side !== this.myRole) {
+        cmd.data.forEach(srvUnit => {
+            const localUnit = this.units.find(u => u.id === srvUnit.id);
+
+            if (localUnit) {
+                // ПЛАВНАЯ СИНХРОНИЗАЦИЯ (Интерполяция)
+                // Если юнит слишком далеко (>50px), телепортируем. Иначе - плавно двигаем.
+                if (Math.hypot(localUnit.x - srvUnit.x, localUnit.y - srvUnit.y) > 50) {
+                    localUnit.x = srvUnit.x;
+                    localUnit.y = srvUnit.y;
+                } else {
+                    localUnit.x += (srvUnit.x - localUnit.x) * 0.3; // 30% пути за кадр
+                    localUnit.y += (srvUnit.y - localUnit.y) * 0.3;
+                }
+                localUnit.hp = srvUnit.hp;
+                if(srvUnit.loyalty !== undefined) localUnit.loyalty = srvUnit.loyalty;
+            } else {
+                // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ:
+                // Если юнита нет у нас, но сервер говорит он есть - СОЗДАЕМ ЕГО!
+                // Нам нужно знать type. В текущей версии sync_units отправляет только id, x, y, hp.
+                // Нужно обновить отправку (см. ниже) или попытаться угадать/запросить.
+                // Хак: Если мы не знаем тип, мы пока не можем создать.
+                // НО! Мы исправим отправку.
+                if (srvUnit.type) {
+                     const newU = new Unit(srvUnit.type, srvUnit.x, srvUnit.y, cmd.side, srvUnit.id);
+                     newU.hp = srvUnit.hp;
+                     this.units.push(newU);
+                 }
+             }
+         });
+      }
+   }
+ },
 
 update() {
         if (this.clickDelay > 0) this.clickDelay--;
@@ -2187,14 +2222,24 @@ Tutorial.update();
         this.camera.x = Math.max(0, Math.min(this.camera.x, MAP_W - canvas.width));
         this.camera.y = Math.max(0, Math.min(this.camera.y, MAP_H - canvas.height));
         if (this.state === 'BATTLE') {
-            if (this.isMultiplayer && this.frameCount % 30 === 0) {
-                const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({ id: u.id, x: u.x, y: u.y, hp: u.hp, loyalty: u.loyalty }));
-                if (myUnits.length > 0 && CURRENT_ROOM) {
-                    this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits });
-                }
-            }
+      if (this.isMultiplayer && this.frameCount % 15 === 0) { // Частоту повысим до 15 кадров
+    const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({
+        id: u.id,
+        type: u.type, // <--- ДОБАВИЛИ ТИП! ЭТО ВАЖНО ДЛЯ СПАВНА
+        x: Math.floor(u.x), // Округляем для экономии трафика
+        y: Math.floor(u.y),
+        hp: Math.floor(u.hp),
+        loyalty: Math.floor(u.loyalty || 0)
+    }));
+    if (myUnits.length > 0 && CURRENT_ROOM) {
+        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits });
+    }
+}
 
             this.bots.forEach(bot => bot.update());
+// --- ВСТАВИТЬ ЭТОТ БЛОК ---
+            this.spatialGrid = new SpatialHash(150);
+            this.units.forEach(u => this.spatialGrid.add(u));
             if (this.isSpectator && this.frameCount % 30 === 0) {
                 const hud = document.getElementById('spectator-hud');
                 let html = '';
@@ -3397,6 +3442,33 @@ window.addEventListener('mousemove', e => {
     if (Game.camera) { const r = canvas.getBoundingClientRect(); window.mousePos = { x: e.clientX - r.left + Game.camera.x, y: e.clientY - r.top + Game.camera.y }; }
 });
 
+class SpatialHash {
+    constructor(cellSize) {
+        this.cellSize = cellSize;
+        this.cells = new Map();
+    }
+    key(x, y) {
+        return `${Math.floor(x / this.cellSize)},${Math.floor(y / this.cellSize)}`;
+    }
+    add(unit) {
+        const k = this.key(unit.x, unit.y);
+        if (!this.cells.has(k)) this.cells.set(k, []);
+        this.cells.get(k).push(unit);
+    }
+    getNearby(unit) {
+        const cx = Math.floor(unit.x / this.cellSize);
+        const cy = Math.floor(unit.y / this.cellSize);
+        let results = [];
+        for (let x = cx - 1; x <= cx + 1; x++) {
+            for (let y = cy - 1; y <= cy + 1; y++) {
+                const k = `${x},${y}`;
+                if (this.cells.has(k)) results.push(...this.cells.get(k));
+            }
+        }
+        return results;
+    }
+}
+
 class Unit {
     constructor(type, x, y, side, id) {
         const p = UNITS[type]; this.id = id || Math.floor(Math.random() * 10000000); 
@@ -3486,31 +3558,43 @@ checkPower() {
         const uInfo = UNITS[unitType]; this.spawnMax = uInfo.buildTime * 60; this.spawnCooldown = this.spawnMax; this.productionType = unitType; this.visualOnly = visual;
     }
 
-    resolveCollision() {
-        if (this.isFlying && this.flyState === 2) return;
-        const mountain = MapUtils.checkMountain(this.x, this.y, this.radius);
-        if (mountain) {
-            let angle = Math.atan2(this.y - mountain.y, this.x - mountain.x);
-            let distToPush = (mountain.radius + this.radius) + 1;
-            this.x = mountain.x + Math.cos(angle) * distToPush;
-            this.y = mountain.y + Math.sin(angle) * distToPush;
-        }
-        Game.units.forEach(u => {
-            if (u === this) return;
-            if (u.isFlying && u.flyState === 2) return;
-            let dx = this.x - u.x, dy = this.y - u.y;
-            let dist = Math.hypot(dx, dy);
-            let minDist = this.radius + u.radius;
-            if (dist < minDist && dist > 0) {
-                let force = (minDist - dist) / minDist;
-                let pushX = (dx / dist) * force * 2; let pushY = (dy / dist) * force * 2;
-                const isImmovable = (t) => ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(t);
-                if (!this.isProducer && !isImmovable(this.type)) {
-                    if (u.isProducer || isImmovable(u.type)) { this.x += pushX * 2; this.y += pushY * 2; }
-                    else { this.x += pushX; this.y += pushY; }
-                 }
+resolveCollision() {
+    if (this.isFlying && this.flyState === 2) return;
+    const mountain = MapUtils.checkMountain(this.x, this.y, this.radius);
+    if (mountain) {
+         // ... старый код с горами оставляем ...
+         let angle = Math.atan2(this.y - mountain.y, this.x - mountain.x);
+         let distToPush = (mountain.radius + this.radius) + 1;
+         this.x = mountain.x + Math.cos(angle) * distToPush;
+         this.y = mountain.y + Math.sin(angle) * distToPush;
+    }
+
+    // ОПТИМИЗАЦИЯ: Берем только соседей из сетки
+    const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+
+    neighbors.forEach(u => {
+        if (u === this) return;
+        if (u.isFlying && u.flyState === 2) return;
+
+        // Быстрая проверка через квадрат расстояния (без корня)
+        let dx = this.x - u.x;
+        let dy = this.y - u.y;
+        let distSq = dx*dx + dy*dy;
+        let minDist = this.radius + u.radius;
+
+        if (distSq < minDist * minDist && distSq > 0.1) {
+            let dist = Math.sqrt(distSq);
+            let force = (minDist - dist) / minDist;
+            let pushX = (dx / dist) * force * 2;
+            let pushY = (dy / dist) * force * 2;
+
+            const isImmovable = (t) => ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(t);
+            if (!this.isProducer && !isImmovable(this.type)) {
+                if (u.isProducer || isImmovable(u.type)) { this.x += pushX * 2; this.y += pushY * 2; }
+                else { this.x += pushX; this.y += pushY; }
             }
-        });
+        }
+    });
 
 
         if (Game.isIslandMode && !this.isFlying) {
@@ -4353,4 +4437,3 @@ Game.init();
 </script>
 </body>
 </html>
-``````html

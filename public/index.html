@@ -1885,7 +1885,20 @@ loadPvpLevel(settings) {
         }
 
         this.startGameUI(this.isIslandMode ? "PVP: АРХИПЕЛАГ" : "PVP: БИТВА");
+// --- ДОБАВИТЬ ЭТОТ БЛОК ---
+        if (this.isMultiplayer && CURRENT_ROOM) {
+            // Когда мы зашли, ждем 1.5 секунды (пока все прогрузится) 
+            // и просим остальных игроков прислать нам всё, что они построили.
+            setTimeout(() => {
+                this.socket.emit('gameCommand', { 
+                    roomName: CURRENT_ROOM, 
+                    type: 'request_sync', 
+                    side: this.myRole 
+                });
+            }, 1500); 
+        }
     },
+ 
     
  loadAdvancedMode() {
         this.isMultiplayer = false;
@@ -2161,41 +2174,80 @@ else if (cmd.type === 'build_start') {
             const shooter = this.units.find(u => u.id === cmd.id);
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
         }
+// === 1. НОВИЧОК ПРОСИТ ДАННЫЕ ===
+        else if (cmd.type === 'request_sync') {
+            // Если запрос пришел не от меня - значит зашел новичок.
+            if (cmd.side !== this.myRole) {
+                // Собираем ВСЮ свою базу (юниты + уровень зданий)
+                const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({
+                    id: u.id, type: u.type, x: u.x, y: u.y, hp: u.hp, loyalty: u.loyalty, level: u.level
+                }));
+                // Собираем все текущие стройки (фундаменты)
+                const myConstructions = this.constructions.filter(c => c.owner === this.myRole);
 
-else if (cmd.type === 'sync_units') {
-    if (cmd.side !== this.myRole) {
-        cmd.data.forEach(srvUnit => {
-            const localUnit = this.units.find(u => u.id === srvUnit.id);
+                // Отправляем обратно в комнату
+                this.socket.emit('gameCommand', { 
+                    roomName: CURRENT_ROOM, 
+                    type: 'full_sync', 
+                    side: this.myRole, 
+                    units: myUnits,
+                    constructions: myConstructions
+                });
+            }
+        }
 
-            if (localUnit) {
-                // ПЛАВНАЯ СИНХРОНИЗАЦИЯ (Интерполяция)
-                // Если юнит слишком далеко (>50px), телепортируем. Иначе - плавно двигаем.
-                if (Math.hypot(localUnit.x - srvUnit.x, localUnit.y - srvUnit.y) > 50) {
-                    localUnit.x = srvUnit.x;
-                    localUnit.y = srvUnit.y;
-                } else {
-                    localUnit.x += (srvUnit.x - localUnit.x) * 0.3; // 30% пути за кадр
-                    localUnit.y += (srvUnit.y - localUnit.y) * 0.3;
+        // === 2. МЫ ПОЛУЧИЛИ ПОЛНЫЕ ДАННЫЕ ОТ СТАРИЧКА ===
+        else if (cmd.type === 'full_sync') {
+            if (cmd.side !== this.myRole) {
+                // 1. Сначала удаляем дефолтные стартовые базы этого врага, чтобы они не дублировались
+                this.units = this.units.filter(u => u.side !== cmd.side);
+                this.constructions = this.constructions.filter(c => c.owner !== cmd.side);
+
+                // 2. Спавним все его реальные юниты и здания
+                cmd.units.forEach(srvUnit => {
+                    const newU = new Unit(srvUnit.type, srvUnit.x, srvUnit.y, cmd.side, srvUnit.id);
+                    newU.hp = srvUnit.hp;
+                    if (srvUnit.loyalty !== undefined) newU.loyalty = srvUnit.loyalty;
+                    if (srvUnit.level !== undefined) newU.level = srvUnit.level; // Применяем уровень
+                    this.units.push(newU);
+                });
+
+                // 3. Добавляем его активные стройки
+                if (cmd.constructions) {
+                    cmd.constructions.forEach(c => this.constructions.push(c));
                 }
-                localUnit.hp = srvUnit.hp;
-                if(srvUnit.loyalty !== undefined) localUnit.loyalty = srvUnit.loyalty;
-            } else {
-                // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ:
-                // Если юнита нет у нас, но сервер говорит он есть - СОЗДАЕМ ЕГО!
-                // Нам нужно знать type. В текущей версии sync_units отправляет только id, x, y, hp.
-                // Нужно обновить отправку (см. ниже) или попытаться угадать/запросить.
-                // Хак: Если мы не знаем тип, мы пока не можем создать.
-                // НО! Мы исправим отправку.
-                if (srvUnit.type) {
-                     const newU = new Unit(srvUnit.type, srvUnit.x, srvUnit.y, cmd.side, srvUnit.id);
-                     newU.hp = srvUnit.hp;
-                     this.units.push(newU);
-                 }
-             }
-         });
-      }
-   }
- },
+            }
+        }
+
+        // === 3. РЕГУЛЯРНАЯ СИНХРОНИЗАЦИЯ (ИСПРАВЛЕННАЯ) ===
+        else if (cmd.type === 'sync_units') {
+            if (cmd.side !== this.myRole) {
+                cmd.data.forEach(srvUnit => {
+                    const localUnit = this.units.find(u => u.id === srvUnit.id);
+
+                    if (localUnit) {
+                        if (Math.hypot(localUnit.x - srvUnit.x, localUnit.y - srvUnit.y) > 50) {
+                            localUnit.x = srvUnit.x; localUnit.y = srvUnit.y;
+                        } else {
+                            localUnit.x += (srvUnit.x - localUnit.x) * 0.3; 
+                            localUnit.y += (srvUnit.y - localUnit.y) * 0.3;
+                        }
+                        localUnit.hp = srvUnit.hp;
+                        if(srvUnit.loyalty !== undefined) localUnit.loyalty = srvUnit.loyalty;
+                        if(srvUnit.level !== undefined) localUnit.level = srvUnit.level; // <--- ДОБАВЛЕНО ТУТ
+                    } else {
+                        // Если юнита нет у нас - создаем
+                        if (srvUnit.type) {
+                             const newU = new Unit(srvUnit.type, srvUnit.x, srvUnit.y, cmd.side, srvUnit.id);
+                             newU.hp = srvUnit.hp;
+                             if(srvUnit.level !== undefined) newU.level = srvUnit.level;
+                             this.units.push(newU);
+                         }
+                     }
+                 });
+              }
+           }
+       },
 
 update() {
         if (this.clickDelay > 0) this.clickDelay--;
@@ -2215,14 +2267,16 @@ Tutorial.update();
         this.camera.x = Math.max(0, Math.min(this.camera.x, MAP_W - canvas.width));
         this.camera.y = Math.max(0, Math.min(this.camera.y, MAP_H - canvas.height));
         if (this.state === 'BATTLE') {
-      if (this.isMultiplayer && this.frameCount % 15 === 0) { // Частоту повысим до 15 кадров
+// В функции Game.update(), блок отправки sync_units замени на этот:
+if (this.isMultiplayer && this.frameCount % 15 === 0) { 
     const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({
         id: u.id,
-        type: u.type, // <--- ДОБАВИЛИ ТИП! ЭТО ВАЖНО ДЛЯ СПАВНА
-        x: Math.floor(u.x), // Округляем для экономии трафика
+        type: u.type, 
+        x: Math.floor(u.x), 
         y: Math.floor(u.y),
         hp: Math.floor(u.hp),
-        loyalty: Math.floor(u.loyalty || 0)
+        loyalty: Math.floor(u.loyalty || 0),
+        level: u.level || 0 // <--- ДОБАВИЛИ ЭТО
     }));
     if (myUnits.length > 0 && CURRENT_ROOM) {
         this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits });

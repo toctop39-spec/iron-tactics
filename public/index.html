@@ -1834,10 +1834,8 @@ loadPvpLevel(settings) {
         this.resetGameData();
         
         // Список ролей для спавна (по порядку подключения)
-        // player=хост, enemy=2й, bot1=3й, bot2=4й и т.д.
         const roles = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
         
-        // Ограничиваем количество спавнов настройками комнаты (или берем всех 8, чтобы наверняка)
         const playersToSpawn = Math.min(roles.length, cfg.maxPlayers || 8);
 
         if (this.isIslandMode) {
@@ -1846,18 +1844,15 @@ loadPvpLevel(settings) {
             
             for (let i = 0; i < playersToSpawn; i++) {
                 const role = roles[i];
-                // Берем остров по кругу (если игроков больше, чем островов)
                 const island = MapUtils.islands[i % MapUtils.islands.length];
                 
-                // Спавним в центре острова
-                this.units.push(new Unit('HOUSE', island.x, island.y, role));
-                this.units.push(new Unit('BUILDER', island.x + 20, island.y + 20, role));
+                // ИСПРАВЛЕНИЕ: ЖЕСТКИЕ ID ('base_player', 'builder_player' и т.д.)
+                this.units.push(new Unit('HOUSE', island.x, island.y, role, 'base_' + role));
+                this.units.push(new Unit('BUILDER', island.x + 20, island.y + 20, role, 'builder_' + role));
             }
             
         } else {
             // --- СТАНДАРТНЫЙ / ГИГАНТСКИЙ РЕЖИМ ---
-            // Генерируем точки спавна по кругу или квадрату
-            
             const spawns = [
                 { x: 300, y: MAP_H/2 },            // 1. Слева (Синий)
                 { x: MAP_W - 300, y: MAP_H/2 },    // 2. Справа (Красный)
@@ -1871,11 +1866,11 @@ loadPvpLevel(settings) {
 
             for (let i = 0; i < playersToSpawn; i++) {
                 const role = roles[i];
-                // Если точек не хватает, берем рандомную (на всякий случай)
                 const pt = spawns[i] || { x: Math.random()*MAP_W, y: Math.random()*MAP_H };
                 
-                this.units.push(new Unit('HOUSE', pt.x, pt.y, role));
-                this.units.push(new Unit('BUILDER', pt.x + 40, pt.y + 40, role));
+                // ИСПРАВЛЕНИЕ: ЖЕСТКИЕ ID
+                this.units.push(new Unit('HOUSE', pt.x, pt.y, role, 'base_' + role));
+                this.units.push(new Unit('BUILDER', pt.x + 40, pt.y + 40, role, 'builder_' + role));
             }
         }
 
@@ -1885,8 +1880,6 @@ loadPvpLevel(settings) {
             this.camera.x = myBase.x - canvas.width/2;
             this.camera.y = myBase.y - canvas.height/2;
         } else {
-            // Если вдруг (баг) моего юнита нет - не паникуем, ставим камеру в центр
-            // Это предотвратит мгновенный проигрыш визуально, хотя checkWin сработает
             this.camera.x = MAP_W/2;
             this.camera.y = MAP_H/2;
         }

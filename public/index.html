@@ -4022,12 +4022,24 @@ attemptAutoProduction() {
             return; // Бункер больше ничего не делает
         }
 
-        // --- ЛОГИКА ТУРЕЛИ (SENTINEL) ---
+// --- ЛОГИКА ТУРЕЛИ (SENTINEL) ---
         if (this.type === 'SENTINEL') {
             if (!this.isPowered) return;
             if (this.reload > 0) this.reload--;
             if (this.ammo > 0 && this.reload <= 0) {
-                const target = Game.units.find(u => u.side !== this.side && !u.isFlying && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
+                // ИСПРАВЛЕНИЕ: Ищем только врагов, не летунов, и строго НЕ здания
+                const target = Game.units.find(u => {
+                    // Базовые проверки: чужой, живой, не летает, не мина
+                    if (u.side === this.side || u.hp <= 0 || u.isFlying || u.type === 'MINE') return false;
+                    
+                    // Проверка на здание
+                    const isBuilding = u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type);
+                    if (isBuilding) return false;
+                    
+                    // Проверка дистанции
+                    return Math.hypot(u.x - this.x, u.y - this.y) < this.range;
+                });
+
                 if (target) {
                     this.ammo--; 
                     this.reload = this.reloadMax;

@@ -1127,22 +1127,38 @@ manageIndustry() {
     manageHouse() {
         const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
         
-        // --- ЛОГИСТИКА: Берем дома ближе к центру, чтобы строители не бежали через полкарты ---
-        houses.sort((a, b) => { // Сортируем: сначала те, что ближе к центру карты (или центру базы)
-            // Допустим, просто сортируем случайно, чтобы распределять нагрузку, 
-            // но в идеале нужно проверять расстояние до стройки.
-            // Пока оставим так, но спавним строителей только если их мало.
-            return 0.5 - Math.random(); 
-        });
+        // --- ЛОГИСТИКА: Перемешиваем дома, чтобы распределять очередь ---
+        houses.sort(() => 0.5 - Math.random());
+
+        // 1. Считаем текущую армию ОДИН РАЗ до цикла (это очень ускорит игру)
+        let builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
+        // 2. Считаем строителей, которые УЖЕ заказаны и делаются прямо сейчас!
+        let buildersInProd = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
+        
+        // Складываем живых и заказанных
+        let totalBuilders = builders + buildersInProd;
+
+        let snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
+        let army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
 
         houses.forEach(h => {
-            const builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
-            const snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
-            const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer).length;
-
-            if (builders < 6 && this.money >= UNITS.BUILDER.cost) { this.craft(h, 'BUILDER'); return; }
-            if (snipers < 5 && this.money >= UNITS.SNIPER.cost) { this.craft(h, 'SNIPER'); return; }
-            if (army < 8 && this.money >= UNITS.SOLDIER.cost) { this.craft(h, 'SOLDIER'); }
+            // Ограничение: максимум 20 строителей (включая тех, что еще крафтятся)
+            if (totalBuilders < 20 && this.money >= UNITS.BUILDER.cost) { 
+                this.craft(h, 'BUILDER'); 
+                totalBuilders++; // Мгновенно увеличиваем счетчик, чтобы следующий дом его уже учел!
+                return; 
+            }
+            // То же самое делаем для снайперов и пехоты
+            if (snipers < 5 && this.money >= UNITS.SNIPER.cost) { 
+                this.craft(h, 'SNIPER'); 
+                snipers++;
+                return; 
+            }
+            if (army < 15 && this.money >= UNITS.SOLDIER.cost) { 
+                this.craft(h, 'SOLDIER'); 
+                army++;
+                return;
+            }
         });
     }
 

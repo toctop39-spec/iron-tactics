@@ -3964,7 +3964,7 @@ attemptAutoProduction() {
                 if (Math.hypot(this.x - this.prevX, this.y - this.prevY) < 1) this.stuckTimer++; 
                 else this.stuckTimer = 0;
             }
-            if (this.stuckTimer > 1200) { // 20 секунд тупняка = смерть
+            if (this.stuckTimer > 6000) { // 20 секунд тупняка = смерть
                 this.hp = 0; 
                 Game.effects.push({x: this.x, y: this.y, char: '☠️', life: 60});
                 if(this.assignedSite) Game.constructions = Game.constructions.filter(s => s !== this.assignedSite);

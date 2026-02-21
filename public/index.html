@@ -1573,6 +1573,51 @@ const Tutorial = {
     }
 };
 
+// --- МЕНЕДЖЕР ЗВУКОВ ---
+const SoundManager = {
+    sounds: {},
+    bgm: null,
+    lastPlayed: {},
+    
+    init() {
+        // Создаем звуки в памяти
+        this.sounds.explosion = new Audio('explosion.mp3');
+        this.sounds.nuke = new Audio('nuke-explosion.mp3');
+        this.sounds.tankFire = new Audio('tanksound.mp3');
+        this.sounds.steps = new Audio('steps.mp3');
+        this.sounds.driving = new Audio('driving.mp3');
+        
+        // Фоновая музыка
+        this.bgm = new Audio('GameMusic.mp3');
+        this.bgm.loop = true;
+        this.bgm.volume = 0.3; // Громкость музыки (30%)
+
+        // Браузер разрешает музыку только после первого клика игрока
+        const startMusic = () => {
+            if (this.bgm.paused) this.bgm.play().catch(e => {});
+            document.removeEventListener('click', startMusic);
+        };
+        document.addEventListener('click', startMusic);
+    },
+
+    // Функция умного воспроизведения
+    // throttleMs - минимальная задержка между одинаковыми звуками (чтобы не оглохнуть)
+    play(name, throttleMs = 0, volume = 1.0) {
+        if (throttleMs > 0) {
+            const now = Date.now();
+            if (this.lastPlayed[name] && now - this.lastPlayed[name] < throttleMs) return;
+            this.lastPlayed[name] = now;
+        }
+        if (this.sounds[name]) {
+            const snd = this.sounds[name].cloneNode(); // Клонируем, чтобы звуки могли накладываться
+            snd.volume = volume;
+            snd.play().catch(e => {});
+        }
+    }
+};
+// Инициализируем звуки сразу
+SoundManager.init();
+    
 const Game = {
 isSandbox: false, sandboxSide: 'player', // <--- Добавляем флаги
     
@@ -4402,8 +4447,10 @@ if (this.type === 'AA_DEFENSE') {
                                 Game.bullets.push(new Bullet(this.x + 10, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
                             }
                         } 
-                        // Остальные
+                 // Остальные
                         else {
+                            if (this.type === 'TANK') SoundManager.play('tankFire', 100, 0.5); // ЗВУК ВЫСТРЕЛА ТАНКА
+                            
                             let splashR = (this.type === 'TANK') ? 60 : 0;
                             Game.bullets.push(new Bullet(this.x, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
@@ -4485,7 +4532,7 @@ _movePhysics() {
             this.angle = Math.atan2(dy, dx);
         }
 
-        if (dist < 15) { 
+if (dist < 15) { 
             this.x = this.target.x; 
             this.y = this.target.y;
             if (this.pathQueue.length > 0) { 
@@ -4497,6 +4544,15 @@ _movePhysics() {
         } else { 
             this.x += (dx / dist) * currentSpeed; 
             this.y += (dy / dist) * currentSpeed; 
+            
+            // --- ЗВУКИ ДВИЖЕНИЯ ---
+            if (UNITS[this.type] && UNITS[this.type].isInfantry || this.isBuilder) {
+                // Шаги звучат макс. 1 раз в 400 мс (чтобы толпа не топала как пулемет)
+                SoundManager.play('steps', 400, 0.15); 
+            } else if (this.type === 'TANK' || this.type === 'GRAD' || this.type === 'HIMARS') {
+                // Гул техники макс. 1 раз в 600 мс
+                SoundManager.play('driving', 600, 0.2);
+            }
         }
 
 // --- ПЕРЕВОЗКА ПАССАЖИРОВ НА ЛОДКЕ ---
@@ -4703,6 +4759,7 @@ hit() {
         const isWaterHit = MapUtils.isWater(this.x, this.y);
 
         if (this.isNuke) {
+            SoundManager.play('nuke', 0, 1.0);
             // --- ЭПИЧНАЯ АНИМАЦИЯ ЯДЕРКИ ---
             // 1. Ослепительная вспышка (белый экран)
             Game.effects.push({ type: 'nuke_flash', x: this.x, y: this.y, life: 50 });
@@ -4721,11 +4778,13 @@ hit() {
                     life: 100 + Math.random() * 150 
                 });
             }
-        } else {
+} else {
             if (isWaterHit) {
                 Game.effects.push({ type: 'splash_ring', x: this.x, y: this.y, radius: 5, maxRadius: this.splashRadius || 20, life: 40, color: 'rgba(200, 255, 255, 0.8)' });
                 for(let k=0; k<5; k++) Game.effects.push({ type: 'water_particle', x: this.x, y: this.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 30 });
             } else {
+                SoundManager.play('explosion', 80, 0.4); // ЗВУК ВЗРЫВА (громкость 40%, макс 1 раз в 80мс)
+                
                 if (this.arty || this.splashRadius > 0) Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
                 Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});
             }

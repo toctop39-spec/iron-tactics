@@ -1592,9 +1592,12 @@ const SoundManager = {
         this.bgm.loop = true;
         this.bgm.volume = 0.3; // Громкость музыки (30%)
 
-        // Браузер разрешает музыку только после первого клика игрока
+// Браузер разрешает музыку только после первого клика игрока
         const startMusic = () => {
-            if (this.bgm.paused) this.bgm.play().catch(e => {});
+            // Включаем музыку, ТОЛЬКО если игрок сейчас находится в меню
+            if (Game.state === 'MENU') {
+                this.bgm.play().catch(e => {});
+            }
             document.removeEventListener('click', startMusic);
         };
         document.addEventListener('click', startMusic);
@@ -2014,13 +2017,18 @@ waterOffset: 0,
     transitToLevel(l) { this.transition(() => this.loadLevel(l)); },
     transitToAdvanced() { this.transition(() => this.loadAdvancedMode()); },
     transitToSpectator() { this.transition(() => this.startSpectator()); },
-    backToMenu() {
+ backToMenu() {
         this.transition(() => {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('menu-screen').classList.remove('hidden');
             this.state = 'MENU';
             document.getElementById('top-bar').style.display='none';
             document.getElementById('build-menu').style.display='none';
+            
+            // --- ВКЛЮЧАЕМ МУЗЫКУ ОБРАТНО ---
+            if (typeof SoundManager !== 'undefined' && SoundManager.bgm) {
+                SoundManager.bgm.play().catch(e => {});
+            }
         });
     },
     // --- КОНЕЦ ЛОГИКИ РЕСУРСОВ ---
@@ -2284,6 +2292,9 @@ loadLevel(lvlId) {
 
 
  resetGameData() {
+     if (typeof SoundManager !== 'undefined' && SoundManager.bgm) {
+            SoundManager.bgm.pause();
+        }
         this.units = []; this.bullets = [];
         this.selection = []; this.constructions = []; this.effects = []; this.bots = [];
         this.buffs = [];

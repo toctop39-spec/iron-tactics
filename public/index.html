@@ -188,15 +188,20 @@ canvas { display: block; cursor: crosshair; }
     <div id="top-bar" class="clickable" style="display: none;">
         <div style="display: flex; align-items: center;">
             <div id="player-stats">
-                <div class="res-group" title="Деньги">💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span></div>
-                <div class="res-group" title="Железо"><span class="res-icon">🔩</span> <span id="res-iron" class="res-val">0</span></div>
+              <div class="res-group" title="Деньги">💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span></div>
+<div class="res-group" title="Население">👥 <span id="pop-val" class="res-val" style="color: #44aaff;">0/0</span></div>
+<div class="res-group" title="Железо"><span class="res-icon">🔩</span> <span id="res-iron" class="res-val">0</span></div>
                 <div class="res-group" title="Химия"><span class="res-icon">🧪</span> <span id="res-chem" class="res-val">0</span></div>
                 <div class="res-group" title="Микросхемы"><span class="res-icon">💾</span> <span id="res-chips" class="res-val">0</span></div>
+                <div class="res-group" style="margin-left: 10px;" title="Ракеты">🚀 <span id="res-rockets" class="res-val" style="color: #ffaa00;">0</span></div>
+                <div class="res-group" title="Бомбардировщики">☄️ <span id="res-heavies" class="res-val" style="color: #ff5555;">0</span></div>
+                <div class="res-group" title="Ядерные ракеты">☢️ <span id="res-nukes" class="res-val" style="color: #55ff55;">0</span></div>
                 <span id="energy-container" class="energy-stat">⚡ <span id="energy-val">0</span></span>
                 <span style="color:#aaa; font-size:0.8em; margin-left:10px;">LVL <span id="level" style="color:#fff; font-size:1.2em;">1</span></span>
             </div>
             
             <div id="speed-controls">
+                <button id="sandbox-side-btn" class="filter-btn hidden" onclick="Game.toggleSandboxSide()" style="background: #44aaff; color: #fff; border-color: #fff; font-size: 0.9em; padding: 5px 15px;">СИНИЕ</button>
                 <button class="speed-btn time-btn active" onclick="Game.setSpeed(1)">1x</button>
                 <button class="speed-btn time-btn" onclick="Game.setSpeed(2)">2x</button>
                 <button class="speed-btn time-btn" onclick="Game.setSpeed(5)">5x</button>
@@ -206,6 +211,7 @@ canvas { display: block; cursor: crosshair; }
                 <button id="btn-filt-army" class="filter-btn" title="Только армия" onclick="Game.setFilter('ARMY')">⚔️</button>
                 <button id="btn-filt-house" class="filter-btn" title="Только дома" onclick="Game.setFilter('HOUSE')">🏠</button>
                 <button id="btn-filt-fact" class="filter-btn" title="Только заводы" onclick="Game.setFilter('FACTORY')">🏭</button>
+                <button id="btn-filt-boat" class="filter-btn" title="Только лодки" onclick="Game.setFilter('BOAT')">🚤</button>
             </div>
         </div>
         <div id="phase-text" style="color:#aaa; letter-spacing: 2px;">МЕНЮ</div>
@@ -218,6 +224,7 @@ canvas { display: block; cursor: crosshair; }
     <div id="build-menu" class="clickable"></div>
     
     <div id="right-controls" class="clickable">
+<button id="auto-reload-btn" class="action-circle-btn" onclick="Game.toggleAutoReload()" style="display: none; flex-direction: column; width: 75px; height: 75px; font-size: 0.7em; background: radial-gradient(circle at 30% 30%, #444, #111);"><span>🔄</span><span>AUTO</span><span id="auto-reload-status" style="color:#f00; font-size:0.9em">OFF</span></button>
         <button id="reload-btn" class="action-circle-btn" onclick="Game.reloadGrads()"><span>♻️</span><span style="font-size:0.8em">RELOAD</span><span style="color:#ff0; font-size:0.9em">1000$</span></button>
         <button id="arty-btn" class="action-circle-btn" onclick="Game.toggleArty()"><span>🚀</span><span>ARTY</span><span style="font-size:0.8em; color:#ffff00">200$</span></button>
     </div>
@@ -230,6 +237,7 @@ canvas { display: block; cursor: crosshair; }
     <div style="display:flex; gap: 30px; margin-top: 40px;">
         <div style="display:flex; flex-direction:column; gap:15px;">
             <button class="menu-btn" onclick="Game.transitToLevel(1)">👤 ОДИНОЧНАЯ КАМПАНИЯ</button>
+            <button class="menu-btn" style="border-color: #00ffcc; color: #00ffcc; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);" onclick="Game.transitToSandbox()">🧪 ПЕСОЧНИЦА (ТЕСТ)</button>
             <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.transitToAdvanced()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
             <button class="menu-btn" style="background:rgba(0, 68, 136, 0.4); border-color:#0af;" onclick="Lobby.initTransition()">🌐 ГЛОБАЛЬНЫЙ МУЛЬТИПЛЕЕР</button>
         </div>
@@ -289,7 +297,7 @@ canvas { display: block; cursor: crosshair; }
     <button id="end-btn" class="menu-btn">ДАЛЕЕ</button>
 </div>
 <script>
-const CAPTURABLE_BUILDINGS = ['HOUSE', 'FACTORY', 'POWER_PLANT', 'SILO', 'HOSPITAL', 'WAREHOUSE'];
+const CAPTURABLE_BUILDINGS = ['HOUSE', 'FACTORY', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'HOSPITAL', 'WAREHOUSE'];
 
 const BUFF_TYPES = {
     FACTORY_SPEED: { color: 'rgba(255, 165, 0, 0.3)', text: '⚡ ЗАВОД: Скорость x2', target: 'FACTORY', type: 'speed', val: 2 },
@@ -317,7 +325,7 @@ const formatCost = (u) => {
 };
 
 const UNITS = {
-    SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 60, dmg: 15, range: 140, speed: 0.7, reload: 40, color: '#44aaff', radius: 15, buildTime: 5, isInfantry: true },
+    SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 125, dmg: 15, range: 140, speed: 0.35, reload: 40, color: '#44aaff', radius: 8, buildTime: 5, isInfantry: true },
     SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 15, buildTime: 5, isInfantry: true },
     
     // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
@@ -329,12 +337,17 @@ const UNITS = {
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 25, buildTime: 15, maxAmmo: 4, splash: 100 },
 
+BOAT: { 
+        type:'unit', name: 'Лодка', cost: 1500, imageSrc: 'https://static.vecteezy.com/system/resources/previews/024/554/198/original/gray-boat-on-the-sea-png.png', resCost: { iron: 25, chem: 5 }, 
+        hp: 800, dmg: 0, range: 0, speed: 1.2, color: '#666', radius: 30, buildTime: 12 
+    },
+
 HIMARS: {
    type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png',
    cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
-   hp: 200, dmg: 600, range: 1200, speed: 0.65, reload: 180,
+   hp: 200, dmg: 2400, range: 1200, speed: 0.65, reload: 80,
    color: '#004400', radius: 22, buildTime: 20,
-   maxAmmo: 3, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
+   maxAmmo: 10, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
    isArty: true,
    isHIMARS: true
 },
@@ -353,16 +366,18 @@ FPV: {
                   resCost: { iron: 80, chips: 4, chem: 8 }, 
                   hp: 700, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 25, buildTime: 25, isFlying: true, maxAmmo: 30 },
     
-    BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.8, color: '#e6c200', radius: 15, buildTime: 5, isBuilder: true },
+    BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 7, buildTime: 5, isBuilder: true },
     
     POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 25, color: '#ffd700', constructTime: 10, energyGen: 50 },
-SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 30, constructTime: 25, energyUse: 15, maxAmmo: 5 },
+NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 30, color: '#33ff33', constructTime: 40, energyGen: 500 },
+SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
-    HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 700, income: 3, radius: 30, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
+    HOUSE:   { type:'bldg', name: 'Дом',    emoji: '🏠', cost: 300, hp: 700, income: 3, radius: 15, color: '#8d6e63', spawnList: ['SOLDIER','SNIPER','BUILDER'], constructTime: 20, energyUse: 10 },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 45, color: '#607d8b', 
              
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BTN_AUTO'],
+// Замените строчку spawnList у FACTORY на эту:
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
@@ -383,6 +398,11 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HIMARS','HE
     CRAFT_IRON: { type: 'action', name: 'Железо x1', emoji: '🔩', cost: 15, producedRes: { iron: 1 }, buildTime: 2 },
     CRAFT_CHEM: { type: 'action', name: 'Химия x1', emoji: '🧪', cost: 150, resCost: { iron: 10 }, producedRes: { chem: 1 }, buildTime: 5 },
     CRAFT_CHIP: { type: 'action', name: 'Чип x1', emoji: '💾', cost: 1000, resCost: { iron: 15, chem: 1 }, producedRes: { chips: 1 }, buildTime: 10 },
+   
+   // --- ПРОИЗВОДСТВО БОЕПРИПАСОВ ---
+    CRAFT_ROCKET: { type: 'action', name: 'Ракета', emoji: '🚀', cost: 500, resCost: { iron: 20, chips: 1 }, producedRes: { rockets: 1 }, buildTime: 5 },
+    CRAFT_HEAVY:  { type: 'action', name: 'Бомбер', emoji: '☄️', cost: 2500, resCost: { iron: 25, chips: 2 }, producedRes: { heavies: 1 }, buildTime: 8 },
+    CRAFT_NUKE:   { type: 'action', name: 'Ядерка', emoji: '☢️', cost: 12000, resCost: { iron: 50, chem: 20, chips: 3 }, producedRes: { nukes: 1 }, buildTime: 25 },
     
     // --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
@@ -400,10 +420,11 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'TANK','GRAD','HIMARS','HE
 ];
     
 const SILO_AMMO = {
-    ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 15000,   damage: 300,  speed: 6,   radius: 60,  hp: 10 },
-    HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 20000,  damage: 600,  speed: 3,   radius: 300, hp: 300 },
-    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '☢️', cost: 50000, damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
+    ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1000, reqRes: 'rockets', damage: 300,  speed: 6,   radius: 60,  hp: 500 },
+    HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 5000, reqRes: 'heavies', damage: 600,  speed: 3,   radius: 300, hp: 3000 },
+    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '🖍️', cost: 20000, reqRes: 'nukes',   damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
 };
+
 const LEVELS = [
 { id:1,  budget:5000,  unlock:['SOLDIER'], enemies:{ SOLDIER:6 }, note:'Базовое управление' },
 { id:2,  budget:13000,  unlock:['SOLDIER'], enemies:{ SOLDIER:22 }, note:'Численное превосходство' },
@@ -442,106 +463,176 @@ let CURRENT_ROOM = null; // Хранит имя текущей комнаты
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// --- ДВИЖОК ГЕНЕРАЦИИ ШУМА ---
+const SimplexNoise = (function() {
+    const grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+    let p = new Uint8Array(512);
+    function init(seed) {
+        const sourceP = new Uint8Array(256);
+        for (let i=0; i<256; i++) sourceP[i] = i;
+        for (let i=255; i>0; i--) {
+            const r = Math.floor(Math.abs(Math.sin(seed++) * 10000) % (i + 1));
+            [sourceP[i], sourceP[r]] = [sourceP[r], sourceP[i]];
+        }
+        for (let i=0; i<512; i++) p[i] = sourceP[i & 255];
+    }
+    function dot(g, x, y) { return g[0]*x + g[1]*y; }
+    return {
+        init,
+        noise: function(xin, yin) {
+            let n0, n1, n2;
+            const F2 = 0.5*(Math.sqrt(3.0)-1.0), s = (xin+yin)*F2, i = Math.floor(xin+s), j = Math.floor(yin+s);
+            const G2 = (3.0-Math.sqrt(3.0))/6.0, t = (i+j)*G2, X0 = i-t, Y0 = j-t, x0 = xin-X0, y0 = yin-Y0;
+            let i1, j1; if(x0>y0) {i1=1; j1=0;} else {i1=0; j1=1;}
+            const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2, x2 = x0 - 1.0 + 2.0 * G2, y2 = y0 - 1.0 + 2.0 * G2;
+            const ii = i & 255, jj = j & 255;
+            const gi0 = p[ii+p[jj]] % 12, gi1 = p[ii+i1+p[jj+j1]] % 12, gi2 = p[ii+1+p[jj+1]] % 12;
+            let t0 = 0.5 - x0*x0-y0*y0; if(t0<0) n0 = 0.0; else { t0 *= t0; n0 = t0 * t0 * dot(grad3[gi0], x0, y0); }
+            let t1 = 0.5 - x1*x1-y1*y1; if(t1<0) n1 = 0.0; else { t1 *= t1; n1 = t1 * t1 * dot(grad3[gi1], x1, y1); }
+            let t2 = 0.5 - x2*x2-y2*y2; if(t2<0) n2 = 0.0; else { t2 *= t2; n2 = t2 * t2 * dot(grad3[gi2], x2, y2); }
+            return 70.0 * (n0 + n1 + n2);
+        }
+    };
+})();
+
 const MapUtils = {
-    islands: [], // Теперь массив пустой, мы его заполним в init()
-    seed: Math.random() * 100,
+    seed: 0,
     lakes: [],
     mountains: [],
+    spawnPoints: [],
+    bgCanvas: null, // Кэшированный холст для производительности
 
-    init() { 
+    init() {
+        this.seed = Math.floor(Math.random() * 10000);
+        SimplexNoise.init(this.seed);
         this.lakes = [];
         this.mountains = [];
-        this.islands = [];
+        this.spawnPoints = [];
 
-        // --- ГЕНЕРАЦИЯ АДАПТИВНЫХ ОСТРОВОВ ---
-        // Размеры зависят от текущего MAP_W и MAP_H
-        
-        // 1. Большой левый (Материк)
-        this.islands.push({
-            x: MAP_W * 0.35,  // 35% от ширины
-            y: MAP_H * 0.5,   // Центр по высоте
-            rx: MAP_W * 0.3,  // Радиус по X
-            ry: MAP_H * 0.45, // Радиус по Y
-            noise: 80
-        });
-
-        // 2. Верхний правый
-        this.islands.push({
-            x: MAP_W * 0.78, 
-            y: MAP_H * 0.30,
-            rx: MAP_W * 0.15, 
-            ry: MAP_H * 0.15,
-            noise: 50
-        });
-
-        // 3. Нижний правый
-        this.islands.push({
-            x: MAP_W * 0.78,
-            y: MAP_H * 0.70,
-            rx: MAP_W * 0.15,
-            ry: MAP_H * 0.18,
-            noise: 60
-        });
-
-        // --- ГЕНЕРАЦИЯ ГОР ---
-        let attempts = 0;
-        while (this.mountains.length < 15 && attempts < 1000) {
-            attempts++;
-            const x = Math.random() * MAP_W;
-            const y = Math.random() * MAP_H;
-            // Размер горы тоже немного зависит от карты, но не сильно
-            const radius = 60 + Math.random() * 60;
-            const margin = radius + 80; 
-
-            if (this.getTerrain(x, y) !== 'LAND') continue;
-            if (this.getTerrain(x + margin, y) !== 'LAND') continue;
-            if (this.getTerrain(x - margin, y) !== 'LAND') continue;
-            if (this.getTerrain(x, y + margin) !== 'LAND') continue;
-            if (this.getTerrain(x, y - margin) !== 'LAND') continue;
-
-            let overlap = false;
-            for (let m of this.mountains) {
-                if (Math.hypot(x - m.x, y - m.y) < radius + m.radius + 100) { overlap = true; break; }
-            }
-            
-            if (!overlap) {
-                this.mountains.push({ x: x, y: y, radius: radius });
-            }
+        if (Game.isIslandMode) {
+            this.calculateSpawns();
+            this.generateMountains();
+            this.renderBackground();
         }
+    },
+
+getWorldHeight(x, y) {
+        if (!Game.isIslandMode) return 0.6; 
+        
+        const wx = x - MAP_W / 2;
+        const wy = y - MAP_H / 2;
+        const mapSize = Math.max(MAP_W, MAP_H);
+
+        // 1. Мягкий ограничитель краев (просто чтобы суша не обрывалась об экран)
+        const dist = Math.sqrt(wx*wx + wy*wy) / (mapSize * 0.48); 
+        const edgeMask = Math.max(0, 1.0 - Math.pow(dist, 4.0)); 
+
+        // 2. Генерируем шум. freq = 1/1000 даст нам несколько крупных пятен (островов)
+        let noiseVal = 0, amp = 1, freq = 1 / 1000; 
+        let maxAmp = 0;
+        
+        for(let o = 0; o < 5; o++) {
+            noiseVal += SimplexNoise.noise(wx * freq, wy * freq) * amp;
+            maxAmp += amp;
+            amp *= 0.5; freq *= 2.0;
+        }
+        
+        // Нормализуем значение шума (чтобы оно было примерно от 0 до 1)
+        noiseVal = (noiseVal / maxAmp + 1) / 2;
+
+        // 3. Немного "топим" карту, чтобы острова визуально отделились друг от друга проливами
+        noiseVal = Math.pow(noiseVal, 0.7); 
+
+        // 4. Накладываем краевую маску
+        let h = noiseVal * edgeMask;
+
+        return Math.max(0, Math.min(1, h));
     },
 
     getTerrain(x, y) {
         if (!Game.isIslandMode) return 'LAND';
-        let isShallow = false;
-        for (let isl of this.islands) {
-            const dx = x - isl.x;
-            const dy = y - isl.y;
-            // Формула эллипса
-            const distSq = (dx*dx)/(isl.rx*isl.rx) + (dy*dy)/(isl.ry*isl.ry);
-            
-            if (distSq <= 0.85) return 'LAND';   
-            if (distSq <= 1.5) isShallow = true; 
-        }
-        return isShallow ? 'SHALLOW' : 'DEEP';
+        const h = this.getWorldHeight(x, y);
+        if (h >= 0.48) return 'LAND';
+        if (h >= 0.42) return 'SHALLOW'; 
+        return 'DEEP';
     },
 
-   // Эта функция отвечает за то, где НЕЛЬЗЯ строить
-    isWater(x, y) { 
-        if (Game.isIslandMode) {
-            // Строить можно ТОЛЬКО на 'LAND'. 
-            // 'SHALLOW' (мелководье) и 'DEEP' (глубина) считаются водой для зданий.
-            return this.getTerrain(x, y) !== 'LAND';
-        }
-        return false; 
-    },
-    
+    isWater(x, y) { return Game.isIslandMode && this.getTerrain(x, y) !== 'LAND'; },
     checkWater(x, y) { return this.isWater(x, y); },
-    
+
+    // Тот самый УМНЫЙ поиск точек старта
+    calculateSpawns() {
+        const spawns = [];
+        const radius = Math.max(MAP_W, MAP_H) * 0.42;
+        for (let p = 0; p < 8; p++) {
+            let best = null, maxD = -1;
+            for (let t = 0; t < 1000; t++) {
+                const wx = (Math.random() - 0.5) * radius * 2;
+                const wy = (Math.random() - 0.5) * radius * 2;
+                const gx = wx + MAP_W / 2;
+                const gy = wy + MAP_H / 2;
+
+                if (gx < 300 || gx > MAP_W - 300 || gy < 300 || gy > MAP_H - 300) continue;
+
+                const h = this.getWorldHeight(gx, gy);
+                // Ищем хорошую ровную сушу (не гора, не вода)
+                if (h >= 0.52 && h < 0.8) { 
+                    let minD = 1e7;
+                    spawns.forEach(s => minD = Math.min(minD, Math.hypot(gx-s.x, gy-s.y)));
+                    if (minD > maxD) { maxD = minD; best = { x: gx, y: gy }; }
+                }
+            }
+            if (best) spawns.push(best);
+        }
+        this.spawnPoints = spawns;
+    },
+
+    generateMountains() {
+        let attempts = 0;
+        while (this.mountains.length < 30 && attempts < 2000) {
+            attempts++;
+            const x = Math.random() * MAP_W;
+            const y = Math.random() * MAP_H;
+            
+            // Спавним горы только там, где высота по шуму большая
+            if (this.getWorldHeight(x, y) > 0.85) { 
+                const radius = 50 + Math.random() * 50;
+                let overlap = false;
+                for (let m of this.mountains) {
+                    if (Math.hypot(x - m.x, y - m.y) < radius + m.radius) { overlap = true; break; }
+                }
+                if (!overlap) this.mountains.push({ x, y, radius });
+            }
+        }
+    },
+
     checkMountain(x, y, radius) {
         for (let m of this.mountains) {
             if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
         }
         return null;
+    },
+
+    // Отрисовка огромной карты один раз (очень ускорит игру)
+    renderBackground() {
+        this.bgCanvas = document.createElement('canvas');
+        const scale = 0.5; // Рендерим в полразмера для скорости
+        this.bgCanvas.width = MAP_W * scale;
+        this.bgCanvas.height = MAP_H * scale;
+        const ctx = this.bgCanvas.getContext('2d', { alpha: true });
+        
+        for (let y = 0; y < this.bgCanvas.height; y++) {
+            for (let x = 0; x < this.bgCanvas.width; x++) {
+                const h = this.getWorldHeight(x / scale, y / scale);
+                if (h >= 0.48) {
+                    ctx.fillStyle = '#243b29'; // Суша (травянистый цвет из твоей игры)
+                    ctx.fillRect(x, y, 1, 1);
+                } else if (h >= 0.42) {
+                    ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; // Мелководье
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
     }
 };
 
@@ -885,13 +976,21 @@ manageBase() {
 
         const bRadius = UNITS[type].radius;
 
-        // Увеличили количество попыток с 30 до 100 (база теперь будет гигантской)
-        for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 100; i++) {
             const anchor = anchors[Math.floor(Math.random() * anchors.length)];
-            const angle = Math.random() * Math.PI * 2;
             
-            // Ищем дальше от центра! От 50 до 350 пикселей (база будет разрастаться вширь)
-            const dist = anchor.radius + bRadius + 20 + Math.random() * 300; 
+            // --- ЭКСПАНСИЯ: Бот тянет здания к центру карты! ---
+            let angle;
+            if (Math.random() > 0.4) {
+                // В 60% случаев строим в сторону центра карты (захват территорий)
+                angle = Math.atan2((MAP_H/2) - anchor.y, (MAP_W/2) - anchor.x) + (Math.random() - 0.5);
+            } else {
+                // В 40% случаев строим случайно в разные стороны
+                angle = Math.random() * Math.PI * 2;
+            }
+            
+            // Ищем дальше от центра базы! От 80 до 400 пикселей
+            const dist = anchor.radius + bRadius + 20 + Math.random() * 380; 
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
 
@@ -901,7 +1000,6 @@ manageBase() {
             // Проверка: не лезем ли в воду или на горы
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRadius)) continue;
 
-            // УМНАЯ ПРОВЕРКА КОЛЛИЗИЙ (Вместо жестких 110 пикселей берем реальные радиусы)
             const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 25) || 
                          Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 25);
 
@@ -913,8 +1011,8 @@ manageBase() {
                 builder.assignSite(site);
                 return true;
             }
-        }
-        return false; // Место не найдено даже за 100 попыток
+        }        
+                return false; // Место не найдено даже за 100 попыток
     }
 
 manageIndustry() {
@@ -924,21 +1022,35 @@ manageIndustry() {
         const tanks = army.filter(u => u.type === 'TANK').length;
         const helis = army.filter(u => u.type === 'HELICOPTER').length;
         const grads = army.filter(u => u.type === 'GRAD').length;
+        const fpv = army.filter(u => u.type === 'FPV').length;
+        const himars = army.filter(u => u.type === 'HIMARS').length;
+        
+        // Лодки для ботов пока отключены!
 
         factories.forEach(f => {
-            // 1. ВЫБИРАЕМ ЦЕЛЬ (Что хотим купить?)
-            let targetUnit = 'TANK';
-            if (tanks >= 3 && helis < tanks / 2) targetUnit = 'HELICOPTER';
+            // 1. УМНЫЙ ВЫБОР ЦЕЛИ
+            let targetUnit = 'TANK'; // Танк — это "хлеб", строим его по умолчанию
+            
+            // ВРЕМЕННО ОТКЛЮЧЕНО:
+            // if (Game.isIslandMode && boats < Math.ceil(army.length / 8)) targetUnit = 'BOAT';
+
+            // Рой дронов (строят чаще, чтобы кошмарить базу)
+            if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
+            // Элитная артиллерия (Хаймарс) - копят на него активнее
+            else if (tanks >= 4 && himars < 1 && this.money > 5500) targetUnit = 'HIMARS';
+            // Массовая артиллерия (Град)
             else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
+            // Авиация (Вертолеты)
+            else if (tanks >= 10 && helis < 3) targetUnit = 'HELICOPTER';
 
             const uInfo = UNITS[targetUnit];
-            
+
             // Проверяем, хватает ли ресурсов (не денег, а именно материалов)
             const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
             const hasChem = this.resources.chem >= (uInfo.resCost.chem || 0);
             const hasChips = this.resources.chips >= (uInfo.resCost.chips || 0);
             const hasAllRes = hasIron && hasChem && hasChips;
-
+     
             // СЦЕНАРИЙ А: Ресурсы есть, но денег нет?
             if (hasAllRes) {
                 if (this.money >= uInfo.cost) {
@@ -1009,41 +1121,85 @@ manageIndustry() {
     }
 
 manageCombat() {
-        // Берем всех боевых юнитов (кроме строителей и заводов)
-        const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type !== 'SILO');
+        const myUnits = Game.units.filter(u => u.side === this.side);
+        // Отделяем армию от лодок
+        const army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'SILO' && u.type !== 'BOAT');
+        const boats = myUnits.filter(u => u.type === 'BOAT');
         
-        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0);
+        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE');
         if (enemies.length === 0) return;
 
-        // 1. Стрельба ГРАДов (Артиллерия)
-        army.filter(u => u.type === 'GRAD' && u.ammo > 0).forEach(g => {
-            // Ищем важные цели (Заводы, Турели) в радиусе
-            const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
-            if (t && !g.gradSeq) g.fireArty(t.x, t.y);
+        // 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
+        army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
+            if (g.type === 'GRAD') {
+                const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
+                if (t && !g.gradSeq) g.fireArty(t.x, t.y);
+            }
+            // HIMARS сам найдет вертолеты в Unit.update(), мы его просто двигаем с армией
         });
 
-        // 2. ИСПРАВЛЕННАЯ ПЕРЕЗАРЯДКА
-        // Фильтруем тех, у кого кончились патроны, НО ТОЛЬКО ЕСЛИ ОНИ ИХ ИСПОЛЬЗУЮТ (maxAmmo > 0)
-        // Это исключит солдат, снайперов и обычные танки.
+        // 2. ПЕРЕЗАРЯДКА
         const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
-
         emptyUnits.forEach(u => {
-            // Проверяем, есть ли деньги на КАЖДУЮ перезарядку отдельно
             if (this.money >= 1000) { 
-                this.money -= 1000; 
-                u.ammo = u.maxAmmo; 
+                this.money -= 1000; u.ammo = u.maxAmmo; 
                 Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); 
             }
         });
 
-        // 3. Атака
-        if (army.length > 12) {
-            let target = enemies.find(e => e.type === 'HOUSE');
+        // 3. АТАКА И ЛОГИСТИКА
+        if (army.length > 8) {
+            // Приоритет целей: Сначала чужие заводы/дома (для захвата территории), затем всё остальное
+            let target = enemies.find(e => e.type === 'FACTORY' || e.type === 'HOUSE');
             if (!target) target = enemies[0];
+
+            // Движение армии
             army.forEach(u => { 
-                // Не отправляем статичные юниты (Турели) в атаку
-                if (!u.target && u.type !== 'SENTINEL') {
+                if (u.type === 'SENTINEL' || u.target) return; // Статика и занятые стоят
+
+                // ТАКТИКА FPV-ДРОНОВ
+                if (u.type === 'FPV') {
+                    // Ищут ПВО или заводы
+                    let fpvTarget = enemies.find(e => e.type === 'AA_DEFENSE' || e.type === 'FACTORY');
+                    if (!fpvTarget) fpvTarget = target;
+                    u.moveCmd(fpvTarget.x, fpvTarget.y);
+                    return;
+                }
+
+                // ТАКТИКА ЛОДОК (Если мы на островах)
+                if (Game.isIslandMode && !u.isFlying) {
+                    let distToTarget = Math.hypot(target.x - u.x, target.y - u.y);
+                    
+                    // Если цель далеко (на другом острове) и есть лодки
+                    if (distToTarget > 600 && boats.length > 0) {
+                        // Ищем ближайшую лодку
+                        let closestBoat = boats.sort((a, b) => Math.hypot(a.x - u.x, a.y - u.y) - Math.hypot(b.x - u.x, b.y - u.y))[0];
+                        
+                        if (closestBoat) {
+                            // Если мы рядом с лодкой, залазим и "жмемся" к ней
+                            if (Math.hypot(closestBoat.x - u.x, closestBoat.y - u.y) < 150) {
+                                u.moveCmd(closestBoat.x, closestBoat.y);
+                            } else {
+                                // Иначе бежим к берегу, где лодка
+                                u.moveCmd(closestBoat.x, closestBoat.y);
+                            }
+                        }
+                    } else {
+                        // Если на одном острове - просто атакуем
+                        u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250);
+                    }
+                } 
+                // ОБЫЧНАЯ АТАКА
+                else {
                     u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250); 
+                }
+            });
+
+            // УПРАВЛЕНИЕ САМИМИ ЛОДКАМИ
+            boats.forEach(b => {
+                if (!b.target) {
+                    // Плывем к врагу, высаживаем десант!
+                    b.moveCmd(target.x + (Math.random()-0.5)*300, target.y + (Math.random()-0.5)*300);
                 }
             });
         }
@@ -1205,52 +1361,22 @@ const Tutorial = {
     timer: 0,
     startPos: { x: 0, y: 0 },
     
+    // --- РАСШИРЕННЫЕ ШАГИ ОБУЧЕНИЯ ---
     steps: [
-        { 
-            title: "ВЫЖИВАНИЕ", 
-            text: "Командир! Мы начинаем с нуля. У вас есть Строитель и Дом. Цель: построить базу и выжить.", 
-            action: "wait_click" 
-        },
-        { 
-            title: "КАМЕРА", 
-            text: "Осмотритесь. Используйте WASD или стрелки, чтобы двигать камеру.", 
-            action: "check_move" 
-        },
-        { 
-            title: "СТРОИТЕЛЬ", 
-            text: "Найдите и выделите СТРОИТЕЛЯ (человечек в желтой каске).", 
-            action: "check_select_builder" 
-        },
-        { 
-            title: "ЭНЕРГИЯ (СЭС)", 
-            text: "Зданиям нужен ток! Выберите Строителя, нажмите на СЭС (⚡) внизу и поставьте её рядом с Домом. ЖДИТЕ ПОСТРОЙКИ.", 
-            action: "check_build_power" 
-        },
-        { 
-            title: "УСКОРЕНИЕ ВРЕМЕНИ", 
-            text: "Строить долго? Нажмите кнопку '5x' вверху экрана, чтобы ускорить время. Как построится — верните '1x'.", 
-            action: "check_speed" 
-        },
-        { 
-            title: "НАЙМ ПЕХОТЫ", 
-            text: "Энергия есть! Теперь выберите свой ДОМ (ЛКМ). В меню закажите ПЕХОТИНЦА (🪖).", 
-            action: "check_train_soldier" 
-        },
-        { 
-            title: "ТЕРРИТОРИИ (КВАДРАТЫ)", 
-            text: "Видите кнопку 🗺️ вверху? Нажмите её, чтобы включить режим 'Влияния'. Цветные квадраты показывают, кто контролирует землю.", 
-            action: "check_map_mode" 
-        },
-        { 
-            title: "ЗАВОДЫ И ТАНКИ", 
-            text: "Пехота слаба. Чтобы строить ТАНКИ, вам нужно построить ЗАВОД (🏭). Но он стоит дорого.", 
-            action: "wait_click" 
-        },
-        { 
-            title: "УДАЧИ!", 
-            text: "Вы готовы. Развивайтесь, захватывайте территорию и уничтожьте врагов. В бой!", 
-            action: "wait_click" 
-        }
+        { title: "ВЫЖИВАНИЕ", text: "Командир! Мы начинаем с нуля. У вас есть Строитель и Дом. Цель: построить базу и выжить.", action: "wait_click" },
+        { title: "КАМЕРА", text: "Осмотритесь. Используйте WASD, стрелки (или тяните экран на телефоне), чтобы двигать камеру.", action: "check_move" },
+        { title: "СТРОИТЕЛЬ", text: "Найдите и выделите СТРОИТЕЛЯ (человечек в желтой каске) левой кнопкой мыши (ЛКМ).", action: "check_select_builder" },
+        { title: "ЭНЕРГИЯ (СЭС)", text: "Зданиям нужен ток! Выберите Строителя, нажмите на СЭС (⚡) внизу и кликните на землю рядом с Домом. ЖДИТЕ ПОСТРОЙКИ.", action: "check_build_power" },
+        { title: "УСКОРЕНИЕ ВРЕМЕНИ", text: "Строить долго? Нажмите кнопку '5x' вверху экрана, чтобы ускорить время. Как построится — верните '1x'.", action: "check_speed" },
+        { title: "НАЙМ ПЕХОТЫ", text: "Энергия есть! Теперь выберите свой ДОМ (ЛКМ). В меню закажите ПЕХОТИНЦА (🪖).", action: "check_train_soldier" },
+        { title: "УПРАВЛЕНИЕ АРМИЕЙ", text: "ВАЖНО: Нажмите значок с мечами на панели сверху, а потом выделите пехоту и нажмите ПРАВУЮ КНОПКУ (ПКМ) по земле, чтобы они туда пошли. Выбор пустой земли снимает выделение.", action: "wait_click" },
+        { title: "ТЕРРИТОРИИ", text: "Видите кнопку 🗺️ вверху? Нажмите её. Цветные квадраты показывают, кто контролирует землю. Захватывайте новые территории строя здания!", action: "check_map_mode" },
+        { title: "ПРОМЫШЛЕННОСТЬ", text: "Пехота слаба. Чтобы делать ТАНКИ и боеприпасы, нужен ЗАВОД (🏭). Выберите Строителя и постройте Завод.", action: "check_build_factory" },
+        { title: "ПРОИЗВОДСТВО", text: "Завод построен! Выделите его. Технике нужны ресурсы. Закажите на Заводе добычу 'Железо x1' (🔩).", action: "check_craft_iron" },
+        { title: "АВТОМАТИЗАЦИЯ", text: "Кликать каждый раз неудобно. В меню Завода нажмите 'АВТО-ПРОИЗВ.' (🔄), а затем снова 'Железо'. Завод будет добывать его сам!", action: "check_auto_iron" },
+        { title: "ЛОГИСТИКА И СКЛАДЫ", text: "У вас лимит — 100 ед. Железа, Химии и Чипов. Стройте СКЛАДЫ (🏚️), чтобы увеличить этот лимит и копить на дорогую технику!", action: "wait_click" },
+        { title: "АРТИЛЛЕРИЯ", text: "У ГРАДа и HIMARS заканчиваются ракеты. Их нужно производить на Заводе (🚀). Они не занимают место на Складах. Следите за запасами вверху!", action: "wait_click" },
+        { title: "К БОЮ!", text: "Командир, вы готовы! Наладьте цепочки поставок, копите на Ядерную ракету и сотрите врагов с лица земли. Удачи!", action: "wait_click" }
     ],
 
     init() {
@@ -1277,7 +1403,6 @@ const Tutorial = {
         this.active = false;
         this.overlay.style.display = 'none';
         Game.showError("ОБУЧЕНИЕ ЗАВЕРШЕНО");
-        // Возвращаем скорость в норму, если игрок забыл
         Game.setSpeed(1);
     },
 
@@ -1320,11 +1445,9 @@ const Tutorial = {
         if (!this.active) return;
         const s = this.steps[this.step];
 
-        // 1. ПРОВЕРКА КАМЕРЫ
         if (s.action === 'check_move') {
             if (Math.abs(Game.camera.x - this.startPos.x) > 200 || Math.abs(Game.camera.y - this.startPos.y) > 200) this.nextStep();
         }
-        // 2. ВЫБОР СТРОИТЕЛЯ
         else if (s.action === 'check_select_builder') {
             const builder = Game.units.find(u => u.side === 'player' && u.isBuilder);
             if (builder) {
@@ -1332,26 +1455,17 @@ const Tutorial = {
                 if (Game.selection.includes(builder)) this.nextStep();
             }
         }
-        // 3. ПОСТРОЙКА СЭС (ЖДЕМ ЗАВЕРШЕНИЯ!)
         else if (s.action === 'check_build_power') {
-            // Ищем ГОТОВОЕ здание (в массиве units), а не стройку (constructions)
             const power = Game.units.find(u => u.type === 'POWER_PLANT' && u.side === 'player');
             const site = Game.constructions.find(c => c.type === 'POWER_PLANT' && c.owner === 'player');
-            
-            // Если стройка идет, но здания еще нет - меняем текст подсказки
             if (site && !power) {
                 this.text.innerText = `Отлично! Строительство идет. Подождите завершения... ${(site.remaining/60).toFixed(0)}с`;
             }
-
-            // Если здание готово - идем дальше
             if (power) this.nextStep();
         }
-        // 4. ПРОВЕРКА СКОРОСТИ
         else if (s.action === 'check_speed') {
-            // Подсветка кнопок скорости (примерно)
             if (Game.speed >= 2) this.nextStep();
         }
-        // 5. НАЙМ СОЛДАТА
         else if (s.action === 'check_train_soldier') {
             const house = Game.units.find(u => u.type === 'HOUSE' && u.side === 'player');
             if (house) {
@@ -1360,9 +1474,34 @@ const Tutorial = {
             } 
             if (Game.units.some(u => u.type === 'SOLDIER' && u.side === 'player')) this.nextStep();
         }
-        // 6. ПРОВЕРКА КАРТЫ ТЕРРИТОРИЙ
         else if (s.action === 'check_map_mode') {
             if (Game.territoryMode > 0) this.nextStep();
+        }
+        
+        // --- НОВЫЕ ПРОВЕРКИ ---
+        // Постройка завода
+        else if (s.action === 'check_build_factory') {
+            const factory = Game.units.find(u => u.type === 'FACTORY' && u.side === 'player');
+            const site = Game.constructions.find(c => c.type === 'FACTORY' && c.owner === 'player');
+            if (site && !factory) this.text.innerText = `Отлично! Строительство идет. Подождите завершения... ${(site.remaining/60).toFixed(0)}с`;
+            if (factory) this.nextStep();
+        }
+        // Заказано железо
+        else if (s.action === 'check_craft_iron') {
+            const factory = Game.units.find(u => u.type === 'FACTORY' && u.side === 'player');
+            if (factory) {
+                this.setHighlight(factory.x, factory.y, 100);
+                if (factory.productionType === 'CRAFT_IRON' && factory.spawnCooldown > 0) this.nextStep();
+            }
+        }
+        // Включен авто-крафт
+        else if (s.action === 'check_auto_iron') {
+            const factory = Game.units.find(u => u.type === 'FACTORY' && u.side === 'player');
+            if (factory) {
+                this.setHighlight(factory.x, factory.y, 100);
+                // Проверяем, что игрок выбрал авто-таргет именно на Железо
+                if (factory.autoTarget === 'CRAFT_IRON') this.nextStep();
+            }
         }
     },
 
@@ -1382,6 +1521,55 @@ const Tutorial = {
 };
 
 const Game = {
+isSandbox: false, sandboxSide: 'player', // <--- Добавляем флаги
+    
+toggleSandboxSide() {
+        if (this.sandboxSide === 'player') {
+            this.sandboxSide = 'enemy';
+            this.myRole = 'enemy'; // <--- ДОБАВИЛИ ЭТО!
+            document.getElementById('sandbox-side-btn').innerText = 'КРАСНЫЕ';
+            document.getElementById('sandbox-side-btn').style.background = '#e53935';
+        } else {
+            this.sandboxSide = 'player';
+            this.myRole = 'player'; // <--- И ЭТО!
+            document.getElementById('sandbox-side-btn').innerText = 'СИНИЕ';
+            document.getElementById('sandbox-side-btn').style.background = '#44aaff';
+        }
+        this.selection = []; // Сбрасываем выделение при смене команды
+        this.updateUI([]);
+    },
+    transitToSandbox() { this.transition(() => this.startSandbox()); },
+startSandbox() {
+        this.isMultiplayer = false;
+        this.isIslandMode = false;
+        this.isSpectator = false;
+        this.myRole = 'player';
+        this.sandboxSide = 'player';
+        this.state = 'BATTLE';
+        
+        MAP_W = 4000; MAP_H = 4000;
+        
+        // 1. Сначала очищаем старые данные (это выключит старую песочницу, если она была)
+        this.resetGameData(); 
+        
+        // 2. А ТЕПЕРЬ ВКЛЮЧАЕМ ЕЁ ДЛЯ НОВОГО ЗАПУСКА!
+        this.isSandbox = true; 
+        
+        document.getElementById('sandbox-side-btn').classList.remove('hidden');
+        document.getElementById('sandbox-side-btn').innerText = 'СИНИЕ';
+        document.getElementById('sandbox-side-btn').style.background = '#44aaff';
+
+        this.startGameUI("ПЕСОЧНИЦА (ТЕСТ)");
+        document.getElementById('start-btn').classList.add('hidden');
+        document.getElementById('speed-controls').style.display = 'flex';
+        
+        this.openSandboxMenu();
+    },
+    openSandboxMenu() {
+        // Достаем всех юнитов и здания для спавна
+        let spawnable = Object.keys(UNITS).filter(k => UNITS[k].type === 'unit' || UNITS[k].type === 'bldg');
+        this.updateUI(spawnable, true, "МЕНЮ МГНОВЕННОГО СПАВНА");
+    },
     artyMode: false, drawPath: [], isDrawingPath: false, dragStart: null,
     level: 1, money: 0, state: 'MENU',
     resources: { iron: 0, chem: 0, chips: 0 }, // НОВОЕ
@@ -1395,26 +1583,39 @@ const Game = {
     },
 
 setFilter(type) {
-        // 1. Логика переключения (ВКЛ/ВЫКЛ)
-        if (this.selectionFilter === type) {
-            this.selectionFilter = null; // Отключаем, если нажали ту же кнопку
-            this.showError("ФИЛЬТР: ВЫКЛ (ВСЕ)");
-        } else {
-            this.selectionFilter = type; // Включаем новый
-            let name = (type==='BUILDER')?"СТРОИТЕЛИ":(type==='ARMY')?"АРМИЯ":(type==='HOUSE')?"ДОМА":"ЗАВОДЫ";
-            this.showError(`ФИЛЬТР: ТОЛЬКО ${name}`);
-        }
-
-        // 2. Логика подсветки (Визуал)
-        // Сначала убираем 'active' со всех кнопок фильтров
+        // 1. Снимаем желтую подсветку со всех кнопок фильтров
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
 
-        // Если фильтр включен (не null), подсвечиваем нужную кнопку
-        if (this.selectionFilter) {
-            if (this.selectionFilter === 'BUILDER') document.getElementById('btn-filt-build').classList.add('active');
-            if (this.selectionFilter === 'ARMY') document.getElementById('btn-filt-army').classList.add('active');
-            if (this.selectionFilter === 'HOUSE') document.getElementById('btn-filt-house').classList.add('active');
-            if (this.selectionFilter === 'FACTORY') document.getElementById('btn-filt-fact').classList.add('active');
+        // 2. Включаем или выключаем фильтр
+        if (this.selectionFilter === type) {
+            // Если нажали на уже активный фильтр - выключаем его
+            this.selectionFilter = null; 
+            this.showError("ФИЛЬТР: ВЫКЛ (ВСЕ)");
+        } else {
+            // Если нажали на новый фильтр - включаем его
+            this.selectionFilter = type; 
+            
+            let name = "";
+            if (type === 'BUILDER') name = "СТРОИТЕЛИ";
+            else if (type === 'ARMY') name = "АРМИЯ";
+            else if (type === 'HOUSE') name = "ДОМА";
+            else if (type === 'FACTORY') name = "ЗАВОДЫ";
+            else if (type === 'BOAT') name = "ЛОДКИ";
+            
+            this.showError(`ФИЛЬТР: ТОЛЬКО ${name}`);
+            
+            // 3. Подсвечиваем только что нажатую кнопку
+            let btnId = '';
+            if (type === 'BUILDER') btnId = 'btn-filt-build';
+            else if (type === 'ARMY') btnId = 'btn-filt-army';
+            else if (type === 'HOUSE') btnId = 'btn-filt-house';
+            else if (type === 'FACTORY') btnId = 'btn-filt-fact';
+            else if (type === 'BOAT') btnId = 'btn-filt-boat';
+            
+            if (btnId) {
+                const btn = document.getElementById(btnId);
+                if (btn) btn.classList.add('active');
+            }
         }
     },
 
@@ -1580,6 +1781,32 @@ setFilter(type) {
     myRole: 'player', 
     territoryMode: 1,
 
+// Добавь эти свойства и методы в начало объекта Game:
+autoReload: false,
+toggleAutoReload() {
+    this.autoReload = !this.autoReload;
+    const btn = document.getElementById('auto-reload-btn');
+    const status = document.getElementById('auto-reload-status');
+    if (this.autoReload) {
+        btn.style.background = 'radial-gradient(circle at 30% 30%, #008800, #004400)';
+        btn.style.boxShadow = '0 0 15px #0f0';
+        status.innerText = 'ON'; status.style.color = '#0f0';
+    } else {
+        btn.style.background = 'radial-gradient(circle at 30% 30%, #444, #111)';
+        btn.style.boxShadow = 'none';
+        status.innerText = 'OFF'; status.style.color = '#f00';
+    }
+},
+
+checkPopulation(type) {
+    const u = UNITS[type];
+    // Если это пехота или строитель, проверяем есть ли свободные люди
+    if (u && (u.isInfantry || u.isBuilder)) {
+        if (this.population <= 0) return false;
+    }
+    return true;
+},
+
     // --- ЛОГИКА РЕСУРСОВ (ВСТАВКА) ---
     checkCost(type) {
         const u = UNITS[type];
@@ -1639,9 +1866,10 @@ hasSpaceForCraft(craftType) {
         const product = UNITS[craftType].producedRes;
         if (!product) return true;
         
-        // ИСПОЛЬЗУЕМ ДИНАМИЧЕСКИЙ ЛИМИТ
-        const currentLimit = this.getPlayerResLimit(); 
+        // Ракеты хранятся безлимитно, не забивая обычные склады!
+        if (product.rockets || product.heavies || product.nukes) return true;
 
+        const currentLimit = this.getPlayerResLimit(); 
         if (product.iron && this.resources.iron + product.iron > currentLimit) return false;
         if (product.chem && this.resources.chem + product.chem > currentLimit) return false;
         if (product.chips && this.resources.chips + product.chips > currentLimit) return false;
@@ -1764,45 +1992,12 @@ waterOffset: 0,
         const factions = [];
         for(let i=1; i<=botCount; i++) factions.push('bot'+i);
 
-        // --- БЕЗОПАСНЫЙ СПАВН БОТОВ ---
+const spawns = MapUtils.spawnPoints;
         factions.forEach((side, i) => {
-            let spawned = false;
-            let attempts = 0;
-            
-            // Пытаемся найти место 100 раз
-            while (!spawned && attempts < 100) {
-                attempts++;
-                
-                // 1. Выбираем остров по очереди (чтобы раскидать ботов)
-                const island = MapUtils.islands[i % MapUtils.islands.length];
-                
-                // 2. Берем случайную точку внутри этого острова
-                // (умножаем на 0.7, чтобы не спавнить на самом пляже)
-                const angle = Math.random() * Math.PI * 2;
-                const r = Math.sqrt(Math.random()) * 0.7; 
-                
-                const sx = island.x + Math.cos(angle) * (island.rx * r);
-                const sy = island.y + Math.sin(angle) * (island.ry * r);
-                
-                // 3. ПРОВЕРКА: Это точно суша? И нет ли горы?
-                if (MapUtils.getTerrain(sx, sy) === 'LAND' && !MapUtils.checkMountain(sx, sy, 50)) {
-                    // Проверка, чтобы не спавниться друг на друге
-                    const tooClose = this.units.some(u => Math.hypot(u.x - sx, u.y - sy) < 300);
-                    
-                    if (!tooClose) {
-                        this.units.push(new Unit('HOUSE', sx, sy, side));
-                        this.units.push(new Unit('BUILDER', sx + 20, sy + 20, side));
-                        this.bots.push(new BotAI(side));
-                        spawned = true;
-                    }
-                }
-            }
-            
-            // Если за 100 попыток место не нашлось (вряд ли), ставим в центр острова
-            if (!spawned) {
-                const island = MapUtils.islands[i % MapUtils.islands.length];
-                this.units.push(new Unit('HOUSE', island.x, island.y, side));
-                this.units.push(new Unit('BUILDER', island.x + 20, island.y + 20, side));
+            const sp = spawns[i % spawns.length];
+            if (sp) {
+                this.units.push(new Unit('HOUSE', sp.x, sp.y, side));
+                this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, side));
                 this.bots.push(new BotAI(side));
             }
         });
@@ -1838,19 +2033,17 @@ loadPvpLevel(settings) {
         
         const playersToSpawn = Math.min(roles.length, cfg.maxPlayers || 8);
 
-        if (this.isIslandMode) {
-            // --- ОСТРОВНОЙ РЕЖИМ ---
-            MapUtils.init(); // Генерируем острова
-            
+if (this.isIslandMode) {
+            MapUtils.init();
+            const spawns = MapUtils.spawnPoints;
             for (let i = 0; i < playersToSpawn; i++) {
                 const role = roles[i];
-                const island = MapUtils.islands[i % MapUtils.islands.length];
-                
-                // ИСПРАВЛЕНИЕ: ЖЕСТКИЕ ID ('base_player', 'builder_player' и т.д.)
-                this.units.push(new Unit('HOUSE', island.x, island.y, role, 'base_' + role));
-                this.units.push(new Unit('BUILDER', island.x + 20, island.y + 20, role, 'builder_' + role));
-            }
-            
+                const sp = spawns[i % spawns.length];
+                if (sp) {
+                    this.units.push(new Unit('HOUSE', sp.x, sp.y, role, 'base_' + role));
+                    this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, role, 'builder_' + role));
+                }
+            }           
         } else {
             // --- СТАНДАРТНЫЙ / ГИГАНТСКИЙ РЕЖИМ ---
             const spawns = [
@@ -1907,38 +2100,27 @@ loadPvpLevel(settings) {
         this.state = 'BATTLE';
         this.money = 4000;
         
-        MAP_W = 3800;
-        MAP_H = 4000;
+        MAP_W = 10000;
+        MAP_H = 10000;
         MapUtils.init();
         
         this.resetGameData(); 
 
-  // --- ИСПРАВЛЕННЫЕ ТОЧКИ СПАВНА ---
-        const spawnPoints = [
-            // ИГРОК: В самом центре левого острова
-            { side: 'player', x: 1400, y: 2000 }, 
-            
-            // БОТ 1 и 2: На том же большом острове, но строго по вертикальной оси
-            // (1400 - это центр X острова, так что они точно не свалятся влево/вправо)
-            { side: 'bot1',   x: 1400, y: 800 },  // Север
-            { side: 'bot2',   x: 1400, y: 3200 }, // Юг
-            
-            // БОТ 3: Прямо в центре правого верхнего острова (x=3100, y=1400)
-            { side: 'bot3',   x: 3100, y: 1400 }, 
-            
-            // БОТ 4: Прямо в центре правого нижнего острова (x=3100, y=2600)
-            { side: 'bot4',   x: 3100, y: 2600 }  
-        ];
+const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4'];
+        const spawns = MapUtils.spawnPoints;
 
-        spawnPoints.forEach(sp => {
-            this.units.push(new Unit('HOUSE', sp.x, sp.y, sp.side));
-            this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, sp.side));
-            
-            if (sp.side !== 'player') {
-                this.bots.push(new BotAI(sp.side));
-            } else {
-                this.camera.x = sp.x - canvas.width/2;
-                this.camera.y = sp.y - canvas.height/2;
+        factions.forEach((side, index) => {
+            if (index < spawns.length) {
+                const sp = spawns[index];
+                this.units.push(new Unit('HOUSE', sp.x, sp.y, side));
+                this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, side));
+                
+                if (side !== 'player') {
+                    this.bots.push(new BotAI(side));
+                } else {
+                    this.camera.x = sp.x - canvas.width/2;
+                    this.camera.y = sp.y - canvas.height/2;
+                }
             }
         });
         
@@ -2012,7 +2194,10 @@ loadLevel(lvlId) {
         this.energy = 0; this.energyUse = 0; this.energyFactor = 1;
         this.speed = 1;
         this.clickDelay = 0;
-        this.resources = { iron: 0, chem: 0, chips: 0 }; // RESET RESOURCES
+        this.resources = { iron: 0, chem: 0, chips: 0, rockets: 0, heavies: 0, nukes: 0 }; 
+        this.casualties = 0; // Потери населения
+        this.population = 0; // Текущее население
+        this.maxPopulation = 0; // Макс население
         
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
@@ -2080,17 +2265,44 @@ loadLevel(lvlId) {
     },
 
 reloadGrads() {
-    this.clickDelay = 20;
-    const mySelection = this.selection.filter(u => u.side === this.myRole);
-    // ДОБАВЛЕНО: u.type === 'HIMARS'
-    const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
+        this.clickDelay = 20;
+        const mySelection = this.selection.filter(u => u.side === this.myRole);
+        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
 
-    if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
-    if (this.money >= targets.length * RELOAD_COST) {
-        this.money -= targets.length * RELOAD_COST;
-        targets.forEach(u => { u.ammo = u.maxAmmo; this.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40}); });
-    } else this.showError("НЕТ ДЕНЕГ!");
-},
+        if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
+        
+        let reloadedAnything = false;
+
+        targets.forEach(u => {
+            const neededAmmo = u.maxAmmo - u.ammo;
+            
+            // АРТИЛЛЕРИЯ ЗАРЯЖАЕТСЯ РАКЕТАМИ (1 заряд = 2 ракеты)
+            if (u.type === 'GRAD' || u.type === 'HIMARS') {
+                const affordable = Math.floor(this.resources.rockets / 2);
+                const toReload = Math.min(neededAmmo, affordable);
+                
+                if (toReload > 0) {
+                    this.resources.rockets -= (toReload * 2);
+                    u.ammo += toReload;
+                    reloadedAnything = true;
+                    this.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40});
+                }
+            } 
+            // ВЕРТОЛЕТЫ И ПВО ЗАРЯЖАЮТСЯ ЗА ДЕНЬГИ
+            else {
+                if (this.money >= 1000) {
+                    this.money -= 1000;
+                    u.ammo = u.maxAmmo;
+                    reloadedAnything = true;
+                    this.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40});
+                }
+            }
+        });
+
+        if (!reloadedAnything) {
+            this.showError("НЕТ РАКЕТ (🚀) ИЛИ ДЕНЕГ!");
+        }
+    },
 
     showError(msg) {
         const t = document.getElementById('msg-toast'); t.innerText = msg;
@@ -2312,6 +2524,15 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 hud.innerHTML = html;
             }
 
+// --- ЧИТЫ ДЛЯ ПЕСОЧНИЦЫ ---
+        if (this.isSandbox) {
+            this.money = 999999;
+            this.resources.iron = 9999;
+            this.resources.chem = 9999;
+            this.resources.chips = 9999;
+            this.energyFactor = 2; // Энергия всегда 200%
+        }
+
  if (this.frameCount % 60 === 0) {
     if (!this.isSpectator) {
         let income = 0;
@@ -2353,10 +2574,61 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         document.getElementById('income-display').innerText = `(+${income}/s)`;
         document.getElementById('money').innerText = Math.floor(this.money);
 
+// --- РАСЧЕТ НАСЕЛЕНИЯ ---
+        let baseMaxPop = 0;
+        let usedPop = 0;
+        this.units.forEach(u => {
+            if (u.side === this.myRole) {
+                if (u.type === 'HOUSE') {
+                    baseMaxPop += HOUSE_UPGRADES[u.level || 0].maxSpawn || 0;
+                }
+                if (UNITS[u.type].isInfantry || u.isBuilder) {
+                    usedPop++;
+                }
+            }
+        });
+        
+        // Правое число: Лимит от домов МИНУС погибшие навсегда
+        this.maxPopulation = Math.max(0, baseMaxPop - (this.casualties || 0));
+        
+        // Левое число: Свободные люди (максимум минус живые солдаты)
+        this.population = Math.max(0, this.maxPopulation - usedPop);
+        
+        const popEl = document.getElementById('pop-val');
+        if (popEl) popEl.innerText = `${this.population}/${this.maxPopulation}`;
+
+// ТУТ ЖЕ добавляем логику Авто-перезарядки (каждые 60 кадров):
+        if (this.autoReload) {
+            const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0);
+            
+            targets.forEach(u => {
+                const neededAmmo = u.maxAmmo - u.ammo;
+                
+                if (u.type === 'GRAD' || u.type === 'HIMARS') {
+                    const affordable = Math.floor(this.resources.rockets / 2);
+                    const toReload = Math.min(neededAmmo, affordable);
+                    if (toReload > 0) {
+                        this.resources.rockets -= (toReload * 2);
+                        u.ammo += toReload;
+                        Game.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40});
+                    }
+                } else {
+                    if (this.money >= 1000) {
+                        this.money -= 1000;
+                        u.ammo = u.maxAmmo;
+                        Game.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40});
+                    }
+                }
+            });
+        }
+
         // UI ОБНОВЛЕНИЕ РЕСУРСОВ
         document.getElementById('res-iron').innerText = Math.floor(this.resources.iron);
         document.getElementById('res-chem').innerText = Math.floor(this.resources.chem);
         document.getElementById('res-chips').innerText = Math.floor(this.resources.chips);
+        document.getElementById('res-rockets').innerText = Math.floor(this.resources.rockets || 0);
+        document.getElementById('res-heavies').innerText = Math.floor(this.resources.heavies || 0);
+        document.getElementById('res-nukes').innerText = Math.floor(this.resources.nukes || 0);
   const currentLimit = this.getPlayerResLimit(); // Получаем текущий лимит
         ['iron', 'chem', 'chips'].forEach(r => {
             const el = document.getElementById(`res-${r}`);
@@ -2403,6 +2675,15 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
     }
 }
             this.units.forEach(u => u.update());
+            
+            // --- СЧИТАЕМ ПОТЕРИ ПЕРЕД УДАЛЕНИЕМ ---
+            this.units.forEach(u => {
+                if (u.hp <= 0 && u.side === this.myRole && (UNITS[u.type].isInfantry || u.isBuilder)) {
+                    this.casualties = (this.casualties || 0) + 1; // Записываем в список погибших
+                }
+            });
+            
+            // Удаляем мертвых
             this.units = this.units.filter(u => u.hp > 0);
             
             if (this.selectedProducer && (this.selectedProducer.hp <= 0 || this.selectedProducer.side !== this.myRole)) {
@@ -2430,20 +2711,28 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 if (b.dead) this.bullets.splice(i, 1);
             }
 
-            if (!this.isSpectator) {
+if (!this.isSpectator) {
                 const mySelection = this.selection.filter(u => u.side === this.myRole);
                 const grads = mySelection.filter(u => u.type === 'GRAD' && u.hp > 0);
                 document.getElementById('arty-btn').style.display = grads.length > 0 ? 'flex' : 'none';
                 if (grads.length === 0 && this.artyMode) { this.artyMode = false; document.body.style.cursor = 'default'; }
-                document.getElementById('reload-btn').style.display = mySelection.some(u => (u.type==='GRAD'||u.type==='HELICOPTER'||u.type==='SENTINEL') && u.ammo < u.maxAmmo) ? 'flex' : 'none';
+                
+                // Проверяем, есть ли среди выделенных юниты с боезапасом
+                const reloadableSelected = mySelection.some(u => u.type==='GRAD' || u.type==='HIMARS' || u.type==='HELICOPTER' || u.type==='SENTINEL');
+                
+                // Обычная кнопка (только если патроны не полные)
+                document.getElementById('reload-btn').style.display = reloadableSelected && mySelection.some(u => u.ammo < u.maxAmmo) ? 'flex' : 'none';
+                
+                // Кнопка AUTO (показываем, если выделен нужный юнит)
+                document.getElementById('auto-reload-btn').style.display = reloadableSelected ? 'flex' : 'none';
+                
             } else {
                 document.getElementById('arty-btn').style.display = 'none';
                 document.getElementById('reload-btn').style.display = 'none';
+                document.getElementById('auto-reload-btn').style.display = 'none';
             }
-
-            this.checkWin();
-        }
-    },
+     }
+},
 
     checkWin() {
         if (this.state === 'END') return;
@@ -2500,216 +2789,149 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         return { x: e.clientX - r.left + this.camera.x, y: e.clientY - r.top + this.camera.y, rawX: e.clientX, rawY: e.clientY };
     },
 
-  onDown(e) {
-        if (e.button !== 0) return;
-        
-        // --- РИСОВАНИЕ ПУТИ (CTRL) ---
-        if (e.ctrlKey && this.selection.length > 0) {
-            const m = this.getMouse(e);
-            this.isDrawingPath = true;
-            this.drawPath = [{x: m.x, y: m.y}]; // Первая точка
-            return;
-        }
-
-        if (this.clickDelay > 0) return; 
+onDown(e) {
+        if (e.button !== 0) return; // Только левый клик
+        if (e.target && e.target.tagName !== 'CANVAS') return; // Игнорируем клики по кнопкам меню
         
         const m = this.getMouse(e);
         
-        // ЛОГИКА СКЛАДА
+        // Сброс спец-режимов (если мы целились ракетой или строили)
+        if (this.buildType || this.pendingConstruction || this.artyMode || Game.launchMode) {
+            this.dragStart = null; // Рамку не рисуем, это клик-действие!
+        } else {
+            // Начинаем рисовать рамку (сохраняем точные координаты)
+            this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
+            this.dragCurr = { x: m.rawX, y: m.rawY }; 
+        }
+        
+        this.isDragging = false;
+
         if (this.state === 'BATTLE') {
-            const clicked = this.units.find(u => u.side === this.myRole && u.type === 'WAREHOUSE' && Math.hypot(u.x - m.x, u.y - m.y) < u.radius + 10);
-            if (clicked) {
-                this.selection = [clicked];
-                this.openWarehouseMenu(clicked);
+            // 1. СПАВН ПЕСОЧНИЦЫ
+            if (this.isSandbox && this.buildType) {
+                const isWater = MapUtils.checkWater(m.x, m.y);
+                const isBoat = this.buildType === 'BOAT';
+                if (isWater && !isBoat && !UNITS[this.buildType].isFlying) { this.showError("ЭТО ВОДА!"); return; }
+                const u = new Unit(this.buildType, m.x, m.y, this.sandboxSide);
+                u.isPowered = true;
+                if (this.buildType === 'SILO') u.nukeTimer = 0; 
+                this.units.push(u);
+                this.effects.push({x: m.x, y: m.y, char: '✨', life: 30});
                 return;
             }
-        }
 
-        if (Game.launchMode) {
-             if (Game.launchSilo) {
-                 const silo = Game.launchSilo;
-                 const ammo = SILO_AMMO[Game.launchMode];
-                 if (Game.money >= ammo.cost && Game.energyFactor > 0.5) { 
-                     if (Game.energy < 300) { Game.showError("НЕТ МОЩНОСТИ!"); return; } 
-                     
-                     Game.money -= ammo.cost;
-                     silo.startSiloLaunch(m.x, m.y, Game.launchMode);
-                     Game.launchMode = null;
-                     Game.launchSilo = null;
-                     document.body.style.cursor = 'default';
-                 } else {
-                     Game.showError("НЕТ ДЕНЕГ ИЛИ ЭНЕРГИИ!");
+            // 2. ЗАПУСК ЯДЕРКИ ИЗ БУНКЕРА
+            if (Game.launchMode) {
+                 if (Game.launchSilo) {
+                     const silo = Game.launchSilo;
+                     const ammo = SILO_AMMO[Game.launchMode];
+                     if (Game.resources[ammo.reqRes] >= 1 && Game.energyFactor > 0.5) { 
+                         if (Game.energy < 300) { Game.showError("НЕТ МОЩНОСТИ!"); return; } 
+                         Game.resources[ammo.reqRes] -= 1; 
+                         silo.startSiloLaunch(m.x, m.y, Game.launchMode);
+                         Game.launchMode = null; Game.launchSilo = null; document.body.style.cursor = 'default';
+                     } else this.showError(`НЕТ БОЕПРИПАСОВ (${ammo.emoji}) ИЛИ ЭНЕРГИИ!`);
                  }
-             }
-             return;
-        }
-
-    // Проверка строительства
-        if (this.isSpectator) return;
-
-        // --- НОВАЯ ПРОВЕРКА ЛАНДШАФТА ---
-        const inWater = MapUtils.checkWater(m.x, m.y);
-        const onMountain = MapUtils.checkMountain(m.x, m.y, 40); // 40 - радиус здания
-
-        if (inWater || onMountain) {
-             this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); 
-             return;
-        }
-        // -------------------------------
-
-        if (this.state === 'PLACE' && this.buildType) {
-            const cost = UNITS[this.buildType].cost;
-            if (m.x < 1000 && this.money >= cost) {
-                if (!this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[this.buildType].radius)) {
-                    const u = new Unit(this.buildType, m.x, m.y, 'player');
-                    u.isPowered = true; 
-                    this.units.push(u);
-                    this.money -= cost;
-                    this.updateUI(LEVELS.find(l => l.id === this.level).unlock);
-                    this.effects.push({x: m.x, y: m.y, char: '🔨', life: 30});
-                } else this.showError("ЗАНЯТО!");
+                 return;
             }
-        } 
-        else if (this.state === 'BATTLE') {
+
+            if (this.isSpectator) return;
+
+            // 3. СТРОЙКА (Постановка фундамента)
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
-                const cost = UNITS[bType].cost;
-                
-                // ИСПРАВЛЕННАЯ СТРОКА: РАЗРЕШАЕМ СТРОИТЬ ЕСЛИ ЭТО НАША ЗЕМЛЯ
-                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) {
-                     this.showError("ДАЛЕКО ОТ БАЗЫ!");
-                     return;
-                }
+                const inWater = MapUtils.checkWater(m.x, m.y);
+                const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
+                if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
 
                 const GAP = (bType === 'WALL') ? -15 : 60;
-                
                 if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
                     this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
-                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!");
-                     return; 
+                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 
                 }
 
                 const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (!builder) { this.showError("НЕТ СТРОИТЕЛЯ!"); return; }
                 if (this.checkCost(bType)) {
-                    this.payCost(bType);
-                    this.updateUI([]); 
+                    this.payCost(bType); this.updateUI([]); 
                     const site = { id: Date.now() + Math.random(), type: bType, x: m.x, y: m.y, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
-                    this.constructions.push(site);
-                    builder.assignSite(site);
+                    this.constructions.push(site); builder.assignSite(site);
                     this.pendingConstruction = null; document.body.style.cursor = 'default';
                     this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
-                    
-                    if (this.isMultiplayer && CURRENT_ROOM) {
-                        this.socket.emit('gameCommand', { 
-                            roomName: CURRENT_ROOM, 
-                            type: 'build_start', 
-                            bType: bType, 
-                            x: m.x, 
-                            y: m.y, 
-                            side: this.myRole, 
-                            id: site.id,
-                            builderId: builder.id 
-                        });
-                    }
+                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id, builderId: builder.id });
                 } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
 
+            // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
                 if (this.money >= ARTY_COST) {
                     const capable = this.selection.filter(u => u.type === 'GRAD' && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
-                        this.money -= ARTY_COST;
-                        this.updateUI(); 
+                        this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
                             setTimeout(() => g.fireArty(m.x, m.y), i * 300);
-                            if (this.isMultiplayer && CURRENT_ROOM) {
-                                setTimeout(() => this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'arty_shot', id: g.id, tx: m.x, ty: m.y }), i * 300);
-                            }
+                            if (this.isMultiplayer && CURRENT_ROOM) setTimeout(() => this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'arty_shot', id: g.id, tx: m.x, ty: m.y }), i * 300);
                         });
                         this.artyMode = false; document.body.style.cursor = 'default';
                     } else this.showError("НЕТ БОЕПРИПАСОВ!");
                 } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
-                
 
-            const clickedUnit = this.units.find(u => u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) < u.radius + 10);
-            if (clickedUnit) {
-                if (clickedUnit.isBuilder) {
-                    this.selection = [clickedUnit];
-                    this.selectedProducer = null;
-                   this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, 'МЕНЮ СТРОИТЕЛЯ'); return;
-                }
-                if (clickedUnit.type === 'HOSPITAL') {
-                    this.selection = [clickedUnit];
-                    this.selectedProducer = null;
-                    this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ'); return;
-                }
-                if (clickedUnit.type === 'SILO') {
-                    this.selection = [clickedUnit];
-                    this.selectedProducer = null;
-                    if (clickedUnit.nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(clickedUnit.nukeTimer/60)}s`);
-                    else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ'); 
-                    return;
-                }
-                if (clickedUnit.type === 'HOUSE') { 
-                    this.selectedProducer = clickedUnit;
-                    this.selection = [];
-                    let menuItems = [...UNITS['HOUSE'].spawnList];
-                    if (clickedUnit.level < 5) menuItems.push('UPGRADE_HOUSE');
-                    const title = HOUSE_UPGRADES[clickedUnit.level].name.toUpperCase();
-                    this.updateUI(menuItems, true, title); 
-                    return;
-                }
-                if (UNITS[clickedUnit.type].spawnList) {
-                    this.selectedProducer = clickedUnit;
-                    this.selection = []; 
-                    this.updateUI(UNITS[clickedUnit.type].spawnList, true, clickedUnit.type === 'HOUSE' ? 'МЕНЮ ДОМА' : 'МЕНЮ ЗАВОДА'); return;
-                }
-            }
-            
-            const clickedSite = this.constructions.find(
-                s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25
-            );
-
+            // 5. ПОМОЩЬ СТРОИТЕЛЕМ (Клик на фундамент)
+            const clickedSite = this.constructions.find(s => Math.hypot(s.x - m.x, s.y - m.y) < UNITS[s.type].radius + 25);
             if (clickedSite && clickedSite.owner === this.myRole) {
-                const builder = this.selection.find(
-                    u => u.isBuilder && u.side === this.myRole
-                );
-
+                const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (builder) {
-                    if (this.isMultiplayer && CURRENT_ROOM && this.socket) {
-                        this.socket.emit('gameCommand', {
-                            roomName: CURRENT_ROOM,
-                            type: 'help_build',
-                            builderId: builder.id,
-                            siteId: clickedSite.id,
-                            side: this.myRole
-                        });
-                    }
-                    builder.assignSite(clickedSite);
-                    builder.moveTo(clickedSite.x, clickedSite.y);
-                    this.effects.push({
-                        x: clickedSite.x,
-                        y: clickedSite.y,
-                        char: '🔧',
-                        life: 30
-                    });
+                    builder.assignSite(clickedSite); builder.moveTo(clickedSite.x, clickedSite.y);
+                    this.effects.push({ x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30 });
+                    this.dragStart = null; // Отменяем рамку
+                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'help_build', builderId: builder.id, siteId: clickedSite.id, side: this.myRole });
                     return; 
                 }
             }
-
-            this.selectedProducer = null;
-            this.pendingConstruction = null;
-            this.updateUI([]);
-            this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
-        }        
+        }
     },
 
 menuAction(type) {
         this.clickDelay = 20;
+
+if (type === 'RELOAD_ROCKET' || type === 'RELOAD_HEAVY') {
+            let reloaded = 0;
+            const ammoTypeStr = type === 'RELOAD_ROCKET' ? 'rockets' : 'heavies';
+            const isHeavy = type === 'RELOAD_HEAVY';
+            
+            // Стоимость: 2 ракеты за 1 заряд (любого типа)
+            const costPerShot = 2; 
+
+            this.selection.forEach(u => {
+                // HIMARS заряжает только обычные
+                if ((u.type === 'GRAD' || (u.type === 'HIMARS' && !isHeavy)) && u.ammo < u.maxAmmo) {
+                    const needed = u.maxAmmo - u.ammo; 
+                    const affordable = Math.floor(this.resources[ammoTypeStr] / costPerShot);
+                    const toReload = Math.min(needed, affordable);
+                    
+                    if (toReload > 0) {
+                        this.resources[ammoTypeStr] -= (toReload * costPerShot);
+                        u.ammo += toReload;
+                        u.ammoType = isHeavy ? 'HEAVY' : 'ROCKET'; // Запоминаем тип
+                        reloaded++;
+                        Game.effects.push({x: u.x, y: u.y-30, char: '♻️', life: 40});
+                    }
+                }
+            });
+            
+            if (reloaded === 0) this.showError(`НЕТ РАКЕТ (${isHeavy ? '☄️' : '🚀'}) ИЛИ ПОЛНЫЙ ЗАРЯД!`);
+            else {
+                // Возвращаем меню, чтобы обновить кнопки
+                let list = ['RELOAD_ROCKET'];
+                if (this.selection.some(u => u.type === 'GRAD')) list.push('RELOAD_HEAVY');
+                this.updateUI(list, true, `АРТИЛЛЕРИЯ (${this.selection.length})`);
+            }
+            return;
+        }
 
        // 1. ОПРЕДЕЛЯЕМ ЗАВОД
         let factory = null;
@@ -2920,17 +3142,22 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
 
             if (type.startsWith('CRAFT_') && !this.hasSpaceForCraft(type)) { failReason = "СКЛАД ПОЛОН"; return; }
 
-            // Если денег/ресурсов хватает
+ // Если денег/ресурсов хватает
             if (this.checkCost(type)) {
-                this.payCost(type);
-                p.startProduction(type);
-                successCount++;
-                
-                if (this.isMultiplayer && CURRENT_ROOM) {
-                    this.socket.emit('gameCommand', {
-                        roomName: CURRENT_ROOM, type: 'production_start', 
-                        unitType: type, side: this.myRole, producerId: p.id
-                    });
+                // ПРОВЕРКА НАСЕЛЕНИЯ
+                if (!this.checkPopulation(type)) {
+                    failReason = "НЕТ СВОБОДНЫХ ЛЮДЕЙ!";
+                } else {
+                    this.payCost(type);
+                    p.startProduction(type);
+                    successCount++;
+                    
+                    if (this.isMultiplayer && CURRENT_ROOM) {
+                        this.socket.emit('gameCommand', {
+                            roomName: CURRENT_ROOM, type: 'production_start', 
+                            unitType: type, side: this.myRole, producerId: p.id
+                        });
+                    }
                 }
             } else {
                 failReason = "НЕТ СРЕДСТВ";
@@ -2964,225 +3191,151 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
     },
 
 onUp(e) {
-        // --- ЛОГИКА РИСОВАНИЯ ПУТИ (CTRL) ---
-        if (this.isDrawingPath) {
-            this.isDrawingPath = false; // Выключаем режим рисования
-            
-            // Если путь достаточно длинный, отправляем юнитов
-            if (this.drawPath.length > 2) {
-                // 1. Копируем путь (чтобы он не удалился следующей строкой)
-                const pathToSend = [...this.drawPath];
-
-                // 2. Двигаем своих юнитов локально
-                const myUnits = this.selection.filter(u => u.side === this.myRole);
-                myUnits.forEach(u => u.setPath(pathToSend));
-
-                // 3. Отправляем команду в МУЛЬТИПЛЕЕР (чтобы враг видел движение)
-                if (this.isMultiplayer && CURRENT_ROOM && myUnits.length > 0) {
-                    const packet = myUnits.map(u => ({ id: u.id, path: pathToSend }));
-                    this.socket.emit('gameCommand', {
-                        roomName: CURRENT_ROOM,
-                        type: 'path_move',
-                        data: packet
-                    });
-                }
-            }
-
-            this.drawPath = []; // Теперь очищаем визуальную линию
-            return;
-        }
-
-        if (!this.dragStart) return;
-
+        if (!this.dragStart) return; // Если клик был заблокирован, выходим
         const m = this.getMouse(e);
-        const isClick = Math.hypot(m.rawX - this.dragStart.rx, m.rawY - this.dragStart.ry) < 5;
+        const w = m.x - this.dragStart.x;
+        const h = m.y - this.dragStart.y;
+        
+        this.dragStart = null; // ГАРАНТИРОВАННО СБРАСЫВАЕМ РАМКУ
+        this.isDragging = false;
 
-        // --- ВАЖНО: Сразу сбрасываем рамку, чтобы она не "залипала" при ошибках ---
-        const dragStartCoords = { ...this.dragStart }; // Копируем для расчетов
-        this.dragStart = null;
-        this.dragCurr = null;
-
-        // Массив для будущих выделенных юнитов
-        let newSelection = [];
-
-        // =========================================================
-        // СЦЕНАРИЙ 1: ОБЫЧНЫЙ КЛИК
-        // =========================================================
-        if (isClick) {
-            // Ищем юнитов под курсором
-            const clickedUnits = this.units.filter(u => 
-                (u.side === this.myRole || this.isSpectator) && 
-                Math.hypot(u.x - m.x, u.y - m.y) < (u.radius + 15)
-            );
-
-            if (this.isSpectator) {
-                if (clickedUnits.length > 0) {
-                     const u = clickedUnits[0];
-                     this.showError(`${UNITS[u.type].name} [${FACTIONS[u.side].name}] HP: ${Math.floor(u.hp)}`);
-                }
-                this.selection = [];
-                return;
-            }
-
-            // ЛОГИКА ИГРОКА
-            // Приоритет: Строитель -> Любой другой юнит
-            let target = clickedUnits.find(u => u.isBuilder);
-            if (!target && clickedUnits.length > 0) target = clickedUnits[0];
-
-            if (target) {
-                newSelection = [target];
-            }
-        } 
-        // =========================================================
-        // СЦЕНАРИЙ 2: ВЫДЕЛЕНИЕ РАМКОЙ
-        // =========================================================
-else {
+        if (this.state === 'BATTLE') {
             if (!this.isSpectator) {
-                const x1 = Math.min(dragStartCoords.x, m.x);
-                const x2 = Math.max(dragStartCoords.x, m.x);
-                const y1 = Math.min(dragStartCoords.y, m.y);
-                const y2 = Math.max(dragStartCoords.y, m.y);
-                
-                // Сначала берем всех своих в рамке
-                let candidates = this.units.filter(u => 
-                    u.side === this.myRole && 
-                    u.x > x1 && u.x < x2 && 
-                    u.y > y1 && u.y < y2
-                );
+                let newSelection = [];
+                const isDrag = Math.abs(w) > 10 || Math.abs(h) > 10; // Было ли это выделение рамкой?
 
-                // --- НОВАЯ ЛОГИКА ФИЛЬТРАЦИИ ---
-                if (this.selectionFilter) {
-                    if (this.selectionFilter === 'BUILDER') {
-                        newSelection = candidates.filter(u => u.isBuilder);
-                    } 
-                    else if (this.selectionFilter === 'ARMY') {
-                        // Армия: не строитель, не производитель (дом/завод), не статичные здания
-                        newSelection = candidates.filter(u => 
-                            !u.isBuilder && !u.isProducer && 
-                            !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type)
-                        );
-                    }
-                    else if (this.selectionFilter === 'HOUSE') {
-                        newSelection = candidates.filter(u => u.type === 'HOUSE');
-                    }
-                    else if (this.selectionFilter === 'FACTORY') {
-                        newSelection = candidates.filter(u => u.type === 'FACTORY');
+                // --- СЦЕНАРИЙ 1: ВЫДЕЛЕНИЕ РАМКОЙ ---
+                if (isDrag) {
+                    const rx = Math.min(m.x - w, m.x);
+                    const ry = Math.min(m.y - h, m.y);
+                    const rw = Math.abs(w);
+                    const rh = Math.abs(h);
+                    
+                    let candidates = this.units.filter(u => 
+                        u.side === this.myRole && 
+                        (u.x + u.radius >= rx) && (u.x - u.radius <= rx + rw) && 
+                        (u.y + u.radius >= ry) && (u.y - u.radius <= ry + rh)
+                    );
+                    
+                    if (this.selectionFilter) {
+                        if (this.selectionFilter === 'BUILDER') newSelection = candidates.filter(u => u.isBuilder);
+                        else if (this.selectionFilter === 'ARMY') newSelection = candidates.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'BOAT' && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type));
+                        else if (this.selectionFilter === 'HOUSE') newSelection = candidates.filter(u => u.type === 'HOUSE');
+                        else if (this.selectionFilter === 'FACTORY') newSelection = candidates.filter(u => u.type === 'FACTORY');
+                        else if (this.selectionFilter === 'BOAT') newSelection = candidates.filter(u => u.type === 'BOAT');
+                    } else {
+                        // Умная рамка: если есть армия, здания не выделяем
+                        const mobile = candidates.filter(u => !u.isProducer && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'HOUSE', 'FACTORY'].includes(u.type));
+                        if (mobile.length > 0) newSelection = mobile;
+                        else newSelection = candidates;
                     }
                 } 
-                else {
-                    // ЕСЛИ ФИЛЬТРА НЕТ (старое поведение - просто берем всех)
-                    newSelection = candidates;
+                
+                // --- СЦЕНАРИЙ 2: ОДИНОЧНЫЙ КЛИК ---
+                // Запускается, если мы кликнули без протягивания, ИЛИ если рамка пустая
+                if (!isDrag || (isDrag && newSelection.length === 0)) {
+                    // Ищем юнита под курсором с запасом +15 пикселей (чтобы легче было попасть по турелям)
+                    let target = this.units.slice().reverse().find(u => Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+                    
+                    if (target && (target.side === this.myRole || this.isSandbox)) {
+                        newSelection = [target];
+                    } else if (!isDrag) {
+                        // Клик по пустой земле - сбрасываем выделение!
+                        this.selection = [];
+                        this.selectedProducer = null;
+                        if (this.isSandbox) this.openSandboxMenu();
+                        else this.updateUI([]);
+                        return; 
+                    }
                 }
-            }
-        }
 
-        // Применяем выделение
-        this.selection = newSelection;
-        // Сбрасываем старый "одиночный" выбор, чтобы не мешал
-        this.selectedProducer = null; 
+                // Применяем то, что выделили
+                if (newSelection.length > 0) this.selection = newSelection;
 
-        // Если ничего не выбрали - очищаем меню
-        if (this.selection.length === 0) {
-            this.updateUI([]);
-            return;
-        }
+         // --- СЦЕНАРИЙ 3: ВЫВОД МЕНЮ И ИНТЕРФЕЙСА ДЛЯ ВЫДЕЛЕННЫХ ---
+                if (this.selection.length > 0) {
+                    this.selectedProducer = null;
+                    let s0 = this.selection[0];
 
-        // =========================================================
-        // ЛОГИКА ОТОБРАЖЕНИЯ МЕНЮ (ПРИОРИТЕТЫ)
-        // =========================================================
-        
-        // 1. СТРОИТЕЛИ (Самый высокий приоритет)
-        const builders = this.selection.filter(u => u.isBuilder);
-        if (builders.length > 0) {
-            // Если в группе есть строители, управляем только ими
-            this.selection = builders; 
-            this.updateUI(
-                ['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], 
-                true, 
-                `СТРОИТЕЛИ (${builders.length})`
-            );
-            return;
-        }
+                    // УМНАЯ ПРОВЕРКА: Все ли выделенные здания — одинаковые заводы/дома?
+                    const allSameProducer = this.selection.every(u => u.isProducer && u.type === s0.type);
 
-        // 2. ЗАВОДЫ (FACTORIES)
-        const factories = this.selection.filter(u => u.type === 'FACTORY');
-        if (factories.length > 0) {
-            this.selection = factories;
-            // Проверка на случай, если spawnList не определен в UNITS
-            const list = UNITS.FACTORY.spawnList || [];
-            this.updateUI(list, true, `ЗАВОДЫ (${factories.length})`);
-            return;
-        }
-
-        // 3. ДОМА (HOUSES)
-        const houses = this.selection.filter(u => u.type === 'HOUSE');
-        if (houses.length > 0) {
-            this.selection = houses;
-            // Берем уровень первого дома для формирования меню
-            const lvl = houses[0].level || 0;
-            const upgradeName = HOUSE_UPGRADES[lvl] ? HOUSE_UPGRADES[lvl].name.toUpperCase() : "ДОМ";
-            
-            let list = [];
-            if (UNITS.HOUSE.spawnList) list = [...UNITS.HOUSE.spawnList];
-            
-            // Кнопка апгрейда (только если не макс уровень)
-            if (lvl < 5) list.push('UPGRADE_HOUSE');
-            
-            this.updateUI(list, true, `${upgradeName} (${houses.length})`);
-            return;
-        }
-
-        // 4. ОДИНОЧНЫЕ СПЕЦИАЛЬНЫЕ ЗДАНИЯ (Склад, Бункер, Госпиталь)
-        // (Работает, только если выбран 1 юнит, чтобы не смешивать меню)
-        if (this.selection.length === 1) {
-            const target = this.selection[0];
-            
-            if (target.type === 'WAREHOUSE') {
-                this.openWarehouseMenu(target);
-                return;
-            }
-            if (target.type === 'HOSPITAL') {
-                this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
-                return;
-            }
-            if (target.type === 'SILO') {
-                if (target.nukeTimer > 0) {
-                    this.updateUI([], true, `ЗАПУСК: ${Math.floor(target.nukeTimer/60)}s`);
+                    if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
+                        this.openWarehouseMenu(s0);
+                    }
+                    else if (this.selection.length === 1 && s0.type === 'HOSPITAL') {
+                        this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
+                    }
+                    // --- НОВАЯ ЛОГИКА ДЛЯ МАССОВОГО ВЫДЕЛЕНИЯ ДОМОВ И ЗАВОДОВ ---
+                    else if (allSameProducer) {
+                        this.selectedProducer = s0; // Берем первый как шаблон
+                        let menuItems = [...(UNITS[s0.type].spawnList || [])];
+                        let title = UNITS[s0.type].name.toUpperCase();
+                        
+                        if (s0.type === 'HOUSE') {
+                            // Если хотя бы один дом можно улучшить - показываем кнопку апгрейда
+                            if (this.selection.some(u => (u.level || 0) < 5)) menuItems.push('UPGRADE_HOUSE');
+                            title = HOUSE_UPGRADES[s0.level || 0].name.toUpperCase();
+                        }
+                        
+                        // Добавляем количество к названию, если выбрано больше одного
+                        if (this.selection.length > 1) title += ` (${this.selection.length})`;
+                        
+                        this.updateUI(menuItems, true, title);
+                    } 
+                    else if (this.selection.length === 1 && s0.type === 'SILO') {
+                        if (s0.nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(s0.nukeTimer/60)}s`);
+                        else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                    }
+                    else if (this.selection.some(u => u.isBuilder)) {
+                        // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
+                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, "ПОСТРОЙКИ");
+                    }
+                    else {
+                        // Для армии просто пишем количество
+                        this.updateUI([], true, `ВЫБРАНО: ${this.selection.length}`);
+                    }
                 } else {
-                    this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                    this.selectedProducer = null;
+                    if (this.isSandbox) this.openSandboxMenu();
+                    else this.updateUI([]);
                 }
-                return;
             }
         }
-
-        // 5. БОЕВЫЕ ЮНИТЫ (Армия)
-        // Если это не строители и не производители, значит армия. Меню очищаем.
-        this.updateUI([]);
     },
 
-    onRight(e) {
-if (this.state !== 'BATTLE' || this.isSpectator) return;
+onRight(e) {
+        if (this.state !== 'BATTLE' || this.isSpectator) return;
         const m = this.getMouse(e);
-        this.artyMode = false; this.pendingConstruction = null; document.body.style.cursor = 'default';
+        
+        // 1. Сбрасываем спец-режимы (прицел, постройка и т.д.)
+        this.artyMode = false; 
+        this.pendingConstruction = null; 
+        this.buildType = null; 
+        Game.launchMode = null;
+        Game.launchSilo = null;
+        Game.pendingAutoSelect = null;
+        document.body.style.cursor = 'default';
+        
+        if (this.isSandbox && this.selection.length === 0) this.openSandboxMenu();
 
-        // ИСПРАВЛЕНИЕ: Проверяем именно ГЛУБИНУ (DEEP), а не просто воду
-        // Если летим - можно везде. Если идем - нельзя только в DEEP.
-        const terrain = MapUtils.getTerrain(m.x, m.y);
-        if (terrain === 'DEEP' && !this.selection.every(u => u.isFlying)) {
-            this.showError("СЛИШКОМ ГЛУБОКО! 🚫");
-            return;
-        }
-
+        // 2. Отправляем юнитов в точку (если кто-то выделен)
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
+        
         const cols = Math.ceil(Math.sqrt(this.selection.length || 1));
         const idsToMove = [];
+        
         this.selection.forEach((u, i) => {
+            // Здания не пытаются двигаться
+            if (u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) return; 
+            
             const ox = (i % cols) * 35 - (cols*17);
             const oy = Math.floor(i / cols) * 35 - (cols*17);
             u.moveCmd(m.x + ox, m.y + oy);
             this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
             idsToMove.push(u.id);
-         });
+        });
+         
         if (this.isMultiplayer && idsToMove.length > 0 && CURRENT_ROOM) {
             this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
         }
@@ -3211,67 +3364,11 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
         // Заливаем весь мир фоном воды
         ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
 
-// 2. Отрисовка ОСТРОВОВ и ВОДЫ
-        if (this.isIslandMode) {
-            // Вспомогательная функция, которая добавляет путь к текущему контексту
-            const tracePoly = (isl, scale, offsetY) => {
-                const steps = 100;
-                for (let i = 0; i <= steps; i++) {
-                    const angle = (Math.PI * 2 * i) / steps;
-                    const noise = 1 + Math.sin(angle * 10 + MapUtils.seed) * 0.03 + Math.cos(angle * 25) * 0.02;
-                    
-                    const rX = isl.rx * noise * scale;
-                    const rY = isl.ry * noise * scale;
-                    
-                    const px = isl.x + Math.cos(angle) * rX;
-                    const py = isl.y + Math.sin(angle) * rY + offsetY;
-                    
-                    // ВАЖНО: Используем moveTo для первой точки, чтобы не соединять острова линиями
-                    if (i === 0) ctx.moveTo(px, py);
-                    else ctx.lineTo(px, py);
-                }
-            };
-
-            // --- СЛОЙ 1: АНИМИРОВАННЫЕ ВОЛНЫ (ДЕКОР) ---
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 2;
-            const waveOffset = (Game.frameCount * 0.5) % 100;
-            MapUtils.islands.forEach(isl => {
-                ctx.beginPath();
-                ctx.arc(isl.x, isl.y, isl.rx + 200 - waveOffset, 0, Math.PI*2);
-                ctx.stroke();
-            });
-            ctx.restore();
-
-// --- СЛОЙ 2: МЕЛКОВОДЬЕ (СЛИЯНИЕ) ---
-            ctx.beginPath();
-            MapUtils.islands.forEach(isl => {
-                tracePoly(isl, 1.55, 0); // Рисуем контуры
-            });
-            
-            // 1. Заливаем цветом (стыков не будет видно, так как цвет один)
-            ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; 
-            ctx.fill();
-            // 3. Заливаем ОДИН РАЗ (теперь наложения не будет!)
-            ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; // Красивая бирюза
-            ctx.fill();
-
-            // --- СЛОЙ 3: СУША ---
-            // Скалы (тень) - рисуем отдельно каждый, тут наложение не страшно (они непрозрачные)
-            ctx.fillStyle = '#151c25'; 
-            ctx.beginPath();
-            MapUtils.islands.forEach(isl => tracePoly(isl, 0.95, 15));
-            ctx.fill();
-
-            // Трава (верх)
-            ctx.fillStyle = '#1a222d'; 
-            ctx.strokeStyle = '#4466aa'; 
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            MapUtils.islands.forEach(isl => tracePoly(isl, 0.95, 0));
-            ctx.fill();
-            ctx.stroke();
+// 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
+        if (this.isIslandMode && MapUtils.bgCanvas) {
+            ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль
+            ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
+            ctx.imageSmoothingEnabled = true;
         }
         
         // --- РИСУЕМ ЛАНДШАФТ ---
@@ -3316,8 +3413,10 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
         ctx.lineWidth = 2;
         const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
         this.units.forEach(u => {
-            if (u.type === 'POWER_PLANT') {
-                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < 300);
+            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
+                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
+                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < range);
+                
                 neighbors.forEach(n => {
                     let factor = (u.side === 'player') ? Game.energyFactor : 1;
                     if (u.side !== 'player') { const bot = Game.bots.find(b => b.side === u.side); if (bot) factor = bot.energyFactor; }
@@ -3330,8 +3429,7 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
                     ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(n.x, n.y); ctx.stroke(); ctx.globalAlpha = 1;
                 });
             }
-        });
-        if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
+        });        if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
 
         this.constructions.forEach(s => {
             ctx.save(); ctx.globalAlpha = 0.55;
@@ -3342,18 +3440,35 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2, 6);
             ctx.fillStyle = '#6cf'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2 * pct, 6);
         });
+       // 1. Здания
         const buildings = this.units.filter(u => UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(u.type));
-        const mobile = this.units.filter(u => !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(u.type));
-        buildings.forEach(u => u.draw(ctx)); mobile.forEach(u => u.draw(ctx));
-        this.bullets.forEach(b => b.draw(ctx));
+        // 2. Лодки (выделяем в отдельный слой)
+        const boats = this.units.filter(u => u.type === 'BOAT');
+        // 3. Остальная техника и пехота
+        const mobile = this.units.filter(u => u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(u.type));
         
-      for (let i = this.effects.length - 1; i >= 0; i--) {
+        // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ (снизу вверх):
+        buildings.forEach(u => u.draw(ctx)); 
+        boats.forEach(u => u.draw(ctx));      // Лодка рисуется под ногами
+        mobile.forEach(u => u.draw(ctx));     // Солдаты и танки рисуются ПОВЕРХ лодки
+        this.bullets.forEach(b => b.draw(ctx));
+
+for (let i = this.effects.length - 1; i >= 0; i--) {
             const e = this.effects[i];
-            
-            // --- СТАРЫЕ ЭФФЕКТЫ ---
+        
+ // --- СТАРЫЕ ЭФФЕКТЫ ---
             if (e.type === 'smoke') {
-                ctx.fillStyle = `rgba(200,200,200,${e.life/40})`; ctx.beginPath(); ctx.arc(e.x, e.y, 5 + (20-e.life/2), 0, Math.PI*2); ctx.fill(); e.life--;
-            } 
+                // Math.max защищает от вылетов (радиус не будет меньше 2)
+                let r = Math.max(2, 25 - e.life/4); 
+                // Math.min защищает прозрачность от значений больше 100%
+                let alpha = Math.max(0, Math.min(1, e.life/60)); 
+                
+                ctx.fillStyle = `rgba(200, 200, 200, ${alpha})`; 
+                ctx.beginPath(); 
+                ctx.arc(e.x, e.y, r, 0, Math.PI*2); 
+                ctx.fill(); 
+                e.life--;
+            }
             else if (e.type === 'shockwave') {
                 ctx.strokeStyle = (e.color) ? e.color : `rgba(255, 50, 0, ${e.life/20})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.stroke();
                 if (e.maxRadius) { if (e.radius < e.maxRadius) e.radius += 2; } else e.radius += 3;
@@ -3391,6 +3506,52 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
                 e.x += e.vx;
                 e.y += e.vy;
                 e.vy += 0.2; // Гравитация
+                e.life--;
+            }
+
+// --- ЯДЕРНЫЕ ЭФФЕКТЫ ---
+            else if (e.type === 'nuke_flash') {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Игнорируем камеру, заливаем весь экран
+                let alpha = e.life / 50; // Плавно затухает
+                ctx.fillStyle = `rgba(255, 255, 230, ${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+                e.life--;
+            }
+            else if (e.type === 'nuke_mushroom') {
+                let progress = 1 - (e.life / 180); // от 0 до 1
+                let mHeight = progress * 350;      // Высота ножки растет
+                let capRadius = 60 + progress * 150; // Шапка раздувается
+                let stemWidth = 40 + progress * 30;
+                
+                // Ножка гриба (темнеет со временем)
+                ctx.fillStyle = `rgba(${80 - progress*50}, ${80 - progress*50}, ${80 - progress*50}, ${e.life / 180})`;
+                ctx.beginPath();
+                ctx.ellipse(e.x, e.y - mHeight/2, stemWidth, mHeight/2, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                // Огненная шапка гриба, которая со временем превращается в черный дым
+                let red = 255 - progress * 200;
+                let green = 150 - progress * 150;
+                ctx.fillStyle = `rgba(${red}, ${green}, 0, ${e.life / 180})`;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y - mHeight, capRadius, 0, Math.PI*2);
+                ctx.fill();
+
+                // Внутренние бурлящие кольца огня
+                ctx.fillStyle = `rgba(255, 200, 0, ${(1-progress) * (e.life / 180)})`;
+                ctx.beginPath(); ctx.arc(e.x - capRadius*0.3, e.y - mHeight + 10, capRadius*0.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e.x + capRadius*0.3, e.y - mHeight - 10, capRadius*0.4, 0, Math.PI*2); ctx.fill();
+                
+                e.life--;
+            }
+            else if (e.type === 'ash') {
+                ctx.fillStyle = `rgba(150, 150, 150, ${e.life / 150})`;
+                ctx.beginPath(); ctx.arc(e.x, e.y, 2 + Math.random(), 0, Math.PI*2); ctx.fill();
+                e.x += e.vx;
+                e.y += e.vy;
+                e.vx += (Math.random() - 0.5) * 0.3; // Имитация ветра
                 e.life--;
             }
             // --- ТЕКСТОВЫЕ ЭФФЕКТЫ ---
@@ -3467,11 +3628,35 @@ if (this.state !== 'BATTLE' || this.isSpectator) return;
                     div.onclick = () => this.menuAction(key); menu.appendChild(div); return;
                 }
                 const u = UNITS[key];
-                if (isMenu && !this.selection.some(s=>s.isBuilder) && u && u.type === 'bldg') return;
+// СТАЛО:
+       if (isMenu && !this.selection.some(s=>s.isBuilder) && u && u.type === 'bldg' && !Game.isSandbox) return;
                 const div = document.createElement('div'); div.className = 'unit-card';
+                
+                // Если кнопка уже была нажата, оставляем её "светящейся" при перерисовке меню
+                if (this.buildType === key) div.classList.add('active');
+
                 div.onclick = () => {
-                    if (isMenu) this.menuAction(key);
-                    else { this.buildType = key; document.querySelectorAll('.unit-card').forEach(c => c.classList.remove('active')); div.classList.add('active'); }
+                    // Обычная игра (крафт на заводе)
+                    if (isMenu && !Game.isSandbox) {
+                        this.menuAction(key);
+                    } 
+                    // Песочница: если мы выделили конкретный Завод или Дом и хотим произвести юнита внутри него
+                    else if (isMenu && Game.isSandbox && this.selection.length > 0 && titleText !== "МЕНЮ МГНОВЕННОГО СПАВНА") {
+                        this.menuAction(key);
+                    } 
+                    // Песочница (Спавн) или Обычная игра (Строитель ставит здание)
+                    else { 
+                        if (this.buildType === key) {
+                            // ОТЖИМАЕМ КНОПКУ (Выключаем режим спавна)
+                            this.buildType = null;
+                            div.classList.remove('active');
+                        } else {
+                            // НАЖИМАЕМ КНОПКУ (Включаем режим спавна)
+                            this.buildType = key; 
+                            document.querySelectorAll('.unit-card').forEach(c => c.classList.remove('active')); 
+                            div.classList.add('active'); 
+                        }
+                    }
                 };
               if (u) {
     let displayIcon = u.imageSrc 
@@ -3529,6 +3714,7 @@ class Unit {
         this.reload = 0; this.target = null; this.targetUnit = null; this.aggro = false;
         this.isProducer = !!p.spawnList; this.isBuilder = !!p.isBuilder;
         this.isArty = !!p.isArty; this.isFlying = !!p.isFlying;
+        this.isHIMARS = !!p.isHIMARS;
         this.flyState = 0; this.flyHeight = 0; this.flyTimer = 0;
         this.isFlying = !!p.isFlying;
         this.isKamikaze = !!p.isKamikaze; // <--- НОВОЕ
@@ -3562,10 +3748,14 @@ class Unit {
 
 checkPower() {
         if (!UNITS[this.type].energyUse) { this.isPowered = true; return; }
-        const nearPP = Game.units.some(u => u.side === this.side && u.type === 'POWER_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 300);
-        let globalPower = false;
         
-        // ИСПРАВЛЕНИЕ ЗДЕСЬ: используем Game.myRole
+        // --- ПРОВЕРКА РАДИУСОВ ПИТАНИЯ ---
+        const nearPP = Game.units.some(u => u.side === this.side && (
+            (u.type === 'POWER_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 300) ||
+            (u.type === 'NUCLEAR_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 800)
+        ));
+        
+        let globalPower = false;
         if (this.side === Game.myRole) globalPower = Game.energyFactor > 0.1;
         else { const bot = Game.bots.find(b => b.side === this.side); globalPower = bot ? (bot.energyFactor > 0.1) : true; }
         
@@ -3593,16 +3783,29 @@ checkPower() {
         }
     }
 
-    fireArty(tx, ty, force = false) {
+fireArty(tx, ty, force = false) {
         if (this.ammo <= 0 && !force) return;
         if (this.ammo > 0) this.ammo -= 1; 
         let d = Math.hypot(tx - this.x, ty - this.y);
         if (d > UNITS.GRAD.range) { let angle = Math.atan2(ty - this.y, tx - this.x); tx = this.x + Math.cos(angle) * UNITS.GRAD.range; ty = this.y + Math.sin(angle) * UNITS.GRAD.range; }
-        for(let i=0; i<2; i++) Game.bullets.push(new Bullet(this.x, this.y, tx+Math.random()*60-30, ty+Math.random()*60-30, this.damage, this.side, true, null, this));
-    }
-
-    startProduction(unitType, visual = false) {
-        const uInfo = UNITS[unitType]; this.spawnMax = uInfo.buildTime * 60; this.spawnCooldown = this.spawnMax; this.productionType = unitType; this.visualOnly = visual;
+        
+        let dmg = this.damage;
+        let splash = UNITS.GRAD.splash || 100;
+        let bulletSpeed = 4;
+        
+        // Если заряжен БОМБЕР (HEAVY)
+        if (this.ammoType === 'HEAVY') {
+            dmg *= 2.5; // Урон в 2.5 раза выше
+            splash = 250; // Огромный радиус взрыва
+            bulletSpeed = 3; // Летят медленнее
+        }
+        
+        for(let i=0; i<2; i++) {
+            let b = new Bullet(this.x, this.y, tx+Math.random()*60-30, ty+Math.random()*60-30, dmg, this.side, true, null, this, splash);
+            b.speed = bulletSpeed;
+            if (this.ammoType === 'HEAVY') b.splashRadius = 250; 
+            Game.bullets.push(b);
+        }
     }
 
 resolveCollision() {
@@ -3623,6 +3826,11 @@ resolveCollision() {
         if (u === this) return;
         if (u.isFlying && u.flyState === 2) return;
 
+// --- ДОБАВЛЯЕМ ЭТИ ДВЕ СТРОКИ ДЛЯ ЛОДКИ ---
+            // Лодка не толкает своих пассажиров, а пассажиры не толкают лодку
+            if (this.type === 'BOAT' && u.side === this.side && !u.isFlying && u.type !== 'BOAT') return;
+            if (u.type === 'BOAT' && this.side === u.side && !this.isFlying && this.type !== 'BOAT') return;
+
         // Быстрая проверка через квадрат расстояния (без корня)
         let dx = this.x - u.x;
         let dy = this.y - u.y;
@@ -3635,25 +3843,21 @@ resolveCollision() {
             let pushX = (dx / dist) * force * 2;
             let pushY = (dy / dist) * force * 2;
 
-            const isImmovable = (t) => ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(t);
+            const isImmovable = (t) => ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(t);
             if (!this.isProducer && !isImmovable(this.type)) {
                 if (u.isProducer || isImmovable(u.type)) { this.x += pushX * 2; this.y += pushY * 2; }
                 else { this.x += pushX; this.y += pushY; }
             }
         }
     });
+ }
 
-
-        if (Game.isIslandMode && !this.isFlying) {
-            // Проверяем именно DEEP (Глубина), а не просто воду
-            if (MapUtils.getTerrain(this.x, this.y) === 'DEEP') {
-                const cx = MAP_W/2, cy = MAP_H/2;
-                const angle = Math.atan2(this.y - cy, this.x - cx);
-                // Толкаем чуть сильнее, чтобы точно вылезти
-                this.x -= Math.cos(angle) * 8; 
-                this.y -= Math.sin(angle) * 8;
-            }
-        }
+startProduction(type, force = false) {
+        if (this.spawnCooldown > 0 && !force) return false;
+        this.productionType = type;
+        this.spawnMax = (UNITS[type].buildTime || 5) * 60; 
+        this.spawnCooldown = this.spawnMax;
+        return true;
     }
 
 attemptAutoProduction() {
@@ -3795,33 +3999,29 @@ attemptAutoProduction() {
             }
         }
 
-        // --- ЛОГИКА HIMARS ---
-        if (this.isHIMARS && this.side === Game.myRole) {
+ // --- ЛОГИКА HIMARS ---
+        if (this.isHIMARS) {
              if (this.reload > 0) this.reload--;
              if (this.reload <= 0 && this.ammo > 0) {
                  let target = null;
-                 // 1. Ищем ядерки
-                 const nukes = Game.bullets.filter(b => b.isNuke && b.side !== this.side && !b.dead);
-                 if (nukes.length > 0) {
-                     nukes.sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
-                     if (Math.hypot(nukes[0].x - this.x, nukes[0].y - this.y) < this.range) target = nukes[0];
-                 }
-                 // 2. Ищем воздух
-                 if (!target) {
-                     const air = Game.units.filter(u => u.side !== this.side && u.isFlying && u.hp > 0 && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
-                     if (air.length > 0) target = air[0];
-                 }
-                 // 3. Огонь
+                 
+                 // HIMARS больше не отвлекается на ядерки!
+                 // Ищем только авиацию (вертолеты)
+                 const air = Game.units.filter(u => u.side !== this.side && u.isFlying && u.hp > 0 && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
+                 if (air.length > 0) target = air[0];
+                 
+                 // Огонь
                  if (target) {
                      this.ammo--;
                      this.reload = this.reloadMax;
+                     // Выпускаем самонаводящуюся ракету
                      Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, this.damage, this.side, false, target, this, 30, false, 1, 10));
                      Game.effects.push({x: this.x, y: this.y - 40, char: '🚀', life: 30});
                  }
              }
         }
 
-        // --- ГЛАВНАЯ ЛОГИКА ПРОИЗВОДСТВА (ИСПРАВЛЕННАЯ) ---
+// --- ГЛАВНАЯ ЛОГИКА ПРОИЗВОДСТВА (ИСПРАВЛЕННАЯ) ---
         if (this.isProducer && this.spawnCooldown > 0) {
             if (!this.isPowered) return;
             
@@ -3839,18 +4039,29 @@ attemptAutoProduction() {
 
                 // 1. ВЫДАЧА ПРОДУКЦИИ
                 if (this.productionType.startsWith('CRAFT_')) {
-                    // Ресурсы
+                    // Если производим ракеты или ресурсы
                     const info = UNITS[this.productionType];
-                    if (this.side === Game.myRole && info.producedRes) {
-                        if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
-                        if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
-                        if (info.producedRes.chips) Game.resources.chips += info.producedRes.chips;
-                        Game.showError(`ИЗГОТОВЛЕНО: ${info.name}`);
+                    if (info.producedRes) {
+                        if (this.side === Game.myRole) {
+                            if (info.producedRes.iron) Game.resources.iron += info.producedRes.iron;
+                            if (info.producedRes.chem) Game.resources.chem += info.producedRes.chem;
+                            if (info.producedRes.chips) Game.resources.chips += info.producedRes.chips;
+                            if (info.producedRes.rockets) Game.resources.rockets += info.producedRes.rockets;
+                            if (info.producedRes.heavies) Game.resources.heavies += info.producedRes.heavies;
+                            if (info.producedRes.nukes) Game.resources.nukes += info.producedRes.nukes;
+                            Game.showError(`ИЗГОТОВЛЕНО: ${info.name}`);
+                        } else {
+                            // Выдаем боту
+                            const bot = Game.bots.find(b => b.side === this.side);
+                            if (bot) {
+                                if (info.producedRes.rockets) bot.resources.rockets = (bot.resources.rockets || 0) + info.producedRes.rockets;
+                            }
+                        }
                     }
                     Game.effects.push({x: this.x, y: this.y, char: '✅', life: 40});
                 } 
                 else {
-                    // Юниты (Танки и т.д.)
+                    // Если производим ЮНИТОВ (Танки, Пехоту, Лодки и т.д.)
                     this.spawnedCount++;
                     if (!this.visualOnly) {
                         const angle = Math.random() * Math.PI * 2;
@@ -3889,47 +4100,74 @@ attemptAutoProduction() {
         // Если это чисто производитель (завод), дальше код не идет
         if (this.isProducer) return;
 
-        // --- ЛОГИКА ПВО (AA_DEFENSE) ---
-        if (this.type === 'AA_DEFENSE') {
-            if (!this.isPowered) { this.aaTarget = null; this.aaCharge = 0; return; } 
-            
-            // Проверка цели
-            if (this.aaTarget && (this.aaTarget.hp <= 0 || (this.aaTarget instanceof Bullet && this.aaTarget.dead) || Math.hypot(this.aaTarget.x - this.x, this.aaTarget.y - this.y) > this.range * this.buffRangeMult)) { 
-                this.aaTarget = null; this.aaCharge = 0; 
+      // --- ЛОГИКА УМНОГО ПВО (AA_DEFENSE) ---
+if (this.type === 'AA_DEFENSE') {
+    if (!this.isPowered) { this.aaTarget = null; this.aaCharge = 0; return; } 
+    
+    // Проверка, актуальна ли цель
+    if (this.aaTarget && (this.aaTarget.hp <= 0 || (this.aaTarget instanceof Bullet && this.aaTarget.dead) || Math.hypot(this.aaTarget.x - this.x, this.aaTarget.y - this.y) > this.range * this.buffRangeMult)) { 
+        this.aaTarget = null; this.aaCharge = 0; this.aaThinkTimer = 0;
+    }
+    
+    // Поиск новой цели
+    if (!this.aaTarget && this.reload <= 0) {
+        // 1. Ищем ракеты в радиусе
+        const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
+        
+        // УМНЫЙ ФИЛЬТР: Проверяем траекторию. Летит ли на НАШУ территорию?
+        const dangerousRockets = rockets.filter(r => {
+            const impactOwner = Game.getTerritoryOwner(r.tx, r.ty);
+            return impactOwner === this.side; // Берем только те, что упадут на нас
+        });
+
+        if (dangerousRockets.length > 0) {
+            this.aaTarget = dangerousRockets[0];
+            this.aaThinkTimer = 30; // 0.5 секунд на "подумать" (30 кадров)
+            Game.effects.push({x: this.x, y: this.y - 30, char: '📡', life: 30}); // Анимация просчета
+        } else { 
+            // 2. Если опасных ракет нет, ищем вертолеты
+            const helis = Game.units.filter(u => u.isFlying && u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < this.range * this.buffRangeMult); 
+            if (helis.length > 0) {
+                this.aaTarget = helis[0]; 
+                this.aaThinkTimer = 0; // Вертолеты бьем без раздумий
             }
-            
-            // Поиск новой цели
-            if (!this.aaTarget && this.reload <= 0) {
-                // Сначала ищем ракеты
-                const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
-                if (rockets.length > 0) this.aaTarget = rockets[0];
-                else { 
-                    // Потом вертолеты
-                    const helis = Game.units.filter(u => u.isFlying && u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < this.range * this.buffRangeMult); 
-                    if (helis.length > 0) this.aaTarget = helis[0]; 
-                }
-            }
-            
-            // Атака
-            if (this.aaTarget) {
-                this.aaCharge++;
-                if (this.aaCharge > 20) { 
-                    if (this.aaTarget instanceof Bullet) { 
-                        this.aaTarget.hp -= 200; 
-                        if (this.aaTarget.hp <= 0) { this.aaTarget.dead = true; Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '💥', life: 20}); } 
-                    } 
-                    else { 
-                        this.aaTarget.hp -= 200; 
-                        Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '⚡', life: 20}); 
-                    }
-                    this.reload = this.reloadMax; this.aaTarget = null; this.aaCharge = 0;
-                }
-            } else { 
-                if (this.reload > 0) this.reload--; 
-            }
-            return;
+        }
+    }
+    
+    // Атака цели
+    if (this.aaTarget) {
+        // Если ПВО еще "думает"
+        if (this.aaThinkTimer > 0) {
+            this.aaThinkTimer--;
+            return; 
         }
 
+        this.aaCharge++;
+        if (this.aaCharge > 20) { 
+            if (this.aaTarget instanceof Bullet) { 
+                this.aaTarget.hp -= 200; 
+                if (this.aaTarget.hp <= 0) { 
+                    this.aaTarget.dead = true; 
+                    Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '💥', life: 20}); 
+                    this.aaTarget = null; // Сброс только если убили
+                } else {
+                    Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '💨', life: 20}); 
+                }
+            } 
+            else { 
+                this.aaTarget.hp -= 200; 
+                Game.effects.push({x: this.aaTarget.x, y: this.aaTarget.y, char: '⚡', life: 20}); 
+                if (this.aaTarget.hp <= 0) this.aaTarget = null;
+            }
+            // Лупим пока не собьем: сбрасываем заряд, но оставляем цель, если она еще жива!
+            this.aaCharge = 0; 
+            this.reload = this.reloadMax / 2; // Перезаряжаемся в 2 раза быстрее, если лупим по одной цели
+        }
+    } else { 
+        if (this.reload > 0) this.reload--; 
+    }
+    return;
+}
         // --- ОБНОВЛЕНИЕ ПЕРЕЗАРЯДКИ ---
         if (this.reload > 0) this.reload--;
 
@@ -4065,50 +4303,52 @@ _movePhysics() {
         let currentSpeed = this.speed;
         let onWater = false;
         
+        let prevX = this.x; // Сохраняем старую позицию (для перевозки)
+        let prevY = this.y;
+
         // --- ЛОГИКА ВОДЫ ---
         if (!this.isFlying) {
             const terrain = MapUtils.getTerrain(this.x, this.y);
             
-            if (terrain === 'SHALLOW') {
-                currentSpeed *= 0.5; // Замедление
-                onWater = true;
+            if (this.type === 'BOAT') {
+                // ЛОДКА
+                if (terrain === 'LAND') {
+                    currentSpeed *= 0.1; // Еле ползет по суше
+                    onWater = false;
+                } else {
+                    currentSpeed *= 1.5; // Ускоряется на воде
+                    onWater = true;
+                }
+            } else {
+                // ОСТАЛЬНЫЕ
+                if (terrain === 'SHALLOW') {
+                    currentSpeed *= 0.5;
+                    onWater = true;
+                } else if (terrain === 'DEEP') {
+                    currentSpeed *= 0.1;
+                    onWater = true;
+                }
             }
         }
 
-        // --- РЕАЛИСТИЧНЫЕ ВОЛНЫ (FIX для 5x скорости) ---
-        // Генерируем волну не по таймеру, а по рандому при движении
-        // Чем быстрее движется юнит, тем чаще волны, но без "спама"
+        // --- РЕАЛИСТИЧНЫЕ ВОЛНЫ ---
         if (onWater && (this.target || this.pathQueue.length > 0)) {
-            // Шанс 15% каждый кадр при движении - выглядит органичнее, чем % 10
             if (Math.random() < 0.15) {
                 Game.effects.push({ 
-                    type: 'ripple', 
-                    x: this.x, 
-                    y: this.y + 5, 
-                    radius: 2,      // Начинаем с маленького радиуса
-                    maxRadius: 15,  // Растут до 15
-                    life: 50, 
-                    color: 'rgba(255, 255, 255, 0.4)',
-                    growSpeed: 0.5
+                    type: 'ripple', x: this.x, y: this.y + 5, 
+                    radius: 2, maxRadius: 15, life: 50, 
+                    color: 'rgba(255, 255, 255, 0.4)', growSpeed: 0.5
                 });
             }
         }
 
-        // Движение к цели
         let dx = this.target.x - this.x;
         let dy = this.target.y - this.y;
         let dist = Math.hypot(dx, dy);
 
-        // Проверка глубины
-        if (!this.isFlying && dist > currentSpeed) {
-            const nextX = this.x + (dx / dist) * currentSpeed * 2; 
-            const nextY = this.y + (dy / dist) * currentSpeed * 2;
-            
-            if (MapUtils.getTerrain(nextX, nextY) === 'DEEP') {
-                this.target = null;
-                this.pathQueue = [];
-                return; 
-            }
+        // Поворот лодки туда, куда она плывет
+        if (dist > 0.1) {
+            this.angle = Math.atan2(dy, dx);
         }
 
         if (dist < 15) { 
@@ -4124,15 +4364,81 @@ _movePhysics() {
             this.x += (dx / dist) * currentSpeed; 
             this.y += (dy / dist) * currentSpeed; 
         }
+
+// --- ПЕРЕВОЗКА ПАССАЖИРОВ НА ЛОДКЕ ---
+        if (this.type === 'BOAT' && (this.x !== prevX || this.y !== prevY)) {
+            let dxMove = this.x - prevX;
+            let dyMove = this.y - prevY;
+            
+            Game.units.forEach(u => {
+                // ПРОВЕРКА: Юнит НЕ должен быть зданием
+                const isBuilding = u.isProducer || ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type);
+
+                if (u.side === this.side && u !== this && !u.isFlying && u.type !== 'BOAT' && !isBuilding) {
+                    if (Math.hypot(u.x - prevX, u.y - prevY) < this.radius + 10) {
+                        u.x += dxMove;
+                        u.y += dyMove;
+                    }
+                }
+            });
+        }
     }
 
     draw(ctx) {
+// --- КРАСИВАЯ МОДЕЛЬ ЛОДКИ ---
+        if (this.type === 'BOAT') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle || 0); // Поворачиваем по направлению движения
+
+            // Корпус (серый)
+            ctx.fillStyle = '#666666'; 
+            ctx.beginPath();
+            ctx.moveTo(this.radius, 0); // Острый нос
+            ctx.quadraticCurveTo(this.radius * 0.8, this.radius * 0.8, 0, this.radius * 0.8);
+            ctx.lineTo(-this.radius, this.radius * 0.8); // Задний правый угол
+            ctx.lineTo(-this.radius, -this.radius * 0.8); // Задний левый угол
+            ctx.lineTo(0, -this.radius * 0.8);
+            ctx.quadraticCurveTo(this.radius * 0.8, -this.radius * 0.8, this.radius, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.stroke();
+
+            // Открытая палуба сзади для пехоты
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(-this.radius + 3, -this.radius * 0.65, this.radius * 1.1, this.radius * 1.3);
+
+            // Лобовое стекло (светло-голубое, изогнутое)
+            ctx.fillStyle = '#8ce6ff';
+            ctx.beginPath();
+            ctx.moveTo(this.radius * 0.75, 0);
+            ctx.quadraticCurveTo(this.radius * 0.5, this.radius * 0.4, 0, this.radius * 0.4);
+            ctx.lineTo(this.radius * 0.2, 0);
+            ctx.lineTo(0, -this.radius * 0.4);
+            ctx.quadraticCurveTo(this.radius * 0.5, -this.radius * 0.4, this.radius * 0.75, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+
+            // Полоска здоровья
+            let hpOffset = this.radius + 10;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            
+            // Если лодка выделена - рисуем круг
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI*2); ctx.stroke();
+            }
+            return; // Завершаем отрисовку, эмодзи для лодки нам не нужны!
+        }
         if (!this.isPowered && (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO','WAREHOUSE'].includes(this.type))) ctx.globalAlpha = 0.5;
         if (this === Game.selectedProducer) { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.fill(); ctx.strokeStyle = '#ff0'; ctx.stroke(); }
         ctx.fillStyle = this.color;
         if (this.isFlying && this.flyHeight > 0) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(this.x, this.y + (30 * this.flyHeight), 15 * (1-this.flyHeight*0.2), 10 * (1-this.flyHeight*0.2), 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = this.color; }
 
-        if (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(this.type)) {
+        if (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(this.type)) {
              ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.stroke();
         } else {
              ctx.beginPath(); ctx.arc(this.x, this.y, 15, 0, Math.PI*2); ctx.fill();
@@ -4164,7 +4470,7 @@ _movePhysics() {
                  ctx.fillStyle = '#000'; ctx.fillRect(this.x-15, this.y - 40, 30, 4); ctx.fillStyle = '#0af'; ctx.fillRect(this.x-15, this.y - 40, 30 * pct, 4);
              }
         }
-        if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL') {
+      if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL' || this.type === 'HIMARS') {
              ctx.font = '12px Arial'; ctx.fillStyle = this.ammo === 0 ? 'red' : 'yellow'; ctx.fillText(`${this.ammo}/${this.maxAmmo}`, this.x, this.y - 25);
              if (this.gradSeq > 0) { ctx.fillStyle = '#f90'; let w = 30 * (this.gradSeq/360); ctx.fillRect(this.x - 15, this.y + 20, w, 4); }
         }
@@ -4249,9 +4555,13 @@ class Bullet {
         let yOffset = 0;
         if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; }
         this.visX = this.x; this.visY = this.y - yOffset;
-        if (this.arty && Game.frameCount % 5 === 0) { Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); }
+        // Если это артиллерия ИЛИ если снаряд выпустил HIMARS - рисуем дымный след
+        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 3 === 0) { 
+            Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); 
+        }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }
     }
+
 hit() {
         this.dead = true;
         
@@ -4259,46 +4569,66 @@ hit() {
         const isWaterHit = MapUtils.isWater(this.x, this.y);
 
         if (this.isNuke) {
-            Game.effects.push({x: this.x, y: this.y, char: '☢️', life: 100});
-            Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: 10, maxRadius: 400, life: 100, color: 'rgba(255, 100, 0, 0.5)'});
+            // --- ЭПИЧНАЯ АНИМАЦИЯ ЯДЕРКИ ---
+            // 1. Ослепительная вспышка (белый экран)
+            Game.effects.push({ type: 'nuke_flash', x: this.x, y: this.y, life: 50 });
+            // 2. Огромная ударная волна
+            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 600, life: 80, color: 'rgba(255, 60, 0, 0.7)' });
+            // 3. Грибовидное облако
+            Game.effects.push({ type: 'nuke_mushroom', x: this.x, y: this.y, life: 180 });
+            // 4. Разлетающийся пепел (50 частиц)
+            for (let i = 0; i < 50; i++) {
+                Game.effects.push({ 
+                    type: 'ash', 
+                    x: this.x + (Math.random() - 0.5) * 500, 
+                    y: this.y + (Math.random() - 0.5) * 500, 
+                    vx: (Math.random() - 0.5) * 3, 
+                    vy: 1 + Math.random() * 2, 
+                    life: 100 + Math.random() * 150 
+                });
+            }
         } else {
             if (isWaterHit) {
-                // --- РЕАЛИСТИЧНЫЙ ВСПЛЕСК ВОДЫ ---
-                // 1. Белый круг (пена)
-                Game.effects.push({
-                    type: 'splash_ring', 
-                    x: this.x, y: this.y, 
-                    radius: 5, maxRadius: this.splashRadius || 20, 
-                    life: 40, color: 'rgba(200, 255, 255, 0.8)'
-                });
-                // 2. Брызги (частицы)
-                for(let k=0; k<5; k++) {
-                     Game.effects.push({
-                        type: 'water_particle',
-                        x: this.x, y: this.y,
-                        vx: (Math.random()-0.5)*3,
-                        vy: (Math.random()-0.5)*3,
-                        life: 30
-                    });
-                }
-                // Звуковой эффект текстом (опционально)
-                // Game.effects.push({x: this.x, y: this.y, char: '💦', life: 20});
+                Game.effects.push({ type: 'splash_ring', x: this.x, y: this.y, radius: 5, maxRadius: this.splashRadius || 20, life: 40, color: 'rgba(200, 255, 255, 0.8)' });
+                for(let k=0; k<5; k++) Game.effects.push({ type: 'water_particle', x: this.x, y: this.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 30 });
             } else {
-                // Обычный взрыв на земле
                 if (this.arty || this.splashRadius > 0) Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
                 Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});
             }
         }
         
-        // ... (дальше код урона остается прежним) ...
         let range = this.arty ? (UNITS.GRAD.splash || 100) : (this.splashRadius || 15);
-        if (this.isNuke) range = 450; if (this.splashRadius > 100) range = 150;
+        if (this.isNuke) range = 600; // Максимальный радиус поражения ядерки
+        if (this.splashRadius > 100 && !this.isNuke) range = 150;
+        
         Game.units.forEach(u => {
             if (u.side !== this.side && u.type !== 'MINE') {
-                if (Math.hypot(u.x - this.x, u.y - this.y) < range + u.radius) {
+                // Считаем дистанцию от центра взрыва до КРАЯ юнита
+                let d = Math.hypot(u.x - this.x, u.y - this.y) - u.radius;
+                
+                if (d < range) {
                     let damage = this.dmg;
-                    if (this.isNuke) damage = 9999; if (u.type === 'SILO') damage = 0; 
-                    if (u.isFlying && u.flyHeight > 0.5 && !this.arty) { damage = Math.ceil(this.dmg * 0.1); if (damage < 1) damage = 1; }
+                    
+                    if (this.isNuke) {
+                        if (u.type === 'SILO') damage = 0; // Бункер неуязвим
+                        else {
+                            // --- ГРАДАЦИЯ УРОНА ПО РАССТОЯНИЮ ---
+                            if (d <= 150) damage = 9999;                    // Эпицентр (100% уничтожение)
+                            else if (d <= 250) damage = u.maxHp * 0.70;     // 70% от максимального ХП
+                            else if (d <= 350) damage = u.maxHp * 0.50;     // 50%
+                            else if (d <= 450) damage = u.maxHp * 0.30;     // 30%
+                            else damage = u.maxHp * 0.10;                   // 10% (край волны)
+                            
+                            // Эффект дыма на выживших зданиях
+                            if (damage > 0 && damage < 9999 && !u.isFlying) {
+                                Game.effects.push({ type: 'smoke', x: u.x, y: u.y, life: 80 });
+                            }
+                        }
+                    } 
+                    else if (u.isFlying && u.flyHeight > 0.5 && !this.arty) { 
+                        damage = Math.ceil(this.dmg * 0.1); if (damage < 1) damage = 1; 
+                    }
+                    
                     if (CAPTURABLE_BUILDINGS.includes(u.type)) {
                         if (this.isExplosive) { u.hp -= damage; } 
                         else {
@@ -4311,22 +4641,55 @@ hit() {
                             }
                         }
                     } else { u.hp -= damage; }
-                    if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) { u.aggro = true; Game.effects.push({x: u.x, y: u.y - 30, char: '😡', life: 40}); u.target = {x: this.owner.x, y: this.owner.y}; }
+                    
+                    if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) { 
+                        u.aggro = true; Game.effects.push({x: u.x, y: u.y - 30, char: '😡', life: 40}); u.target = {x: this.owner.x, y: this.owner.y}; 
+                    }
                 }
             }
         });
     }
     draw(ctx) {
-        let yOffset = 0; let char = '';
-        if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; char = '🚀'; if (this.splashRadius > 100) char = '☄️'; if (this.isNuke) char = '🖍️'; }
+let yOffset = 0; let char = '';
+        let isHIMARS = this.owner && this.owner.isHIMARS; // Проверяем, кто стрелял
+
+        // 1. Выбираем, как выглядит снаряд
+        if (this.arty) { 
+            let progress = Math.min(1, this.traveled / this.dist); 
+            yOffset = Math.sin(progress * Math.PI) * 100; 
+            char = '🚀'; 
+            if (this.splashRadius > 100) char = '☄️'; 
+            if (this.isNuke) char = '🖍️'; 
+        } else if (isHIMARS) {
+            char = '🚀'; // HIMARS стреляет ракетой по прямой наводке
+        }
+
         ctx.fillStyle = this.arty ? '#ffaa00' : '#ffff00';
-        if (this.arty) {
-            ctx.save(); ctx.translate(this.visX, this.visY); let vx = this.visX - this.prevVisX; let vy = this.visY - this.prevVisY;
-            let angle = Math.atan2(vy, vx) + Math.PI/4; ctx.rotate(angle); ctx.font = this.isNuke ? '40px Arial' : '20px Arial'; ctx.fillText(char, 0, 0); ctx.restore();
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(this.x, this.y, 5, 0, Math.PI*2); ctx.fill();
-        } else { ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI*2); ctx.fill(); }
+
+        // 2. Отрисовываем ракету или пульку
+        if (this.arty || isHIMARS) {
+            ctx.save(); 
+            ctx.translate(this.visX, this.visY); 
+            let vx = this.visX - this.prevVisX; 
+            let vy = this.visY - this.prevVisY;
+            // Поворачиваем эмодзи ракеты носом туда, куда она летит
+            let angle = Math.atan2(vy, vx) + Math.PI/4; 
+            ctx.rotate(angle); 
+            ctx.font = this.isNuke ? '40px Arial' : '20px Arial'; 
+            ctx.fillText(char, 0, 0); 
+            ctx.restore();
+            
+            // Тень на земле под ракетой
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; 
+            ctx.beginPath(); 
+            ctx.arc(this.x, this.y, 5, 0, Math.PI*2); 
+            ctx.fill();
+        } else { 
+            // Обычная пулька для солдат и танков
+            ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI*2); ctx.fill(); 
+        }
     }
-}
+ }
 
 // --- МОБИЛЬНОЕ УПРАВЛЕНИЕ ---
 const MobileControls = {
@@ -4484,3 +4847,4 @@ Game.init();
 </script>
 </body>
 </html>
+

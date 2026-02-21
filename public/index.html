@@ -2863,13 +2863,18 @@ if (!this.isSpectator) {
                 // Кнопка AUTO (показываем, если выделен нужный юнит)
                 document.getElementById('auto-reload-btn').style.display = reloadableSelected ? 'flex' : 'none';
                 
-            } else {
+           } else {
                 document.getElementById('arty-btn').style.display = 'none';
                 document.getElementById('reload-btn').style.display = 'none';
                 document.getElementById('auto-reload-btn').style.display = 'none';
             }
-     }
-},
+            
+            // --- НОВОЕ: ПРОВЕРЯЕМ ПОБЕДУ 2 РАЗА В СЕКУНДУ ---
+            if (this.frameCount % 120 === 0) {
+                this.checkWin();
+            }
+         }
+    },
 
     checkWin() {
         if (this.state === 'END') return;

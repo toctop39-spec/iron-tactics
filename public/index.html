@@ -1026,8 +1026,8 @@ manageBase() {
             // Проверка: не лезем ли в воду или на горы
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRadius)) continue;
 
-            const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 25) || 
-                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 25);
+         const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 30) || 
+                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 30);
 
             // Если место свободно — строим!
             if (!busy) {
@@ -1155,11 +1155,13 @@ manageCombat() {
         const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE');
         if (enemies.length === 0) return;
 
-        // 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
+// 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
         army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
             if (g.type === 'GRAD') {
                 const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
-                if (t && !g.gradSeq) g.fireArty(t.x, t.y);
+                // БЫЛО: if (t && !g.gradSeq) g.fireArty(t.x, t.y);
+                // СТАЛО (Заставляем бота ждать 6 секунд перед залпом, как и игрока):
+                if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
             }
             // HIMARS сам найдет вертолеты в Unit.update(), мы его просто двигаем с армией
         });
@@ -2727,9 +2729,12 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 this.updateUI([]);
             }
 
+     // Очистка заброшенных фундаментов
             for (let i = this.constructions.length - 1; i >= 0; i--) {
                 const s = this.constructions[i];
-                const isActive = this.units.some(u => u.assignedSite === s && u.constructing);
+                // ИСПРАВЛЕНО: Теперь фундамент считается активным, даже если строитель просто ИДЕТ к нему
+                const isActive = this.units.some(u => u.assignedSite === s);
+                
                 if (!isActive) {
                     s.idleTime = (s.idleTime || 0) + 1;
                     if (s.idleTime > 600) { 

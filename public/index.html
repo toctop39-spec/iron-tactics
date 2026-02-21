@@ -497,14 +497,25 @@ const SimplexNoise = (function() {
 
 const MapUtils = {
     seed: 0,
+    currentSeed: 0, // Текущее состояние генератора
     lakes: [],
     mountains: [],
     spawnPoints: [],
-    bgCanvas: null, // Кэшированный холст для производительности
+    bgCanvas: null, 
 
-    init() {
-        this.seed = Math.floor(Math.random() * 10000);
+    // НАШ СОБСТВЕННЫЙ ГЕНЕРАТОР СЛУЧАЙНЫХ ЧИСЕЛ (чтобы у всех было одинаково)
+    random() {
+        if (this.currentSeed === 0) this.currentSeed = Math.floor(Math.random() * 1000000);
+        this.currentSeed = (this.currentSeed * 9301 + 49297) % 233280;
+        return this.currentSeed / 233280;
+    },
+
+    init(forcedSeed) {
+        // Если сервер дал сид - используем его, иначе генерируем новый
+        this.seed = forcedSeed !== undefined ? forcedSeed : Math.floor(Math.random() * 1000000);
+        this.currentSeed = this.seed; 
         SimplexNoise.init(this.seed);
+        
         this.lakes = [];
         this.mountains = [];
         this.spawnPoints = [];
@@ -567,8 +578,9 @@ getWorldHeight(x, y) {
         for (let p = 0; p < 8; p++) {
             let best = null, maxD = -1;
             for (let t = 0; t < 1000; t++) {
-                const wx = (Math.random() - 0.5) * radius * 2;
-                const wy = (Math.random() - 0.5) * radius * 2;
+              // В calculateSpawns() замените 2 строчки:
+                const wx = (this.random() - 0.5) * radius * 2;
+                const wy = (this.random() - 0.5) * radius * 2;
                 const gx = wx + MAP_W / 2;
                 const gy = wy + MAP_H / 2;
 
@@ -591,12 +603,11 @@ getWorldHeight(x, y) {
         let attempts = 0;
         while (this.mountains.length < 30 && attempts < 2000) {
             attempts++;
-            const x = Math.random() * MAP_W;
-            const y = Math.random() * MAP_H;
+    const x = this.random() * MAP_W;
+            const y = this.random() * MAP_H;
             
-            // Спавним горы только там, где высота по шуму большая
             if (this.getWorldHeight(x, y) > 0.85) { 
-                const radius = 50 + Math.random() * 50;
+                const radius = 50 + this.random() * 50;
                 let overlap = false;
                 for (let m of this.mountains) {
                     if (Math.hypot(x - m.x, y - m.y) < radius + m.radius) { overlap = true; break; }
@@ -1338,8 +1349,8 @@ setupEvents() {
         // Считываем режим
         const mode = document.querySelector('input[name="gameMode"]:checked').value;
         
-        // Настройки по умолчанию (Standard)
-        let settings = { mapSize: 4000, isIsland: false, maxPlayers: 4 };
+  // СТАЛО: (добавляем seed)
+        let settings = { mapSize: 4000, isIsland: false, maxPlayers: 4, seed: Math.floor(Math.random() * 1000000) };
 
         if (mode === 'island') {
             settings.mapSize = 3000;
@@ -2013,8 +2024,8 @@ const spawns = MapUtils.spawnPoints;
     },
 
 loadPvpLevel(settings) {
-        // Настройки по умолчанию
-        const cfg = settings || { mapSize: 4000, isIsland: false, maxPlayers: 2 };
+        // Достаем настройки с сидом от хоста
+        const cfg = settings || { mapSize: 4000, isIsland: false, maxPlayers: 2, seed: Math.floor(Math.random() * 1000000) };
 
         this.isMultiplayer = true;
         this.isIslandMode = cfg.isIsland;
@@ -2022,19 +2033,20 @@ loadPvpLevel(settings) {
         this.state = 'BATTLE'; 
         this.money = 5000;
         
-        // Применяем размер карты
         MAP_W = cfg.mapSize;
         MAP_H = cfg.mapSize;
         
+        // 1. ИНИЦИАЛИЗИРУЕМ КАРТУ С ОБЩИМ СИДОМ!
+        MapUtils.init(cfg.seed);
+        
+        // 2. Сбрасываем игру (теперь деревья появятся в тех же местах)
         this.resetGameData();
         
-        // Список ролей для спавна (по порядку подключения)
         const roles = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
-        
         const playersToSpawn = Math.min(roles.length, cfg.maxPlayers || 8);
 
-if (this.isIslandMode) {
-            MapUtils.init();
+        if (this.isIslandMode) {
+            // Удалите строчку MapUtils.init(); отсюда, если она там есть!
             const spawns = MapUtils.spawnPoints;
             for (let i = 0; i < playersToSpawn; i++) {
                 const role = roles[i];
@@ -2059,7 +2071,7 @@ if (this.isIslandMode) {
 
             for (let i = 0; i < playersToSpawn; i++) {
                 const role = roles[i];
-                const pt = spawns[i] || { x: Math.random()*MAP_W, y: Math.random()*MAP_H };
+                const pt = spawns[i] || { x: MapUtils.random()*MAP_W, y: MapUtils.random()*MAP_H };
                 
                 // ИСПРАВЛЕНИЕ: ЖЕСТКИЕ ID
                 this.units.push(new Unit('HOUSE', pt.x, pt.y, role, 'base_' + role));
@@ -2208,29 +2220,25 @@ loadLevel(lvlId) {
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
         
-        for (let r = 0; r < rows; r++) {
+       for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                if (Math.random() > 0.3) continue; // 30% шанс спавна
+                if (MapUtils.random() > 0.3) continue; // Используем наш единый рандом!
                 
-                let dx = c * gridSize + Math.random() * gridSize;
-                let dy = r * gridSize + Math.random() * gridSize;
+                let dx = c * gridSize + MapUtils.random() * gridSize;
+                let dy = r * gridSize + MapUtils.random() * gridSize;
                 
-                // ПРОВЕРКА 1: Не вода (использует обновленный isWater, который запрещает мелководье)
                 if (!this.isIslandMode || !MapUtils.isWater(dx, dy)) {
-                    
-                    // ПРОВЕРКА 2: НЕТ ЛИ ТУТ ГОРЫ? (Радиус проверки 30px)
-                    // Если MapUtils.checkMountain вернет true (гора есть), мы НЕ спавним декор
                     if (!MapUtils.checkMountain(dx, dy, 30)) {
                         this.decor.push({
                             x: dx, 
                             y: dy, 
-                            char: emojis[Math.floor(Math.random()*emojis.length)]
+                            char: emojis[Math.floor(MapUtils.random()*emojis.length)]
                         });
                     }
                 }
             }
-        }
-    }, // <--- ОБЯЗАТЕЛЬНО ПРОВЕРЬ ЭТУ ЗАПЯТУЮ!
+       }
+   },
 
     startGameUI(title) {
         document.getElementById('menu-screen').classList.add('hidden');
@@ -4847,4 +4855,3 @@ Game.init();
 </script>
 </body>
 </html>
-

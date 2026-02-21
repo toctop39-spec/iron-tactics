@@ -2943,6 +2943,29 @@ onDown(e) {
         
         this.isDragging = false;
 
+    // --- ВОЗВРАЩАЕМ СПАВН ДЛЯ КАМПАНИИ ---
+        if (this.state === 'PLACE' && this.buildType) {
+            // В кампании зеленая линия находится на координате x=1000
+            if (m.x > 1000) { 
+                this.showError("СТАВЬТЕ ЮНИТОВ СЛЕВА ОТ ЛИНИИ!"); 
+                return; 
+            }
+            
+            if (this.checkCost(this.buildType)) {
+                this.payCost(this.buildType);
+                const u = new Unit(this.buildType, m.x, m.y, 'player');
+                this.units.push(u);
+                this.effects.push({x: m.x, y: m.y, char: '✨', life: 30});
+                
+                // Обновляем интерфейс, чтобы списались деньги на экране
+                const data = LEVELS.find(l => l.id === this.level);
+                if (data) this.updateUI(data.unlock);
+            } else {
+                this.showError("НЕТ СРЕДСТВ ИЛИ РЕСУРСОВ!");
+            }
+            return;
+        }
+
         if (this.state === 'BATTLE') {
             // 1. СПАВН ПЕСОЧНИЦЫ
             if (this.isSandbox && this.buildType) {
@@ -3476,6 +3499,31 @@ onUp(e) {
 onRight(e) {
         if (this.state !== 'BATTLE' || this.isSpectator) return;
         const m = this.getMouse(e);
+
+    // --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ---
+        if (this.state === 'PLACE') {
+            // Ищем нашего юнита под курсором
+            const target = this.units.slice().reverse().find(u => u.side === 'player' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+            if (target) {
+                target.hp = 0; // Удаляем юнита
+                this.money += UNITS[target.type].cost; // Возвращаем деньги
+                
+                // Возвращаем ресурсы, если они были потрачены (например, на танк)
+                if (UNITS[target.type].resCost) {
+                    if (UNITS[target.type].resCost.iron) this.resources.iron += UNITS[target.type].resCost.iron;
+                    if (UNITS[target.type].resCost.chem) this.resources.chem += UNITS[target.type].resCost.chem;
+                    if (UNITS[target.type].resCost.chips) this.resources.chips += UNITS[target.type].resCost.chips;
+                }
+                
+                Game.effects.push({x: target.x, y: target.y, char: '💵', life: 30});
+                const data = LEVELS.find(l => l.id === this.level);
+                if (data) this.updateUI(data.unlock);
+            }
+            return;
+        }
+
+        // Если мы не в бою и не в расстановке - выходим
+        if (this.state !== 'BATTLE') return;
         
         // 1. Сбрасываем спец-режимы (прицел, постройка и т.д.)
         this.artyMode = false; 

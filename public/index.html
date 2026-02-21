@@ -2454,6 +2454,19 @@ else if (cmd.type === 'build_start') {
             }
         }
 
+// --- ОБРАБОТКА СМЕРТИ ЮНИТОВ ПО СЕТИ ---
+        else if (cmd.type === 'kill_units') {
+            if (cmd.ids) {
+                cmd.ids.forEach(id => {
+                    const u = this.units.find(unit => unit.id === id);
+                    if (u) {
+                        u.hp = 0; // Убиваем у себя
+                        Game.effects.push({x: u.x, y: u.y, char: '💨', life: 30}); // Эффект исчезновения
+                    }
+                });
+            }
+        }
+
         // === 3. РЕГУЛЯРНАЯ СИНХРОНИЗАЦИЯ (ИСПРАВЛЕННАЯ) ===
         else if (cmd.type === 'sync_units') {
             if (cmd.side !== this.myRole) {
@@ -2921,30 +2934,34 @@ onDown(e) {
 menuAction(type) {
         this.clickDelay = 20;
 
-// --- НОВОЕ: РАСПУСК АРМИИ ---
+// --- РАСПУСК АРМИИ ---
         if (type === 'DISBAND_ARMY') {
             let count = 0;
+            const killedIds = []; // Собираем ID проданных юнитов
             
             this.selection.forEach(u => {
-                // Защита: убиваем только мобильных юнитов (нельзя случайно продать завод или стену)
                 if (!u.isProducer && !u.isBuilder && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) {
-                    u.hp = 0; // Юнит погибает
+                    u.hp = 0; 
                     count++;
-                    // Эффект вылетающих денег над каждым проданным юнитом
+                    killedIds.push(u.id); // Запоминаем кого удалили
                     Game.effects.push({x: u.x, y: u.y, char: '💵', life: 40}); 
                 }
             });
             
             if (count > 0) {
                 const profit = count * 100;
-                this.money += profit; // Начисляем деньги
+                this.money += profit; 
                 this.showError(`АРМИЯ РАСПУЩЕНА! ПОЛУЧЕНО: ${profit}$ 💵`);
-                this.selection = [];  // Сбрасываем выделение
-                this.updateUI([]);    // Прячем меню
+                this.selection = [];  
+                this.updateUI([]);    
+                
+                // РАССЫЛАЕМ ВСЕМ В КОМНАТЕ, ЧТО ЭТИ ЮНИТЫ УДАЛЕНЫ
+                if (this.isMultiplayer && CURRENT_ROOM) {
+                    this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });
+                }
             }
             return;
         }
-
 if (type === 'RELOAD_ROCKET' || type === 'RELOAD_HEAVY') {
             let reloaded = 0;
             const ammoTypeStr = type === 'RELOAD_ROCKET' ? 'rockets' : 'heavies';
@@ -4111,33 +4128,42 @@ attemptAutoProduction() {
                     }
                     Game.effects.push({x: this.x, y: this.y, char: '✅', life: 40});
                 } 
-                else {
+               else {
                     // Если производим ЮНИТОВ (Танки, Пехоту, Лодки и т.д.)
                     this.spawnedCount++;
                     if (!this.visualOnly) {
-                        const angle = Math.random() * Math.PI * 2;
-                        const dist = this.radius + 35;
-                        const spawnX = this.x + Math.cos(angle)*dist;
-                        const spawnY = this.y + Math.sin(angle)*dist;
-                        
-                        // Если место валидное (не вода)
-                        if (!MapUtils.isWater(spawnX, spawnY)) {
-                            const newUnit = new Unit(this.productionType, spawnX, spawnY, this.side);
-                            newUnit.applyBuffs(); 
-                            Game.units.push(newUnit);
-                            Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
+                        // --- ФИКС ДВОЙНОГО СПАВНА ---
+                        // Только истинный владелец завода генерирует юнита в сеть!
+                        if (this.side === Game.myRole || !Game.isMultiplayer) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const dist = this.radius + 35;
+                            const spawnX = this.x + Math.cos(angle)*dist;
+                            const spawnY = this.y + Math.sin(angle)*dist;
                             
-                            if (Game.isMultiplayer && CURRENT_ROOM) {
-                                Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'spawn', unitType: this.productionType, side: this.side, x: spawnX, y: spawnY, id: newUnit.id });
+                            // Если место валидное (не вода)
+                            if (!MapUtils.isWater(spawnX, spawnY)) {
+                                const newUnit = new Unit(this.productionType, spawnX, spawnY, this.side);
+                                newUnit.applyBuffs(); 
+                                Game.units.push(newUnit);
+                                Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
+                                
+                                if (Game.isMultiplayer && CURRENT_ROOM) {
+                                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'spawn', unitType: this.productionType, side: this.side, x: spawnX, y: spawnY, id: newUnit.id });
+                                }
+                            } else {
+                                // Если вода — спавним под заводом (аварийный вариант)
+                                const newUnit = new Unit(this.productionType, this.x, this.y + this.radius + 10, this.side);
+                                Game.units.push(newUnit);
+                                if (Game.isMultiplayer && CURRENT_ROOM) {
+                                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'spawn', unitType: this.productionType, side: this.side, x: this.x, y: this.y + this.radius + 10, id: newUnit.id });
+                                }
                             }
                         } else {
-                            // Если вода — спавним под заводом (аварийный вариант)
-                            const newUnit = new Unit(this.productionType, this.x, this.y + this.radius + 10, this.side);
-                            Game.units.push(newUnit);
+                            // Для остальных игроков (которые просто смотрят) запускаем только визуальный эффект
+                            Game.effects.push({x: this.x, y: this.y, char: '⭐', life: 40});
                         }
                     }
                 }
-
                 // 2. ЗАПУСК АВТО-ПРОИЗВОДСТВА (Строго после выдачи)
                 this.attemptAutoProduction();
             }

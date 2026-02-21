@@ -2345,10 +2345,25 @@ reloadGrads() {
         }
     },
 
-    showError(msg) {
-        const t = document.getElementById('msg-toast'); t.innerText = msg;
+showError(msg) {
+        // Защита от спама: если это ТА ЖЕ САМАЯ ошибка, и прошло меньше 1.5 секунд — игнорируем
+        if (this.lastErrorMsg === msg && Date.now() - this.lastErrorTime < 1500) return;
+
+        this.lastErrorMsg = msg;
+        this.lastErrorTime = Date.now();
+
+        const t = document.getElementById('msg-toast'); 
+        t.innerText = msg;
         t.style.opacity = 1;
-        setTimeout(() => t.style.opacity = 0, 2000);
+        
+        // Если уже был запущен таймер скрытия — отменяем его, чтобы текст не мигал
+        if (this.errorTimer) clearTimeout(this.errorTimer);
+        
+        // Ставим новый таймер на плавное исчезновение через 2 секунды
+        this.errorTimer = setTimeout(() => {
+            t.style.opacity = 0;
+            this.lastErrorMsg = ''; // Очищаем память об ошибке, когда она исчезла
+        }, 2000);
     },
 
     executeCommand(cmd) {

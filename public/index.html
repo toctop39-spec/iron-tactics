@@ -416,10 +416,13 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     CRAFT_HEAVY:  { type: 'action', name: 'Бомбер', emoji: '☄️', cost: 2500, resCost: { iron: 25, chips: 2 }, producedRes: { heavies: 1 }, buildTime: 8 },
     CRAFT_NUKE:   { type: 'action', name: 'Ядерка', emoji: '☢️', cost: 12000, resCost: { iron: 50, chem: 20, chips: 3 }, producedRes: { nukes: 1 }, buildTime: 25 },
     
-    // --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
+// --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
     WH_DEPOSIT: { type: 'action', name: 'ПОЛОЖИТЬ ВСЕ', emoji: '📥', cost: 0 },
-    WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 }
+    WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 },
+    
+    // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ ---
+    DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 }
 };
 
     const HOUSE_UPGRADES = [
@@ -2918,6 +2921,30 @@ onDown(e) {
 menuAction(type) {
         this.clickDelay = 20;
 
+// --- НОВОЕ: РАСПУСК АРМИИ ---
+        if (type === 'DISBAND_ARMY') {
+            let count = 0;
+            
+            this.selection.forEach(u => {
+                // Защита: убиваем только мобильных юнитов (нельзя случайно продать завод или стену)
+                if (!u.isProducer && !u.isBuilder && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) {
+                    u.hp = 0; // Юнит погибает
+                    count++;
+                    // Эффект вылетающих денег над каждым проданным юнитом
+                    Game.effects.push({x: u.x, y: u.y, char: '💵', life: 40}); 
+                }
+            });
+            
+            if (count > 0) {
+                const profit = count * 100;
+                this.money += profit; // Начисляем деньги
+                this.showError(`АРМИЯ РАСПУЩЕНА! ПОЛУЧЕНО: ${profit}$ 💵`);
+                this.selection = [];  // Сбрасываем выделение
+                this.updateUI([]);    // Прячем меню
+            }
+            return;
+        }
+
 if (type === 'RELOAD_ROCKET' || type === 'RELOAD_HEAVY') {
             let reloaded = 0;
             const ammoTypeStr = type === 'RELOAD_ROCKET' ? 'rockets' : 'heavies';
@@ -3307,13 +3334,17 @@ onUp(e) {
                         if (s0.nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(s0.nukeTimer/60)}s`);
                         else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
                     }
-                    else if (this.selection.some(u => u.isBuilder)) {
+        else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
                         this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, "ПОСТРОЙКИ");
                     }
                     else {
-                        // Для армии просто пишем количество
-                        this.updateUI([], true, `ВЫБРАНО: ${this.selection.length}`);
+                        // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---
+                        let list = [];
+                        if (this.selectionFilter === 'ARMY') {
+                            list.push('DISBAND_ARMY');
+                        }
+                        this.updateUI(list, true, `ВЫБРАНО: ${this.selection.length}`);
                     }
                 } else {
                     this.selectedProducer = null;
@@ -4940,3 +4971,4 @@ InitialLoader.init();
 </script>
 </body>
 </html>
+

@@ -4905,6 +4905,137 @@ if (dist < 15) {
             
             return; // Чтобы не рисовался текст/эмодзи
         }
+
+        // --- КРАСИВАЯ МОДЕЛЬ ГРАДА И HIMARS (РСЗО) ---
+        if (this.type === 'GRAD' || this.type === 'HIMARS') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            // --- 0. ТЕНЬ ОТ МАШИНЫ ---
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(4, 6, this.radius * 1.6, this.radius * 1.1, this.angle || 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // --- 1. ШАССИ (Грузовик) ---
+            ctx.save();
+            ctx.rotate(this.angle || 0);
+            
+            let cW = this.radius * 2.2; 
+            let cH = this.radius * 1.1; 
+            
+            // Колеса (6 массивных колес)
+            ctx.fillStyle = '#111';
+            let wW = 12; let wH = 6; let wDist = cH / 2 + 1;
+            [-cW/3, 0, cW/3].forEach(wx => {
+                ctx.fillRect(wx - wW/2, -wDist - wH/2, wW, wH);
+                ctx.fillRect(wx - wW/2, wDist - wH/2, wW, wH);
+            });
+
+            // Рама грузовика (темная)
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-cW/2, -cH/4, cW, cH/2);
+
+            // Кабина (Градиент в цвет базы)
+            let gradCab = ctx.createLinearGradient(cW/6, 0, cW/2, 0);
+            gradCab.addColorStop(0, '#333');
+            gradCab.addColorStop(0.5, this.color);
+            gradCab.addColorStop(1, '#555');
+            ctx.fillStyle = gradCab;
+            
+            ctx.fillRect(cW/6, -cH/2 + 2, cW/3 + 2, cH - 4);
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+            ctx.strokeRect(cW/6, -cH/2 + 2, cW/3 + 2, cH - 4);
+            
+            // Лобовое стекло и боковые окна
+            ctx.fillStyle = '#112233'; 
+            ctx.fillRect(cW/6 + 6, -cH/2 + 3, 6, cH - 6); // Лобовое
+            ctx.fillRect(cW/6 + 2, -cH/2 + 3, 10, 3);     // Боковое левое
+            ctx.fillRect(cW/6 + 2, cH/2 - 6, 10, 3);      // Боковое правое
+
+            // Фары (желтые)
+            ctx.fillStyle = '#ffaa00';
+            ctx.beginPath(); ctx.arc(cW/2 + 1, -cH/2 + 6, 2, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cW/2 + 1, cH/2 - 6, 2, 0, Math.PI*2); ctx.fill();
+
+            ctx.restore(); // Конец шасси
+
+            // --- 2. РАКЕТНАЯ УСТАНОВКА (Поворачивается к цели!) ---
+            ctx.save();
+            
+            // Умный плавный поворот
+            if (this.turretAngle === undefined) this.turretAngle = this.angle || 0;
+            let targetAngle = this.angle || 0; // По умолчанию смотрит вперед
+            
+            // Если готовимся к выстрелу (или HIMARS перезаряжается) - наводимся на цель
+            if (this.gradSeq > 0 && this.gradTarget) {
+                targetAngle = Math.atan2(this.gradTarget.y - this.y, this.gradTarget.x - this.x);
+            } else if (this.type === 'HIMARS' && this.targetUnit) {
+                targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
+            }
+            
+            let diff = targetAngle - this.turretAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            this.turretAngle += diff * 0.08; // Скорость вращения установки
+            
+            ctx.rotate(this.turretAngle);
+
+            // Поворотный круг (основание)
+            ctx.fillStyle = '#222';
+            ctx.beginPath(); ctx.arc(-this.radius*0.2, 0, this.radius*0.5, 0, Math.PI*2); ctx.fill();
+
+            // Блок направляющих труб (коробка ракет)
+            let rW = this.radius * 1.5;
+            let rH = this.radius * 1.1;
+            let isHimars = this.type === 'HIMARS';
+            
+            // HIMARS немного другого цвета (более военный темно-зеленый/серый)
+            ctx.fillStyle = isHimars ? '#4a554a' : this.color; 
+            ctx.fillRect(-this.radius*0.2 - rW*0.4, -rH/2, rW, rH);
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+            ctx.strokeRect(-this.radius*0.2 - rW*0.4, -rH/2, rW, rH);
+
+            // Рисуем трубы (если есть патроны - видно оранжевые кончики ракет)
+            let ammoRatio = this.ammo / this.maxAmmo;
+            for(let rx = -this.radius*0.2 - rW*0.4 + 4; rx < -this.radius*0.2 + rW*0.6 - 2; rx += (isHimars? 12 : 7)) {
+                for(let ry = -rH/2 + 4; ry < rH/2 - 2; ry += (isHimars? 12 : 6)) {
+                    ctx.fillStyle = (Math.random() < ammoRatio) ? '#ffaa00' : '#111';
+                    ctx.beginPath(); ctx.arc(rx, ry, isHimars? 4 : 2, 0, Math.PI*2); ctx.fill();
+                }
+            }
+            
+            ctx.restore(); // Конец установки
+            ctx.restore(); // Конец машины
+
+            // --- 3. ИНТЕРФЕЙС И ПОЛОСКИ ---
+            ctx.font = '12px Arial'; ctx.fillStyle = this.ammo === 0 ? 'red' : 'yellow'; 
+            ctx.textAlign = 'center';
+            ctx.fillText(`${this.ammo}/${this.maxAmmo}`, this.x, this.y - 25);
+            
+            // Полоска подготовки к залпу (только для ГРАДа)
+            if (this.gradSeq > 0) { 
+                ctx.fillStyle = '#f90'; 
+                let w = 30 * (this.gradSeq/360); 
+                ctx.fillRect(this.x - 15, this.y + 20, w, 4); 
+            }
+
+            // Стандартное здоровье
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            
+            // Выделение и радиус атаки
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            
+            return; // Завершаем отрисовку, чтобы не рисовать старую иконку
+        }
     
         if (!this.isPowered && (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO','WAREHOUSE'].includes(this.type))) ctx.globalAlpha = 0.5;
         if (this === Game.selectedProducer) { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.fill(); ctx.strokeStyle = '#ff0'; ctx.stroke(); }

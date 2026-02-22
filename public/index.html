@@ -4233,7 +4233,7 @@ attemptAutoProduction() {
                 this.constructing = true;
                 if (this.assignedSite.remaining > 0) {
                     this.assignedSite.remaining = Math.max(0, this.assignedSite.remaining - 1);
-                    if (Game.frameCount % 8 === 0) Game.effects.push({x: this.x + (Math.random()*20-10), y: this.y - 20, char: '🔨', life: 20});
+                    if (Game.frameCount % 300 === 0) Game.effects.push({x: this.x + (Math.random()*20-10), y: this.y - 20, char: '🔨', life: 20});
                 }
                 if (this.assignedSite.remaining <= 0) {
                     const st = this.assignedSite;

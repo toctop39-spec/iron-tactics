@@ -3739,18 +3739,24 @@ onRight(e) {
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2, 6);
             ctx.fillStyle = '#6cf'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2 * pct, 6);
         });
-       // 1. Здания
-        const buildings = this.units.filter(u => UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(u.type));
+// 1. Здания и статичные объекты
+        const buildings = this.units.filter(u => UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+        
         // 2. Лодки (выделяем в отдельный слой)
         const boats = this.units.filter(u => u.type === 'BOAT');
-        // 3. Остальная техника и пехота
-        const mobile = this.units.filter(u => u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(u.type));
         
-        // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ (снизу вверх):
+        // 3. Наземная техника и пехота (всё, что не летает и не плавает)
+        const ground = this.units.filter(u => !u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+        
+        // 4. Авиация (Вертолеты и FPV дроны)
+        const flying = this.units.filter(u => u.isFlying);
+        
+        // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ (от земли к небу):
         buildings.forEach(u => u.draw(ctx)); 
-        boats.forEach(u => u.draw(ctx));      // Лодка рисуется под ногами
-        mobile.forEach(u => u.draw(ctx));     // Солдаты и танки рисуются ПОВЕРХ лодки
-        this.bullets.forEach(b => b.draw(ctx));
+        boats.forEach(u => u.draw(ctx));      // Лодка под ногами
+        ground.forEach(u => u.draw(ctx));     // Солдаты и танки
+        flying.forEach(u => u.draw(ctx));     // Авиация перекрывает всё на земле
+        this.bullets.forEach(b => b.draw(ctx)); // Снаряды летят поверх вообще всего
 
 for (let i = this.effects.length - 1; i >= 0; i--) {
             const e = this.effects[i];

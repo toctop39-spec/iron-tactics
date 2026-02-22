@@ -4521,24 +4521,27 @@ attemptAutoProduction() {
              if (this.reload > 0) this.reload--;
              if (this.reload <= 0 && this.ammo > 0) {
                  
-                 // 1. ПРИОРИТЕТ: Ищем крылатые ракеты (Радиус перехвата огромный)
-                 let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
+                 // 1. ПРИОРИТЕТ: Ищем крылатые ракеты. 
+                 // Проверяем !b.targetedByHIMARS, чтобы несколько Хаймарсов не стреляли по одной ракете!
+                 let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && !b.targetedByHIMARS && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
                  
                  if (cruise) {
                      this.ammo--;
-                     this.reload = 40; // Быстрая перезарядка после перехвата
-                     cruise.dead = true; // Сбиваем ракету в воздухе
-                     this.podElev = 1; // Задираем трубы
+                     this.reload = 40; 
+                     this.podElev = 1; 
+                     cruise.targetedByHIMARS = true; // "Метка смерти", чтобы другие Хаймарсы её игнорировали
+
+                     // ВЫПУСКАЕМ РАКЕТУ-ПЕРЕХВАТЧИК (Скорость 20 - невероятно быстрая)
+                     let interceptor = new Bullet(this.x, this.y, cruise.x, cruise.y, 0, this.side, false, null, this, 0, false, 1, 20);
+                     interceptor.isInterceptor = true; // Специальный флаг
+                     interceptor.targetBullet = cruise; // Указываем, за кем гнаться
+                     Game.bullets.push(interceptor);
                      
-                     // Красивый взрыв в небе
-                     SoundManager.play('explosion', 100, SoundManager.getVolumeByDistance(cruise.x, cruise.y, 1500, 0.7));
-                     Game.effects.push({x: cruise.x, y: cruise.y, char: '💥', life: 30, size: 50});
-                     Game.effects.push({type: 'shockwave', x: cruise.x, y: cruise.y, radius: 20, maxRadius: 150, life: 30, color: 'rgba(255, 100, 0, 0.6)'});
-                     for(let k=0; k<20; k++) {
-                         Game.effects.push({type: 'smoke', x: cruise.x, y: cruise.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 40 + Math.random()*30});
-                         Game.effects.push({type: 'dirt', x: cruise.x, y: cruise.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*10, size: 3, life: 30, color: '#ffaa00'});
-                     }
-                     return; // Выходим, чтобы не стрелять еще и по вертолетам одновременно
+                     // Звук и эффект запуска с самого Хаймарса
+                     SoundManager.play('shoot', 100, SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.5));
+                     Game.effects.push({x: this.x, y: this.y - 40, char: '🚀', life: 30});
+                     
+                     return; 
                  }
 
                  // 2. Если крылатых ракет нет - ищем вертолеты
@@ -5609,6 +5612,34 @@ class Bullet {
     }
     updateAngle(targetX, targetY) { let d = Math.hypot(targetX - this.x, targetY - this.y); if (d === 0) d = 1; this.dx = (targetX - this.x) / d; this.dy = (targetY - this.y) / d; }
     update() {
+
+        // --- НОВОЕ: ЛОГИКА РАКЕТЫ-ПЕРЕХВАТЧИКА ---
+        if (this.isInterceptor && this.targetBullet) {
+            if (this.targetBullet.dead) { this.dead = true; return; } // Если цель уже сбили
+            
+            // Наводимся на летящую крылатую ракету
+            this.tx = this.targetBullet.x; 
+            this.ty = this.targetBullet.y; 
+            this.updateAngle(this.tx, this.ty);
+            this.dist = Math.hypot(this.tx - this.x, this.ty - this.y);
+            
+            // Если догнали - БУМ!
+            if (this.dist < this.speed + 15) {
+                this.targetBullet.dead = true; // Уничтожаем крылатую ракету
+                this.dead = true;              // Исчезаем сами
+                
+                // Эффект огромного взрыва высоко в небе
+                SoundManager.play('explosion', 100, SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.7));
+                Game.effects.push({x: this.x, y: this.y, char: '💥', life: 30, size: 50});
+                Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 150, life: 30, color: 'rgba(255, 100, 0, 0.6)'});
+                for(let k=0; k<20; k++) {
+                    Game.effects.push({type: 'smoke', x: this.x, y: this.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 40 + Math.random()*30});
+                    Game.effects.push({type: 'dirt', x: this.x, y: this.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*10, size: 3, life: 30, color: '#ffaa00'});
+                }
+                return;
+            }
+        }
+        
         if (!this.arty && this.targetUnit && this.targetUnit.hp > 0) { this.tx = this.targetUnit.x; this.ty = this.targetUnit.y; this.updateAngle(this.tx, this.ty); this.dist = Math.hypot(this.tx - this.x, this.ty - this.y); this.traveled = 0; }
         this.x += this.dx * this.speed; this.y += this.dy * this.speed;
         this.prevVisX = this.visX; this.prevVisY = this.visY;

@@ -3811,13 +3811,13 @@ onRight(e) {
         if (builders.length > 1) this.selection = this.selection.filter(s => !s.isBuilder).concat([builders[0]]);
     },
 
-    draw() {
+  draw() {
         // Очистка экрана и сохранение контекста (ОБЯЗАТЕЛЬНО)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
 
-// --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ ---
+        // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ ---
         if (this.isIslandMode) {
             // Режим архипелага (заливаем всё водой)
             const gradient = ctx.createRadialGradient(
@@ -3838,18 +3838,6 @@ onRight(e) {
                 ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
             }
         }
-
-        // 1. Анимированный фон (вода / космос)
-        const time = this.frameCount * 0.002;
-        const gradient = ctx.createRadialGradient(
-            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
-            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
-        );
-        gradient.addColorStop(0, '#050a14');
-        gradient.addColorStop(1, '#020408');
-        ctx.fillStyle = gradient;
-        // Заливаем весь мир фоном воды
-        ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
 
 // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
         if (this.isIslandMode && MapUtils.bgCanvas) {
@@ -4506,7 +4494,7 @@ attemptAutoProduction() {
                 // ИСПРАВЛЕНИЕ: Ищем только врагов, не летунов, и строго НЕ здания
                 const target = Game.units.find(u => {
                     // Базовые проверки: чужой, живой, не летает, не мина
-                    if (u.side === this.side || u.hp <= 0 || u.isFlying || u.type === 'MINE') return false;
+                    if (u.side === this.side || u.hp <= 0 || u.isFlying || u.type === 'MINE' || u.type === 'TREE') return false;
                     
                     // Проверка на здание
                     const isBuilding = u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type);

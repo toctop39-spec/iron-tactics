@@ -2834,10 +2834,61 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 }
             this.units.forEach(u => u.update());
             
-            // --- СЧИТАЕМ ПОТЕРИ ПЕРЕД УДАЛЕНИЕМ ---
+     // --- СЧИТАЕМ ПОТЕРИ И РИСУЕМ ВЗРЫВЫ ПЕРЕД УДАЛЕНИЕМ ---
             this.units.forEach(u => {
-                if (u.hp <= 0 && u.side === this.myRole && (UNITS[u.type].isInfantry || u.isBuilder)) {
-                    this.casualties = (this.casualties || 0) + 1; // Записываем в список погибших
+                if (u.hp <= 0) {
+                    // Считаем потери населения
+                    if (u.side === this.myRole && (UNITS[u.type].isInfantry || u.isBuilder)) {
+                        this.casualties = (this.casualties || 0) + 1; 
+                    }
+
+                    // --- КИНЕМАТОГРАФИЧНОЕ УНИЧТОЖЕНИЕ ---
+                    let vol = SoundManager.getVolumeByDistance(u.x, u.y, 1500, 0.6);
+
+                    // 1. УНИЧТОЖЕНИЕ ВЕРТОЛЕТА В ВОЗДУХЕ
+                    if (u.type === 'HELICOPTER') {
+                         SoundManager.play('explosion', 100, vol * 1.2); // Звук громче
+                         Game.effects.push({x:u.x, y:u.y, char:'💥', life:30, size: 60}); 
+                         Game.effects.push({type: 'shockwave', x: u.x, y: u.y, radius: 20, maxRadius: 150, life: 40, color: 'rgba(255, 100, 0, 0.5)'});
+
+                         // Разлет горящих обломков и дыма
+                         for(let i=0; i < 35; i++) {
+                             Game.effects.push({
+                                 type: 'debris', x: u.x, y: u.y,
+                                 vx: (Math.random()-0.5)*25, vy: (Math.random()-0.5)*25 - 5,
+                                 size: 4 + Math.random()*6, life: 60 + Math.random()*40,
+                                 color: Math.random() > 0.5 ? '#222' : '#444'
+                             });
+                             if (i % 2 === 0) {
+                                Game.effects.push({type: 'smoke', x: u.x, y: u.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 90});
+                                Game.effects.push({type: 'dirt', x: u.x, y: u.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*15, size: 3, life: 40, color: '#ff4400'});
+                             }
+                         }
+                    }
+                    // 2. УНИЧТОЖЕНИЕ ТЯЖЕЛОЙ НАЗЕМНОЙ ТЕХНИКИ
+                    else if (['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
+                         SoundManager.play('explosion', 90, vol);
+                         Game.effects.push({x:u.x, y:u.y, char:'💥', life:25});
+                         
+                         // Мощный выброс земли и огня вверх и в стороны
+                         for(let i=0; i < 40; i++) {
+                             Game.effects.push({
+                                 type: 'dirt', x: u.x, y: u.y,
+                                 vx: (Math.random()-0.5)*18, vy: -Math.random()*20 - 5, 
+                                 size: 3 + Math.random()*5, life: 50 + Math.random()*50,
+                                 color: Math.random() > 0.6 ? '#4a3022' : '#222' 
+                             });
+                             if (i % 4 === 0) {
+                                 Game.effects.push({type: 'dirt', x: u.x, y: u.y, vx: (Math.random()-0.5)*10, vy: -Math.random()*12, size: 3, life: 30, color: '#ff5500'});
+                             }
+                         }
+                         Game.effects.push({type: 'smoke', x: u.x, y: u.y - 20, life: 120}); 
+                    }
+                    // 3. ОБЫЧНЫЙ ВЗРЫВ (Пехота, здания, лодки)
+                    else {
+                        SoundManager.play('explosion', 80, vol);
+                        Game.effects.push({x:u.x, y:u.y, char:'💥', life:20});
+                    }
                 }
             });
             

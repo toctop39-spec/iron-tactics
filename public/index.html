@@ -5506,6 +5506,91 @@ if (dist < 15) {
             return;
         }
 
+        // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ (С ПОЛОСКАМИ И АВТО-ПРОИЗВОДСТВОМ) ---
+        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT'].includes(this.type)) {
+            
+            // Полупрозрачность, если нет электричества
+            if (!this.isPowered) ctx.globalAlpha = 0.5;
+            
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            let imgKey = this.type;
+            if (this.type === 'WAREHOUSE') imgKey = 'FACTORY'; 
+
+            let img = Game.loadedImages[imgKey];
+            let hpOffset = this.radius * 1.5; // Поднимаем полоски повыше, чтобы не перекрывали картинку
+            
+            // 1. РИСУЕМ САМО ЗДАНИЕ С ПРАВИЛЬНЫМИ ПРОПОРЦИЯМИ
+            if (img && img.complete && img.naturalHeight !== 0) {
+                let drawWidth = this.radius * 2.8; 
+                let ratio = img.naturalHeight / img.naturalWidth;
+                let drawHeight = drawWidth * ratio;
+
+                ctx.drawImage(img, -drawWidth/2, -drawHeight/2, drawWidth, drawHeight);
+                
+                // Таймеры ракет для бункера прямо на здании
+                if (this.type === 'SILO') {
+                    let timerY = this.radius + 10;
+                    if (this.nukeTimer > 0) { ctx.fillStyle = 'red'; ctx.font = 'bold 16px Arial'; ctx.fillText(Math.ceil(this.nukeTimer/60) + 's', -12, timerY); }
+                    if (this.cruiseTimer > 0) { ctx.fillStyle = '#ffaa00'; ctx.font = 'bold 16px Arial'; ctx.fillText(Math.ceil(this.cruiseTimer/60) + 's', -12, timerY + 18); }
+                }
+            } else {
+                ctx.fillStyle = this.color || '#555';
+                ctx.fillRect(-this.radius, -this.radius, this.radius*2, this.radius*2);
+            }
+            ctx.restore();
+            ctx.globalAlpha = 1.0; // Сбрасываем прозрачность для полосок
+
+            // --- 2. ПОЛОСКА ЗДОРОВЬЯ ---
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30 * (Math.max(0, this.hp) / this.maxHp), 4);
+            
+            // --- 3. ПОЛОСКА ЗАХВАТА (ЛОЯЛЬНОСТЬ) ---
+            if (CAPTURABLE_BUILDINGS.includes(this.type)) {
+                ctx.fillStyle = '#550022'; ctx.fillRect(this.x - 15, this.y - hpOffset + 5, 30, 4);
+                ctx.fillStyle = '#ff69b4'; ctx.fillRect(this.x - 15, this.y - hpOffset + 5, 30 * (Math.max(0, this.loyalty) / this.maxLoyalty), 4);
+            }
+
+            // --- 4. ПОЛОСКА ПРОГРЕССА ПРОИЗВОДСТВА ---
+            if (this.isProducer && this.spawnCooldown > 0) {
+                ctx.fillStyle = '#000'; ctx.fillRect(this.x - 15, this.y - hpOffset - 6, 30, 4);
+                ctx.fillStyle = '#0af'; ctx.fillRect(this.x - 15, this.y - hpOffset - 6, 30 * (1 - this.spawnCooldown / this.spawnMax), 4);
+            }
+
+            // --- 5. ЛЕТАЮЩИЙ ЗНАЧОК "АВТО-ПРОИЗВОДСТВО" ---
+            if (this.autoTarget && this.side === Game.myRole) {
+                const uInfo = UNITS[this.autoTarget];
+                if (uInfo) {
+                    const floatY = Math.sin(Game.frameCount * 0.1) * 5;
+                    ctx.save();
+                    ctx.translate(this.x, this.y - hpOffset - 25 + floatY);
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.stroke();
+
+                    ctx.font = '14px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('🔄', 8, -8); 
+                    ctx.font = '16px Arial'; ctx.fillText(uInfo.emoji, 0, 0); 
+                    ctx.restore();
+                }
+            }
+
+            // --- 6. КРУГИ ВЫДЕЛЕНИЯ ---
+            if (this === Game.selectedProducer) { 
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI*2); 
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.fill(); 
+                ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.stroke(); 
+            }
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; 
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI*2); ctx.stroke();
+            }
+
+            return; // Выходим из функции, чтобы старый квадратный код не нарисовался поверх!
+        }
+
     // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ (ИСПРАВЛЕННАЯ) ---
         if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT'].includes(this.type)) {
             ctx.save();

@@ -5077,6 +5077,142 @@ if (dist < 15) {
             
             return;
         }
+
+        // --- КРАСИВАЯ МОДЕЛЬ ВЕРТОЛЕТА (УДАРНЫЙ) ---
+        if (this.type === 'HELI') {
+            ctx.save();
+            
+            // --- 0. ТЕНЬ (Смещена сильно вправо и вниз для эффекта высоты) ---
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; // Тень от летящего объекта светлее и прозрачнее
+            ctx.save();
+            ctx.translate(this.x + 20, this.y + 25); // Сильное смещение = большая высота
+            ctx.rotate(this.angle || 0);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 1.5, this.radius * 0.6, 0, 0, Math.PI*2);
+            ctx.fill();
+            // Тень от хвоста
+            ctx.fillRect(-this.radius * 2.2, -2, this.radius * 1.5, 4);
+            ctx.restore();
+
+            // --- ПЕРЕНОСИМСЯ К САМОМУ ВЕРТОЛЕТУ ---
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle || 0);
+
+            // 1. Хвост (Балка)
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-this.radius * 2.5, -3, this.radius * 1.5, 6);
+            
+            // Хвостовое оперение (стабилизаторы)
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.radius * 2.2, -12, 8, 24);
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-this.radius * 2.5, -4, 10, 8); // Киль
+
+            // 2. Крылья и подвесное оружие (Ракетные блоки)
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-5, -this.radius * 1.4, 12, this.radius * 2.8); // Пилоны
+            
+            // Сами пусковые установки
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(-2, -this.radius * 1.6, 16, 10);
+            ctx.fillRect(-2, this.radius * 1.6 - 10, 16, 10);
+            
+            // Красные кончики ракет в блоках
+            ctx.fillStyle = 'darkred';
+            ctx.fillRect(14, -this.radius * 1.6 + 1, 3, 8);
+            ctx.fillRect(14, this.radius * 1.6 - 9, 3, 8);
+
+            // 3. Основной корпус (Аэродинамичный фюзеляж)
+            let gradBody = ctx.createLinearGradient(-this.radius, 0, this.radius, 0);
+            gradBody.addColorStop(0, '#222');
+            gradBody.addColorStop(0.5, this.color); // Цвет вашей базы
+            gradBody.addColorStop(1, '#555');
+            
+            ctx.fillStyle = gradBody;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 1.2, this.radius * 0.7, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+
+            // 4. Кабина пилота (Стекло с бликом)
+            ctx.fillStyle = '#0a1118';
+            ctx.beginPath();
+            ctx.ellipse(this.radius * 0.65, 0, this.radius * 0.45, this.radius * 0.35, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Светлый блик на стекле
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.ellipse(this.radius * 0.75, -this.radius * 0.1, this.radius * 0.2, this.radius * 0.1, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Автопушка под носом
+            ctx.fillStyle = '#444';
+            ctx.fillRect(this.radius * 1.1, -2, 12, 4);
+
+            // 5. Малый хвостовой винт (Быстро вращается)
+            ctx.save();
+            ctx.translate(-this.radius * 2.4, -6);
+            ctx.rotate(Game.frameCount * 0.5); // Скорость вращения
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+            ctx.fillRect(-8, -1, 16, 2);
+            ctx.fillRect(-1, -8, 2, 16);
+            ctx.restore();
+
+            // 6. ГЛАВНЫЙ ВИНТ (Анимация лопастей и размытие)
+            ctx.save();
+            ctx.translate(this.radius * 0.1, 0); // Центр винта чуть смещен вперед
+            ctx.rotate(Game.frameCount * 0.35); // Вращение несущего винта
+            
+            // Механизм втулки винта
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+            
+            // 4 Лопасти
+            ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
+            let bladeL = this.radius * 2.4;
+            let bladeW = 6;
+            for(let i=0; i < 4; i++) {
+                ctx.rotate(Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(0, -bladeW/2);
+                ctx.lineTo(bladeL, -bladeW/3);
+                ctx.lineTo(bladeL, bladeW/3);
+                ctx.lineTo(0, bladeW/2);
+                ctx.fill();
+                
+                // Желтые предупреждающие полосы на концах лопастей
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.9)';
+                ctx.fillRect(bladeL - 10, -bladeW/3, 8, bladeW * 0.66);
+                ctx.fillStyle = 'rgba(30, 30, 30, 0.85)'; // Возвращаем цвет
+            }
+            
+            // Эффект "Motion Blur" (полупрозрачный диск от быстрого вращения)
+            ctx.beginPath();
+            ctx.arc(0, 0, bladeL, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(50, 50, 50, 0.15)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.restore(); // Конец главного винта
+            ctx.restore(); // Конец вертолета
+
+            // --- 7. ИНТЕРФЕЙС ---
+            let hpOffset = this.radius + 15;
+            // Полоска здоровья поднята чуть выше, чтобы соответствовать визуальной "высоте"
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset - 15, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset - 15, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            
+            return;
+        }
     
         if (!this.isPowered && (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO','WAREHOUSE'].includes(this.type))) ctx.globalAlpha = 0.5;
         if (this === Game.selectedProducer) { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.fill(); ctx.strokeStyle = '#ff0'; ctx.stroke(); }

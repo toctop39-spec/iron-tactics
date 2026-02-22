@@ -412,6 +412,8 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     },
 
     WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
+
+    TREE: { type: 'bldg', name: 'Дерево', hp: 80, radius: 12, color: '#2d4c1e', isInvulnerable: false },
     
     HEAL_BTN: { type:'action', name: 'ЛЕЧИТЬ', emoji: '💉', cost: 500 },
 
@@ -1766,6 +1768,7 @@ setFilter(type) {
         }
         // Загружаем картинки снарядов
         this.loadedImages['CRUISE'] = new Image(); this.loadedImages['CRUISE'].src = 'Rocket.png';
+        this.loadedImages['GROUND'] = new Image(); this.loadedImages['GROUND'].src = 'Ground.png';
 // Загружаем картинки зданий
         this.loadedImages['NUCLEAR_PLANT'] = new Image(); this.loadedImages['NUCLEAR_PLANT'].src = 'Solarpanels.png';
         this.loadedImages['POWER_PLANT'] = new Image(); this.loadedImages['POWER_PLANT'].src = 'Nuclear.png';
@@ -2412,30 +2415,37 @@ loadLevel(lvlId) {
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
         
-        // --- ГЕНЕРАЦИЯ ДЕКОРА (ИСПРАВЛЕННАЯ) ---
-        const emojis = ['🌲', '🌲', '🌳', '🪨', '🌿', '🪵'];
-        const gridSize = 50; 
+    // --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ С ФИЗИКОЙ ---
+        const treeNoiseScale = 0.0025; // Насколько крупными будут пятна лесов (меньше = крупнее)
+        const gridSize = 40; // Плотность посадки деревьев
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
         
-       for (let r = 0; r < rows; r++) {
+        for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                if (MapUtils.random() > 0.3) continue; // Используем наш единый рандом!
-                
-                let dx = c * gridSize + MapUtils.random() * gridSize;
-                let dy = r * gridSize + MapUtils.random() * gridSize;
+                // Небольшой случайный сдвиг, чтобы деревья не стояли идеально по сетке
+                let dx = c * gridSize + (MapUtils.random() - 0.5) * gridSize;
+                let dy = r * gridSize + (MapUtils.random() - 0.5) * gridSize;
                 
                 if (!this.isIslandMode || !MapUtils.isWater(dx, dy)) {
                     if (!MapUtils.checkMountain(dx, dy, 30)) {
-                        this.decor.push({
-                            x: dx, 
-                            y: dy, 
-                            char: emojis[Math.floor(MapUtils.random()*emojis.length)]
-                        });
+                        
+                        // Используем генератор шума, чтобы понять, есть ли тут лес
+                        let forestVal = SimplexNoise.noise(dx * treeNoiseScale, dy * treeNoiseScale);
+                        
+                        // Если значение шума высокое — спавним ФИЗИЧЕСКОЕ ДЕРЕВО
+                        if (forestVal > 15) { 
+                            let tree = new Unit('TREE', dx, dy, 'neutral');
+                            this.units.push(tree); // Добавляем в общий массив юнитов!
+                        } 
+                        // Если леса нет, с малым шансом кидаем мелкий декор на землю
+                        else if (MapUtils.random() > 0.95) {
+                            this.decor.push({x: dx, y: dy, char: (MapUtils.random() > 0.5 ? '🌿' : '🪨')});
+                        }
                     }
                 }
             }
-       }
+        }
    },
 
     startGameUI(title) {
@@ -3759,6 +3769,31 @@ onRight(e) {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
 
+        // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ ---
+        if (this.isIslandMode) {
+            // Если архипелаг - заливаем водой
+            const gradient = ctx.createRadialGradient(
+                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
+                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
+            );
+            gradient.addColorStop(0, '#050a14'); gradient.addColorStop(1, '#020408');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
+            
+            // Острова рисуются ниже из кэша (MapUtils)
+        } else {
+            // Если обычная карта - заливаем ВСЁ вашей текстурой земли!
+            const img = Game.loadedImages['GROUND'];
+            if (img && img.complete && img.naturalWidth !== 0) {
+                ctx.fillStyle = ctx.createPattern(img, 'repeat');
+                // Рисуем текстуру с учетом смещения камеры, чтобы земля "стояла на месте"
+                ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#243b29'; // Резервный цвет, если картинка не загрузилась
+                ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
+            }
+        }
+
         // 1. Анимированный фон (вода / космос)
         const time = this.frameCount * 0.002;
         const gradient = ctx.createRadialGradient(
@@ -4788,8 +4823,8 @@ if (this.type === 'AA_DEFENSE') {
                 let near = null;
                 
                 // --- ОПТИМИЗАЦИЯ ПОИСКА ЦЕЛИ (Манхэттенское отсечение) ---
-                Game.units.forEach(u => {
-                    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE') {
+               Game.units.forEach(u => {
+    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
                         // Очень быстро отсекаем всех, кто явно дальше радиуса, без тяжелой математики с корнями
                         if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
                             let d = Math.hypot(u.x - this.x, u.y - this.y);
@@ -5071,6 +5106,33 @@ if (dist < 15) {
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
             }
             return; // Завершаем отрисовку, чтобы не рисовался старый текст и эмодзи
+        }
+
+        // --- 3D МОДЕЛЬ ДЕРЕВА ---
+        if (this.type === 'TREE') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // Тень на земле
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.ellipse(4, 4, this.radius*1.4, this.radius*1.1, 0, 0, Math.PI*2); ctx.fill();
+
+            // Коричневый ствол (под кроной)
+            ctx.fillStyle = '#3b2518';
+            ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI*2); ctx.fill();
+
+            // Крона: 3 уровня листвы для создания объема (от темного к светлому)
+            ctx.fillStyle = '#1b3311'; // Темный нижний слой
+            ctx.beginPath(); ctx.arc(0, 0, this.radius * 1.3, 0, Math.PI*2); ctx.fill();
+
+            ctx.fillStyle = '#2d4c1e'; // Средний слой (сдвинут чуть вверх-влево к свету)
+            ctx.beginPath(); ctx.arc(-2, -2, this.radius * 0.95, 0, Math.PI*2); ctx.fill();
+
+            ctx.fillStyle = '#41662d'; // Светлый верхний блик
+            ctx.beginPath(); ctx.arc(-4, -4, this.radius * 0.5, 0, Math.PI*2); ctx.fill();
+
+            ctx.restore();
+            return; // Выходим, чтобы не рисовались полоски ХП
         }
 
    // --- КРАСИВАЯ МОДЕЛЬ ТАНКА (РЕАЛИСТИЧНАЯ) ---

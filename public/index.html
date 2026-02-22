@@ -4535,7 +4535,7 @@ attemptAutoProduction() {
                      interceptor.targetBullet = cruise; 
                      
                      // --- ШАНС ПРОМАХА 30% ---
-                     interceptor.willMiss = Math.random() < 0.3; 
+                     interceptor.willMiss = Math.random() < 0.1; 
                      if (interceptor.willMiss) {
                          // Если эта ракета промажет, снимаем метку с цели, чтобы другой Хаймарс на базе попытался её сбить!
                          cruise.targetedByHIMARS = false; 

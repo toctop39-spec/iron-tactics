@@ -662,13 +662,17 @@ getWorldHeight(x, y) {
         for (let y = 0; y < this.bgCanvas.height; y++) {
             for (let x = 0; x < this.bgCanvas.width; x++) {
                 const h = this.getWorldHeight(x / scale, y / scale);
-                if (h >= 0.48) {
-                    ctx.fillStyle = '#243b29'; // Суша (травянистый цвет из твоей игры)
+                
+                if (h < 0.42) {
+                    // Глубокая вода (темная)
+                    ctx.fillStyle = '#050a14'; 
                     ctx.fillRect(x, y, 1, 1);
-                } else if (h >= 0.42) {
-                    ctx.fillStyle = 'rgba(0, 220, 255, 0.35)'; // Мелководье
+                } else if (h < 0.48) {
+                    // Мелководье (полупрозрачный голубой, сквозь него будет видно дно!)
+                    ctx.fillStyle = 'rgba(0, 150, 200, 0.4)'; 
                     ctx.fillRect(x, y, 1, 1);
                 }
+                // Суша (h >= 0.48) остается ПРОЗРАЧНОЙ, чтобы было видно камуфляж
             }
         }
     }
@@ -3814,29 +3818,21 @@ draw() {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
 
-        // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ ---
-        if (this.isIslandMode) {
-            // Режим архипелага (заливаем всё водой)
-            const gradient = ctx.createRadialGradient(
-                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
-                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
-            );
-            gradient.addColorStop(0, '#050a14');
-            gradient.addColorStop(1, '#020408');
-            ctx.fillStyle = gradient;
+        // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ (ВО ВСЕХ РЕЖИМАХ) ---
+        if (this.groundPattern) {
+            ctx.fillStyle = this.groundPattern;
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         } else {
-            // Стандартный/Гигантский режим (заливаем нашей новой текстурой земли)
-            if (this.groundPattern) {
-                ctx.fillStyle = this.groundPattern;
-                ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
-            } else {
-                ctx.fillStyle = '#243b29'; // Запасной цвет
-                ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
-            }
+            ctx.fillStyle = '#243b29'; // Запасной цвет
+            ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
 
-        // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)}
+        // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
+        if (this.isIslandMode && MapUtils.bgCanvas) {
+            ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль
+            ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
+            ctx.imageSmoothingEnabled = true;
+        }
 
 // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
         if (this.isIslandMode && MapUtils.bgCanvas) {

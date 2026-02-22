@@ -4557,35 +4557,35 @@ if (this.type === 'AA_DEFENSE') {
                         this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
                     }
                 } 
-                // Стрельба
-                else if (d <= this.range) {
-                    if (!this.isFlying) busy = true;
-                    if (this.reload <= 0) {
-                        this.reload = this.reloadMax;
-                        // Вертолет стреляет двойными
+  // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
+                        let spawnX = this.x;
+                        let spawnY = this.y;
+                        
+                        if (this.type === 'TANK') {
+                            spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
+                            spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
+                        } else if (this.type === 'HELICOPTER') {
+                            // Вертолет стреляет прямо из кабины/носа
+                            spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
+                            spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
+                        } else {
+                            // Пехота стреляет чуть впереди себя
+                            spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
+                            spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
+                        }
+
+                        // ВЕРТОЛЕТЫ
                         if (this.type === 'HELICOPTER') {
-                            if (this.ammo > 0) {
-                                this.ammo--;
-                                Game.bullets.push(new Bullet(this.x - 10, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                                Game.bullets.push(new Bullet(this.x + 10, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                            }
-                        } 
-                 // Остальные
-                      // Остальные
-                        else {
-                            // Вычисляем громкость: слышно на расстоянии до 1500 пикселей
-                            let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
-                            
-                            if (this.type === 'TANK') {
-                                SoundManager.play('tankFire', 100, vol);
-                                this.recoil = 12;
-                            } else {
-                                // Все остальные (Пехота, Снайперы, Лодки, Грады) стреляют звуком Shoot.mp3
-                                SoundManager.play('shoot', 100, vol); 
-                            }
-                            
-                            let splashR = (this.type === 'TANK') ? 60 : 0;
-                            Game.bullets.push(new Bullet(this.x, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
+                            SoundManager.play('shoot', 100, vol);
+                            // Стреляем из носа
+                            Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
+                            // Второй выстрел с задержкой
+                            setTimeout(() => {
+                                if (this.hp > 0 && Game.state !== 'MENU') {
+                                    SoundManager.play('shoot', 100, vol);
+                                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
+                                }
+                            }, 150);
                         }
                     }
                 } 

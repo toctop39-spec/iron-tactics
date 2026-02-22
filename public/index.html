@@ -4542,7 +4542,7 @@ if (this.type === 'AA_DEFENSE') {
 
             let busy = false;
             
-            // Если цель есть - действуем
+          // Если цель есть - действуем
             if (this.targetUnit) {
                 let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
                 
@@ -4557,7 +4557,18 @@ if (this.type === 'AA_DEFENSE') {
                         this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
                     }
                 } 
-  // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
+                // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
+                else if (d <= this.range) {
+                    this.target = null; // Останавливаемся для выстрела
+                    let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
+                    this.angle = targetAngle; // Поворачиваемся к цели
+
+                    // Если орудие заряжено
+                    if (this.reload <= 0) {
+                        this.reload = this.reloadMax;
+                        let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
+
+                        // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
                         let spawnX = this.x;
                         let spawnY = this.y;
                         
@@ -4565,11 +4576,9 @@ if (this.type === 'AA_DEFENSE') {
                             spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
                             spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
                         } else if (this.type === 'HELICOPTER') {
-                            // Вертолет стреляет прямо из кабины/носа
                             spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
                             spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
                         } else {
-                            // Пехота стреляет чуть впереди себя
                             spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
                             spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
                         }
@@ -4577,15 +4586,25 @@ if (this.type === 'AA_DEFENSE') {
                         // ВЕРТОЛЕТЫ
                         if (this.type === 'HELICOPTER') {
                             SoundManager.play('shoot', 100, vol);
-                            // Стреляем из носа
                             Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                            // Второй выстрел с задержкой
+                            // Второй выстрел
                             setTimeout(() => {
                                 if (this.hp > 0 && Game.state !== 'MENU') {
                                     SoundManager.play('shoot', 100, vol);
                                     Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
                                 }
                             }, 150);
+                        } 
+                        // ОСТАЛЬНЫЕ (Танки, Пехота)
+                        else {
+                            if (this.type === 'TANK') {
+                                SoundManager.play('tankFire', 100, vol);
+                                this.recoil = 12; // Отдача
+                            } else {
+                                SoundManager.play('shoot', 100, vol); 
+                            }
+                            let splashR = (this.type === 'TANK') ? 60 : 0;
+                            Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
                     }
                 } 

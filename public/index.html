@@ -1697,10 +1697,11 @@ startSandbox() {
     resources: { iron: 0, chem: 0, chips: 0 }, // НОВОЕ
     selectionFilter: null,
 
-    toggleTerritoryMode() {
+toggleTerritoryMode() {
         this.territoryMode++;
-        if (this.territoryMode > 2) this.territoryMode = 0;
-        const modes = ["ВЫКЛ", "ЗОНЫ", "ЛИНИИ"];
+        // Теперь у нас 4 режима (от 0 до 3)
+        if (this.territoryMode > 3) this.territoryMode = 0;
+        const modes = ["ВЫКЛ", "ЗОНЫ", "ЛИНИИ", "ПОЛИТИКА"];
         this.showError(`РЕЖИМ КАРТЫ: ${modes[this.territoryMode]}`);
     },
 
@@ -1851,6 +1852,7 @@ setFilter(type) {
 
         const LINE_W = 4;
         const FILL_OPACITY = 0.2;
+        const factionsData = {}; // Для политического режима (собираем центры империй)
 
         for (let iy = 0; iy < rows; iy++) {
             for (let ix = 0; ix < cols; ix++) {
@@ -1860,6 +1862,18 @@ setFilter(type) {
                 const x = ix * step;
                 const y = iy * step;
                 const color = FACTIONS[owner] ? FACTIONS[owner].color : '#fff';
+
+                // Сбор данных для текста в политическом режиме
+                if (this.territoryMode === 3) {
+                    if (!factionsData[owner]) factionsData[owner] = { sumX: 0, sumY: 0, count: 0, minX: x, maxX: x, minY: y, maxY: y };
+                    factionsData[owner].sumX += x;
+                    factionsData[owner].sumY += y;
+                    factionsData[owner].count++;
+                    if (x < factionsData[owner].minX) factionsData[owner].minX = x;
+                    if (x > factionsData[owner].maxX) factionsData[owner].maxX = x;
+                    if (y < factionsData[owner].minY) factionsData[owner].minY = y;
+                    if (y > factionsData[owner].maxY) factionsData[owner].maxY = y;
+                }
 
                 if (this.territoryMode === 1) { 
                     tCtx.fillStyle = color;
@@ -1874,8 +1888,63 @@ setFilter(type) {
                     if (ix > 0 && getCellOwner(iy * cols + (ix - 1)) !== owner) tCtx.fillRect(x, y, LINE_W, step);
                     if (ix < cols - 1 && getCellOwner(iy * cols + (ix + 1)) !== owner) tCtx.fillRect(x + step - LINE_W, y, LINE_W, step);
                 }
+                else if (this.territoryMode === 3) {
+                    // --- ПОЛИТИЧЕСКИЙ РЕЖИМ (HOI4 Style) ---
+                    tCtx.fillStyle = color;
+                    tCtx.globalAlpha = 0.55; // Более плотная и насыщенная заливка
+                    tCtx.fillRect(x, y, step + 1, step + 1);
+                    
+                    // Тонкие черные границы каждой клетки для легкого эффекта "бумажной карты"
+                    tCtx.fillStyle = '#000';
+                    tCtx.globalAlpha = 0.5;
+                    const BORDER_W = 2;
+                    if (iy > 0 && getCellOwner((iy - 1) * cols + ix) !== owner) tCtx.fillRect(x, y, step, BORDER_W); 
+                    if (iy < rows - 1 && getCellOwner((iy + 1) * cols + ix) !== owner) tCtx.fillRect(x, y + step - BORDER_W, step, BORDER_W);
+                    if (ix > 0 && getCellOwner(iy * cols + (ix - 1)) !== owner) tCtx.fillRect(x, y, BORDER_W, step);
+                    if (ix < cols - 1 && getCellOwner(iy * cols + (ix + 1)) !== owner) tCtx.fillRect(x + step - BORDER_W, y, BORDER_W, step);
+                }
             }
         }
+
+        // --- ОТРИСОВКА НАЗВАНИЙ ГОСУДАРСТВ ---
+        if (this.territoryMode === 3) {
+            for (let owner in factionsData) {
+                const data = factionsData[owner];
+                // Рисуем текст, только если фракция захватила достаточно большую территорию (>25 клеток)
+                if (data.count > 25) {
+                    const cx = data.sumX / data.count; // Вычисляем идеальный "центр массы"
+                    const cy = data.sumY / data.count;
+                    const factionName = FACTIONS[owner] ? FACTIONS[owner].name : owner;
+                    
+                    // Расширенное написание (например: С И Н И Е)
+                    const spacedName = factionName.toUpperCase().split('').join(' ');
+                    const width = data.maxX - data.minX;
+                    
+                    tCtx.save();
+                    tCtx.translate(cx, cy);
+                    tCtx.rotate(-Math.PI / 10); // Классический диагональный наклон
+                    
+                    // Размер шрифта динамически подстраивается под ширину территории (от 15px до 80px)
+                    let fontSize = Math.max(15, Math.min(80, width / 6));
+                    
+                    tCtx.font = `bold ${fontSize}px "Exo 2", sans-serif`;
+                    tCtx.textAlign = 'center';
+                    tCtx.textBaseline = 'middle';
+                    
+                    // Глубокая тень-обводка, чтобы белый текст читался даже на белом/светлом фоне
+                    tCtx.shadowColor = 'rgba(0,0,0,0.9)';
+                    tCtx.shadowBlur = Math.max(4, fontSize / 5);
+                    tCtx.shadowOffsetX = 3;
+                    tCtx.shadowOffsetY = 3;
+                    
+                    tCtx.fillStyle = 'rgba(255, 255, 255, 0.85)'; // Матовый белый
+                    tCtx.fillText(spacedName, 0, 0);
+                    tCtx.restore();
+                }
+            }
+        }
+        tCtx.globalAlpha = 1.0; // Сбрасываем альфу, чтобы не сломать другие рендеры
+    }
     },
 
     camera: { x: 0, y: 0 },

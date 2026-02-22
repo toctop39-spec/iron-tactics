@@ -1181,7 +1181,7 @@ manageCombat() {
         const army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'SILO' && u.type !== 'BOAT');
         const boats = myUnits.filter(u => u.type === 'BOAT');
         
-        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE');
+        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE');
         if (enemies.length === 0) return;
 
 // 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)

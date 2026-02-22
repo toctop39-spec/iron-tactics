@@ -2902,6 +2902,8 @@ if (!this.isSpectator) {
 
     checkWin() {
         if (this.state === 'END') return;
+        // --- ИСПРАВЛЕНИЕ: В ПЕСОЧНИЦЕ НЕТ ПОБЕДЫ ИЛИ ПОРАЖЕНИЯ ---
+        if (this.isSandbox) return;
         if (this.isSpectator) {
              const livingSides = new Set(this.units.filter(u => u.isProducer || u.isBuilder).map(u => u.side));
              if (this.frameCount > 600 && livingSides.size <= 1) {

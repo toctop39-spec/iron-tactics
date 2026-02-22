@@ -4764,80 +4764,146 @@ if (dist < 15) {
             return; // Завершаем отрисовку, чтобы не рисовался старый текст и эмодзи
         }
 
-    // --- КРАСИВАЯ МОДЕЛЬ ТАНКА ---
+   // --- КРАСИВАЯ МОДЕЛЬ ТАНКА (РЕАЛИСТИЧНАЯ) ---
         if (this.type === 'TANK') {
             ctx.save();
             ctx.translate(this.x, this.y);
             
-            // 1. ХОДОВАЯ И КОРПУС (вращаются по вектору движения)
+            // --- 0. ТЕНЬ ОТ ТАНКА ---
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(4, 6, this.radius * 1.8, this.radius * 1.4, this.angle || 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // --- 1. ХОДОВАЯ И КОРПУС ---
             ctx.save();
             ctx.rotate(this.angle || 0);
             
-            // Темный фон гусениц
-            ctx.fillStyle = '#111';
             let tW = this.radius * 2.2;
-            let tH = this.radius * 0.55;
-            let tDist = this.radius * 0.75;
+            let tH = this.radius * 0.6;
+            let tDist = this.radius * 0.8;
+            
+            // Гусеницы (основа)
+            ctx.fillStyle = '#151515';
             ctx.fillRect(-tW/2, -tDist - tH/2, tW, tH);
             ctx.fillRect(-tW/2, tDist - tH/2, tW, tH);
             
-            // Анимация самих траков (бегущие полоски)
-            ctx.fillStyle = '#4a4a4a';
-            let offset = (this.trackOffset || 0) % 8;
-            for(let i = -tW/2 + offset; i < tW/2; i += 8) {
+            // Колеса (катки) внутри гусениц
+            ctx.fillStyle = '#333';
+            for(let w = -tW/2 + 6; w < tW/2 - 2; w += 10) {
+                ctx.beginPath(); ctx.arc(w, -tDist, tH*0.35, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(w, tDist, tH*0.35, 0, Math.PI*2); ctx.fill();
+            }
+            
+            // Анимация траков
+            ctx.fillStyle = '#666';
+            let offset = (this.trackOffset || 0) % 10;
+            for(let i = -tW/2 + offset; i < tW/2; i += 10) {
                 if (i > -tW/2 && i < tW/2 - 2) {
-                    ctx.fillRect(i, -tDist - tH/2, 3, tH);
-                    ctx.fillRect(i, tDist - tH/2, 3, tH);
+                    ctx.fillRect(i, -tDist - tH/2, 4, tH);
+                    ctx.fillRect(i, tDist - tH/2, 4, tH);
                 }
             }
             
-            // Броня корпуса (цвет вашей базы!)
-            ctx.fillStyle = this.color;
-            ctx.fillRect(-this.radius * 0.9, -this.radius * 0.7, this.radius * 1.8, this.radius * 1.4);
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-            ctx.strokeRect(-this.radius * 0.9, -this.radius * 0.7, this.radius * 1.8, this.radius * 1.4);
+            // Броня корпуса (Градиент для 3D объема)
+            let gradBody = ctx.createLinearGradient(-this.radius, 0, this.radius, 0);
+            gradBody.addColorStop(0, '#222'); // темный зад
+            gradBody.addColorStop(0.5, this.color); // цвет базы
+            gradBody.addColorStop(1, '#555'); // светлый перед
             
-            // Детали (решетка радиатора сзади)
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillRect(-this.radius * 0.8, -this.radius * 0.5, 8, this.radius);
+            ctx.fillStyle = gradBody;
+            ctx.beginPath();
+            ctx.moveTo(this.radius * 0.9, -this.radius * 0.6);
+            ctx.lineTo(this.radius * 1.1, -this.radius * 0.4); // Скос лобовой брони
+            ctx.lineTo(this.radius * 1.1, this.radius * 0.4);
+            ctx.lineTo(this.radius * 0.9, this.radius * 0.6);
+            ctx.lineTo(-this.radius * 0.9, this.radius * 0.6);
+            ctx.lineTo(-this.radius * 0.9, -this.radius * 0.6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke();
+            
+            // Детали корпуса: решетка радиатора сзади
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-this.radius * 0.8, -this.radius * 0.4, 10, this.radius * 0.8);
+            ctx.fillStyle = '#000';
+            for(let r = -this.radius*0.35; r < this.radius*0.4; r+=4) {
+                ctx.fillRect(-this.radius * 0.8, r, 10, 2);
+            }
             ctx.restore(); // Конец ходовой
 
-            // 2. БАШНЯ (вращается к цели)
+            // --- 2. БАШНЯ ---
             ctx.save();
             ctx.rotate(this.turretAngle || 0);
             
-            // Дуло (сдвигается назад при выстреле)
             let recoilOut = this.recoil || 0;
-            ctx.fillStyle = '#555';
-            ctx.fillRect(10 - recoilOut, -4, this.radius * 1.6, 8); // Ствол пушки
-            ctx.fillRect(10 + this.radius * 1.6 - recoilOut - 5, -6, 12, 12); // Дульный тормоз на конце
             
-            // Сама башня (круглая, в цвет базы)
-            ctx.fillStyle = this.color;
+            // Маска орудия (кожух)
+            ctx.fillStyle = '#333';
+            ctx.fillRect(4 - recoilOut, -6, this.radius * 0.5, 12); 
+            
+            // Ствол (с металлическим бликом)
+            let gradGun = ctx.createLinearGradient(0, -4, 0, 4);
+            gradGun.addColorStop(0, '#333');
+            gradGun.addColorStop(0.5, '#888');
+            gradGun.addColorStop(1, '#222');
+            ctx.fillStyle = gradGun;
+            ctx.fillRect(10 - recoilOut, -3, this.radius * 1.8, 6); 
+            
+            // Дульный тормоз
+            ctx.fillStyle = '#111';
+            ctx.fillRect(10 + this.radius * 1.8 - recoilOut - 4, -5, 10, 10); 
+            
+            // Сама башня (Градиент сверху для сферичности)
+            let gradTurret = ctx.createRadialGradient(-3, -3, 2, 0, 0, this.radius * 0.8);
+            gradTurret.addColorStop(0, '#fff'); // Блик
+            gradTurret.addColorStop(0.2, this.color);
+            gradTurret.addColorStop(1, '#111'); // Тень на краях
+            
+            ctx.fillStyle = gradTurret;
             ctx.beginPath();
-            ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
+            // Шестиугольная башня (современная композитная броня)
+            ctx.moveTo(this.radius * 0.6, -this.radius * 0.3);
+            ctx.lineTo(this.radius * 0.3, -this.radius * 0.6);
+            ctx.lineTo(-this.radius * 0.5, -this.radius * 0.5);
+            ctx.lineTo(-this.radius * 0.6, 0);
+            ctx.lineTo(-this.radius * 0.5, this.radius * 0.5);
+            ctx.lineTo(this.radius * 0.3, this.radius * 0.6);
+            ctx.closePath();
             ctx.fill();
-            ctx.stroke();
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke();
             
-            // Командирский люк
+            // Люк командира и зенитный пулемет
             ctx.fillStyle = '#222';
-            ctx.beginPath();
-            ctx.arc(-6, -6, this.radius * 0.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore(); // Конец башни
+            ctx.beginPath(); ctx.arc(-5, -8, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-5, -9, 14, 2); 
             
-            ctx.restore(); // Конец танка
+            ctx.restore(); // Конец башни
+            ctx.restore(); // Конец трансформации танка
 
-            // Полоска здоровья (стандартная)
+            // --- 3. ИНТЕРФЕЙС ТАНКА (Здоровье, Радиус, Выделение) ---
             let hpOffset = this.radius + 15;
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
             
-            // Круг выделения
             if (Game.selection.includes(this)) {
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+                // ВОЗВРАЩАЕМ РАДИУС СТРЕЛЬБЫ
+                if (this.range > 0) {
+                    ctx.beginPath(); 
+                    ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; 
+                    ctx.lineWidth = 1; 
+                    ctx.setLineDash([5, 5]); 
+                    ctx.stroke(); 
+                    ctx.setLineDash([]);
+                }
+                // Круг выделения
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; 
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
             }
-            return; // Завершаем отрисовку, чтобы не рисовался старый текст и эмодзи
+            
+            return; // Чтобы не рисовался текст/эмодзи
         }
     
         if (!this.isPowered && (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO','WAREHOUSE'].includes(this.type))) ctx.globalAlpha = 0.5;

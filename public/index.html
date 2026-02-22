@@ -3645,10 +3645,16 @@ onUp(e) {
                         
                         this.updateUI(menuItems, true, title);
                     } 
-                 else if (this.selection.length === 1 && s0.type === 'SILO') {
-                        if (s0.nukeTimer > 0) this.updateUI([], true, `ЯДЕРКА: ${Math.floor(s0.nukeTimer/60)}s`);
-                        else if (s0.cruiseTimer > 0) this.updateUI([], true, `КРЫЛАТАЯ: ${Math.floor(s0.cruiseTimer/60)}s`);
-                        else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_CRUISE', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                else if (this.selection.length === 1 && s0.type === 'SILO') {
+                        // ПРОВЕРКА: Разрешаем управление только СВОИМ бункером
+                        if (s0.side === this.myRole) {
+                            if (s0.nukeTimer > 0) this.updateUI([], true, `ЯДЕРКА: ${Math.floor(s0.nukeTimer/60)}s`);
+                            else if (s0.cruiseTimer > 0) this.updateUI([], true, `КРЫЛАТАЯ: ${Math.floor(s0.cruiseTimer/60)}s`);
+                            else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_CRUISE', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                        } else {
+                            // Если кликнули на вражеский бункер
+                            this.updateUI([], true, 'ВРАЖЕСКИЙ БУНКЕР');
+                        }
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки

@@ -4844,7 +4844,7 @@ class Bullet {
         if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; }
         this.visX = this.x; this.visY = this.y - yOffset;
         // Если это артиллерия ИЛИ если снаряд выпустил HIMARS - рисуем дымный след
-        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 3 === 0) { 
+        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 80 === 0) { 
             Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); 
         }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }

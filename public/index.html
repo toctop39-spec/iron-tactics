@@ -446,6 +446,8 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
 const SILO_AMMO = {
     ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1000, reqRes: 'rockets', damage: 300,  speed: 6,   radius: 60,  hp: 500 },
     HEAVY:  { name: 'Бомбер',  emoji: '☄️', cost: 5000, reqRes: 'heavies', damage: 600,  speed: 3,   radius: 300, hp: 3000 },
+    // --- НОВОЕ: КРЫЛАТАЯ РАКЕТА ---
+    CRUISE: { name: 'Крылатая', emoji: '🛩️', cost: 75000, resCostAmt: 20, damage: 1500, speed: 12, radius: 150, hp: 800, prep: 3 },
     NUKE:   { name: 'ЯДЕРНАЯ', emoji: '🖍️', cost: 20000, reqRes: 'nukes',   damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
 };
 
@@ -1754,7 +1756,7 @@ setFilter(type) {
 
    loadedImages: {}, // Сюда мы сохраним загруженные картинки
 
-    preloadAssets() {
+  preloadAssets() {
         for (let key in UNITS) {
             if (UNITS[key].imageSrc) {
                 const img = new Image();
@@ -1762,8 +1764,9 @@ setFilter(type) {
                 this.loadedImages[key] = img;
             }
         }
-        // Загружаем картинки снарядов (опционально)
+        // Загружаем картинки снарядов
         this.loadedImages['ROCKET'] = new Image(); this.loadedImages['ROCKET'].src = 'https://cdn-icons-png.flaticon.com/512/9984/9984240.png';
+        this.loadedImages['CRUISE'] = new Image(); this.loadedImages['CRUISE'].src = 'https://www.vhv.rs/dpng/d/18-182317_-hd-png-download.png';
     },
 
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
@@ -3130,17 +3133,39 @@ onDown(e) {
                 return;
             }
 
-            // 2. ЗАПУСК ЯДЕРКИ ИЗ БУНКЕРА
+     // 2. ЗАПУСК ОРУЖИЯ ИЗ БУНКЕРА
             if (Game.launchMode) {
                  if (Game.launchSilo) {
                      const silo = Game.launchSilo;
                      const ammo = SILO_AMMO[Game.launchMode];
-                     if (Game.resources[ammo.reqRes] >= 1 && Game.energyFactor > 0.5) { 
-                         if (Game.energy < 300) { Game.showError("НЕТ МОЩНОСТИ!"); return; } 
-                         Game.resources[ammo.reqRes] -= 1; 
-                         silo.startSiloLaunch(m.x, m.y, Game.launchMode);
-                         Game.launchMode = null; Game.launchSilo = null; document.body.style.cursor = 'default';
-                     } else this.showError(`НЕТ БОЕПРИПАСОВ (${ammo.emoji}) ИЛИ ЭНЕРГИИ!`);
+                     
+                     if (Game.energyFactor <= 0.5 || Game.energy < 300) {
+                         this.showError("НЕТ МОЩНОСТИ (НУЖНО 300⚡)!");
+                         return;
+                     }
+
+                     // Для крылатой ракеты снимаем деньги и железо прямо сейчас
+                     if (Game.launchMode === 'CRUISE') {
+                         if (this.money >= ammo.cost && this.resources.iron >= ammo.resCostAmt) {
+                             this.money -= ammo.cost;
+                             this.resources.iron -= ammo.resCostAmt;
+                             silo.startSiloLaunch(m.x, m.y, Game.launchMode);
+                             Game.launchMode = null; Game.launchSilo = null; document.body.style.cursor = 'default';
+                             this.updateUI();
+                         } else {
+                             this.showError(`НУЖНО ${ammo.cost}$ И 🔩${ammo.resCostAmt} ЖЕЛЕЗА!`);
+                         }
+                     } 
+                     // Для остальных (готовые патроны со склада)
+                     else {
+                         if (this.resources[ammo.reqRes] >= 1) { 
+                             this.resources[ammo.reqRes] -= 1; 
+                             silo.startSiloLaunch(m.x, m.y, Game.launchMode);
+                             Game.launchMode = null; Game.launchSilo = null; document.body.style.cursor = 'default';
+                         } else {
+                             this.showError(`НЕТ БОЕПРИПАСОВ (${ammo.emoji})!`);
+                         }
+                     }
                  }
                  return;
             }
@@ -3621,9 +3646,10 @@ onUp(e) {
                         
                         this.updateUI(menuItems, true, title);
                     } 
-                    else if (this.selection.length === 1 && s0.type === 'SILO') {
-                        if (s0.nukeTimer > 0) this.updateUI([], true, `ЗАПУСК: ${Math.floor(s0.nukeTimer/60)}s`);
-                        else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
+                 else if (this.selection.length === 1 && s0.type === 'SILO') {
+                        if (s0.nukeTimer > 0) this.updateUI([], true, `ЯДЕРКА: ${Math.floor(s0.nukeTimer/60)}s`);
+                        else if (s0.cruiseTimer > 0) this.updateUI([], true, `КРЫЛАТАЯ: ${Math.floor(s0.cruiseTimer/60)}s`);
+                        else this.updateUI(['LAUNCH_ROCKET', 'LAUNCH_HEAVY', 'LAUNCH_CRUISE', 'LAUNCH_NUKE'], true, 'УПРАВЛЕНИЕ БУНКЕРОМ');
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
@@ -4024,10 +4050,16 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
         if (unlocks) {
             menu.innerHTML = '';
             unlocks.forEach(key => {
-                if (key.startsWith('LAUNCH_')) {
-                    const ammo = SILO_AMMO[key.replace('LAUNCH_', '')];
+          if (key.startsWith('LAUNCH_')) {
+                    const ammoType = key.replace('LAUNCH_', '');
+                    const ammo = SILO_AMMO[ammoType];
                     const div = document.createElement('div'); div.className = 'unit-card';
-                    div.innerHTML = `<div style="font-size:2em">${ammo.emoji}</div><div class="card-price">${ammo.cost}$</div>`; 
+                    
+                    // Вывод цены: для крылатой ракеты выводим доллары и железо
+                    let costText = `${ammo.cost}$`;
+                    if (ammoType === 'CRUISE') costText = `${ammo.cost}$ | 🔩${ammo.resCostAmt}`;
+                    
+                    div.innerHTML = `<div style="font-size:2em">${ammo.emoji}</div><div class="card-price">${costText}</div>`; 
                     div.onclick = () => { this.menuAction(key); };
                     menu.appendChild(div); return;
                 }
@@ -4118,6 +4150,8 @@ class SpatialHash {
 
 class Unit {
     constructor(type, x, y, side, id) {
+        this.nukeTimer = 0; this.nukeTarget = null;
+        this.cruiseTimer = 0; this.cruiseTarget = null; // <--- НОВОЕ
         const p = UNITS[type]; this.id = id || Math.floor(Math.random() * 10000000); 
         this.type = type; this.x = x; this.y = y; this.side = side;
         this.hp = p.hp; this.maxHp = p.hp; this.pathQueue = [];
@@ -4196,9 +4230,11 @@ checkPower() {
     assignSite(site) { this.assignedSite = site; this.target = {x: site.x, y: site.y}; this.constructing = false; }
     startArtySequence(tx, ty) { if (this.ammo > 0) { this.gradSeq = 360; this.gradTarget = {x: tx, y: ty}; this.target = null; } }
 
-    startSiloLaunch(tx, ty, type) {
+  startSiloLaunch(tx, ty, type) {
         if (type === 'NUKE') {
             this.nukeTimer = SILO_AMMO.NUKE.prep * 60; this.nukeTarget = {x: tx, y: ty}; Game.effects.push({x: this.x, y: this.y - 50, char: '⚠️', life: 120});
+        } else if (type === 'CRUISE') {
+            this.cruiseTimer = SILO_AMMO.CRUISE.prep * 60; this.cruiseTarget = {x: tx, y: ty}; Game.effects.push({x: this.x, y: this.y - 50, char: '⚠️', life: 120});
         } else {
             const ammo = SILO_AMMO[type]; let splash = (type === 'HEAVY') ? 150 : 100;
             Game.bullets.push(new Bullet(this.x, this.y, tx, ty, ammo.damage, this.side, true, null, this, splash, false, ammo.hp, ammo.speed));
@@ -4344,10 +4380,10 @@ attemptAutoProduction() {
             this.prevX = this.x; this.prevY = this.y;
         }
         
-        // --- ЛОГИКА БУНКЕРА (SILO) ---
+  // --- ЛОГИКА БУНКЕРА (SILO) ---
         if (this.type === 'SILO') {
+            if (!this.isPowered) return;
             if (this.nukeTimer > 0) {
-                if (!this.isPowered) return;
                 this.nukeTimer--;
                 if (this.nukeTimer <= 0 && this.nukeTarget) {
                     const ammo = SILO_AMMO.NUKE;
@@ -4355,7 +4391,17 @@ attemptAutoProduction() {
                     this.nukeTarget = null;
                 }
             }
-            return; // Бункер больше ничего не делает
+            if (this.cruiseTimer > 0) {
+                this.cruiseTimer--;
+                if (this.cruiseTimer <= 0 && this.cruiseTarget) {
+                    const ammo = SILO_AMMO.CRUISE;
+                    let b = new Bullet(this.x, this.y, this.cruiseTarget.x, this.cruiseTarget.y, ammo.damage, this.side, true, null, this, ammo.radius, false, ammo.hp, ammo.speed);
+                    b.isCruise = true; // Важный флаг для отрисовки
+                    Game.bullets.push(b);
+                    this.cruiseTarget = null;
+                }
+            }
+            return; 
         }
 
 // --- ЛОГИКА ТУРЕЛИ (SENTINEL) ---
@@ -4938,6 +4984,8 @@ if (dist < 15) {
         }
 
     draw(ctx) {
+
+        
 // --- КРАСИВАЯ МОДЕЛЬ ЛОДКИ ---
         if (this.type === 'BOAT') {
             ctx.save();
@@ -5675,6 +5723,31 @@ hit() {
         });
     }
     draw(ctx) {
+        // --- ОТРИСОВКА КРЫЛАТОЙ РАКЕТЫ ---
+        if (this.isCruise) {
+            ctx.save(); 
+            ctx.translate(this.visX, this.visY); 
+            let vx = this.visX - this.prevVisX; 
+            let vy = this.visY - this.prevVisY;
+            let angle = Math.atan2(vy, vx); 
+            
+            // Компенсируем поворот картинки (+45 градусов)
+            // (Если будет лететь боком - поменяйте + на -)
+            ctx.rotate(angle + Math.PI / 4); 
+            
+            let img = Game.loadedImages['CRUISE'];
+            if (img && img.complete && img.naturalHeight !== 0) {
+                ctx.drawImage(img, -20, -20, 40, 40);
+            } else {
+                ctx.font = '24px Arial'; ctx.fillText('🛩️', 0, 0); 
+            }
+            ctx.restore();
+            
+            // Тень под летящей ракетой
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; 
+            ctx.beginPath(); ctx.arc(this.x, this.y, 8, 0, Math.PI*2); ctx.fill();
+            return; // Дальше обычный код отрисовки не нужен
+        }
 let yOffset = 0; let char = '';
         let isHIMARS = this.owner && this.owner.isHIMARS; // Проверяем, кто стрелял
 

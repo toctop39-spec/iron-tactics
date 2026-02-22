@@ -1766,6 +1766,11 @@ setFilter(type) {
         }
         // Загружаем картинки снарядов
         this.loadedImages['CRUISE'] = new Image(); this.loadedImages['CRUISE'].src = 'Rocket.png';
+        // Загружаем картинки зданий
+        this.loadedImages['NUCLEAR_PLANT'] = new Image(); this.loadedImages['NUCLEAR_PLANT'].src = 'Nuclear.png';
+        this.loadedImages['POWER_PLANT'] = new Image(); this.loadedImages['POWER_PLANT'].src = 'Solarpanels.png';
+        this.loadedImages['FACTORY'] = new Image(); this.loadedImages['FACTORY'].src = 'Factory.png';
+        this.loadedImages['SILO'] = new Image(); this.loadedImages['SILO'].src = 'SILO.png';
     },
 
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
@@ -5498,6 +5503,52 @@ if (dist < 15) {
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
             }
             return;
+        }
+
+        // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ ---
+        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT'].includes(this.type)) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            let imgKey = this.type;
+            if (this.type === 'WAREHOUSE') imgKey = 'FACTORY'; // Склад пусть пока выглядит так же, как Завод
+
+            let img = Game.loadedImages[imgKey];
+            
+            // Если картинка успешно загрузилась
+            if (img && img.complete && img.naturalHeight !== 0) {
+                // Размер картинки делаем в 2.6 раза больше радиуса, чтобы здание выглядело массивно и покрывало свой хитбокс
+                let size = this.radius * 2.6; 
+                ctx.drawImage(img, -size/2, -size/2, size, size);
+                
+                // --- Спецэффекты поверх картинок ---
+                if (this.type === 'SILO') {
+                    // Таймеры запуска ракет для бункера
+                    if (this.nukeTimer > 0) { ctx.fillStyle = 'red'; ctx.font = 'bold 16px Arial'; ctx.fillText(Math.ceil(this.nukeTimer/60) + 's', -12, this.radius + 15); }
+                    if (this.cruiseTimer > 0) { ctx.fillStyle = '#ffaa00'; ctx.font = 'bold 16px Arial'; ctx.fillText(Math.ceil(this.cruiseTimer/60) + 's', -12, this.radius + 30); }
+                }
+                
+                if (this.type === 'FACTORY' && Math.random() > 0.5) {
+                    // Анимация дыма для работающего завода (дым идет примерно из труб на картинке)
+                    Game.effects.push({type: 'smoke', x: this.x + this.radius*0.2, y: this.y - this.radius*0.3, vx: (Math.random()-0.5)*0.5, vy: -1, life: 40});
+                }
+            } else {
+                // Заглушка, если вы ошиблись в названии файла (нарисует цветной квадрат)
+                ctx.fillStyle = this.color || '#555';
+                ctx.fillRect(-this.radius, -this.radius, this.radius*2, this.radius*2);
+            }
+            ctx.restore();
+            
+            // --- Отрисовка полоски здоровья и рамки выделения ---
+            let hpOffset = this.radius + 10;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30 * (Math.max(0, this.hp) / this.maxHp), 4);
+            
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; 
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI*2); ctx.stroke();
+            }
+            return; // Выходим, чтобы поверх картинки не рисовались старые квадратные здания
         }
     
         if (!this.isPowered && (this.isProducer || ['AA_DEFENSE','HOSPITAL','SENTINEL','SILO','WAREHOUSE'].includes(this.type))) ctx.globalAlpha = 0.5;

@@ -3757,6 +3757,17 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                 e.life--;
             }
 
+                // --- НОВОЕ: ФИЗИКА РАЗЛЕТАЮЩЕЙСЯ ЗЕМЛИ ---
+            else if (e.type === 'dirt') {
+                ctx.fillStyle = e.color || '#5c4033'; 
+                // Рисуем угловатые куски земли (квадраты)
+                ctx.fillRect(e.x, e.y, e.size, e.size); 
+                e.x += e.vx;
+                e.y += e.vy;
+                e.vy += 0.4; // Гравитация тянет землю вниз (сильнее, чем воду)
+                e.life--;
+            }
+
 // --- ЯДЕРНЫЕ ЭФФЕКТЫ ---
             else if (e.type === 'nuke_flash') {
                 ctx.save();
@@ -5396,40 +5407,63 @@ hit() {
         // Проверяем, попал ли снаряд в воду
         const isWaterHit = MapUtils.isWater(this.x, this.y);
 
-if (this.isNuke) {
-            // Ядерку слышно на всю карту (до 4000 пикселей), громкость 100%
+        if (this.isNuke) {
+            // Ядерку слышно на всю карту
             let nukeVol = SoundManager.getVolumeByDistance(this.x, this.y, 4000, 1.0);
             SoundManager.play('nuke', 0, nukeVol); 
-            // ... (дальше идет вспышка и урон ядерки)
-            // --- ЭПИЧНАЯ АНИМАЦИЯ ЯДЕРКИ ---
-            // 1. Ослепительная вспышка (белый экран)
+            
+            // 1. Ослепительная вспышка
             Game.effects.push({ type: 'nuke_flash', x: this.x, y: this.y, life: 50 });
-            // 2. Огромная ударная волна
+            // 2. Ударная волна
             Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 600, life: 80, color: 'rgba(255, 60, 0, 0.7)' });
             // 3. Грибовидное облако
             Game.effects.push({ type: 'nuke_mushroom', x: this.x, y: this.y, life: 180 });
-            // 4. Разлетающийся пепел (50 частиц)
+            // 4. Разлетающийся пепел
             for (let i = 0; i < 50; i++) {
-                Game.effects.push({ 
-                    type: 'ash', 
-                    x: this.x + (Math.random() - 0.5) * 500, 
-                    y: this.y + (Math.random() - 0.5) * 500, 
-                    vx: (Math.random() - 0.5) * 3, 
-                    vy: 1 + Math.random() * 2, 
-                    life: 100 + Math.random() * 150 
-                });
+                Game.effects.push({ type: 'ash', x: this.x + (Math.random() - 0.5) * 500, y: this.y + (Math.random() - 0.5) * 500, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, life: 100 + Math.random() * 150 });
             }
-} else {
+            
+            // --- НОВОЕ: АПОКАЛИПСИС (СОТНИ КУСКОВ ЗЕМЛИ) ---
+            if (!isWaterHit) {
+                for (let i = 0; i < 150; i++) {
+                    Game.effects.push({
+                        type: 'dirt', x: this.x, y: this.y,
+                        vx: (Math.random() - 0.5) * 30, // Огромный разлет по сторонам
+                        vy: (Math.random() - 0.5) * 35 - 10, // Мощнейший выброс вверх
+                        size: 3 + Math.random() * 6, // Крупные глыбы
+                        life: 60 + Math.random() * 60,
+                        color: Math.random() > 0.5 ? '#3b2518' : '#5c4033'
+                    });
+                }
+            }
+        } else {
             if (isWaterHit) {
                 Game.effects.push({ type: 'splash_ring', x: this.x, y: this.y, radius: 5, maxRadius: this.splashRadius || 20, life: 40, color: 'rgba(200, 255, 255, 0.8)' });
                 for(let k=0; k<5; k++) Game.effects.push({ type: 'water_particle', x: this.x, y: this.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 30 });
             } else {
-                // --- ИСПРАВЛЕНИЕ: ВЗРЫВ ТОЛЬКО ОТ ТЯЖЕЛОГО ОРУЖИЯ ---
-                // Звук взрыва и ударная волна появляются ТОЛЬКО если есть радиус сплэша (Танк) или это артиллерия (Град/HIMARS)
+                // Звук взрыва ТОЛЬКО если есть радиус сплэша (Танк/Град)
                 if (this.arty || this.splashRadius > 0) {
                     let expVol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
                     SoundManager.play('explosion', 80, expVol); 
                     Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
+                    
+                    // --- НОВОЕ: ВЫБРОС ЗЕМЛИ ОТ ТАНКОВ И РАКЕТ ---
+                    let isRocket = this.splashRadius > 80; // Отличаем ракету от пушки танка
+                    let dirtCount = isRocket ? 45 : 20; // Ракета выбивает больше комьев
+                    
+                    for (let i = 0; i < dirtCount; i++) {
+                        // Ракета: взрыв во все стороны. Танк: фонтан строго вверх.
+                        let vx = isRocket ? (Math.random() - 0.5) * 12 : (Math.random() - 0.5) * 6;
+                        let vy = isRocket ? (Math.random() - 0.5) * 12 - 4 : -(Math.random() * 8 + 3); 
+                        
+                        Game.effects.push({
+                            type: 'dirt', x: this.x, y: this.y,
+                            vx: vx, vy: vy,
+                            size: 2 + Math.random() * 4,
+                            life: 25 + Math.random() * 25,
+                            color: Math.random() > 0.5 ? '#4a3022' : '#6b4a31'
+                        });
+                    }
                 }
                 
                 // Искры от попадания рисуем для всех

@@ -401,14 +401,14 @@ FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600,
 spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
-    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 30, constructTime: 30, energyUse: 15 },
-    HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 40, constructTime: 30, color: '#ef5350', energyUse: 5 },
+    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 80, constructTime: 30, energyUse: 15 },
+    HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 5 },
     
     // --- НОВОЕ ЗДАНИЕ: СКЛАД ---
     WAREHOUSE: { 
         type: 'bldg', name: 'Склад', emoji: '🏚️', 
         cost: 2000, resCost: { iron: 25 }, 
-        hp: 800, radius: 35, constructTime: 15, energyUse: 5, color: '#8d6e63' 
+        hp: 800, radius: 45, constructTime: 15, energyUse: 5, color: '#8d6e63' 
     },
 
     WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
@@ -1766,12 +1766,15 @@ setFilter(type) {
         }
         // Загружаем картинки снарядов
         this.loadedImages['CRUISE'] = new Image(); this.loadedImages['CRUISE'].src = 'Rocket.png';
-        // Загружаем картинки зданий
-  // Загружаем картинки зданий (ИСПРАВЛЕНО: поменяли местами АЭС и СЭС)
-        this.loadedImages['NUCLEAR_PLANT'] = new Image(); this.loadedImages['NUCLEAR_PLANT'].src = 'Solarpanels.png'; // Если было перепутано
-        this.loadedImages['POWER_PLANT'] = new Image(); this.loadedImages['POWER_PLANT'].src = 'Nuclear.png';       // Меняем местами
+// Загружаем картинки зданий
+        this.loadedImages['NUCLEAR_PLANT'] = new Image(); this.loadedImages['NUCLEAR_PLANT'].src = 'Nuclear.png';
+        this.loadedImages['POWER_PLANT'] = new Image(); this.loadedImages['POWER_PLANT'].src = 'Solarpanels.png';
         this.loadedImages['FACTORY'] = new Image(); this.loadedImages['FACTORY'].src = 'Factory.png';
         this.loadedImages['SILO'] = new Image(); this.loadedImages['SILO'].src = 'SILO.png';
+        // --- НОВЫЕ ЗДАНИЯ ---
+        this.loadedImages['AA_DEFENSE'] = new Image(); this.loadedImages['AA_DEFENSE'].src = 'AA.png';
+        this.loadedImages['WAREHOUSE'] = new Image(); this.loadedImages['WAREHOUSE'].src = 'Warehouse.png';
+        this.loadedImages['HOSPITAL'] = new Image(); this.loadedImages['HOSPITAL'].src = 'Hospital.png';
   },
 
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
@@ -5506,8 +5509,9 @@ if (dist < 15) {
             return;
         }
 
-        // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ (С ПОЛОСКАМИ И АВТО-ПРОИЗВОДСТВОМ) ---
-        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT'].includes(this.type)) {
+ // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ (С ПОЛОСКАМИ И АВТО-ПРОИЗВОДСТВОМ) ---
+        // Добавлены WAREHOUSE, AA_DEFENSE и HOSPITAL
+        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL'].includes(this.type)) {
             
             // Полупрозрачность, если нет электричества
             if (!this.isPowered) ctx.globalAlpha = 0.5;
@@ -5515,11 +5519,10 @@ if (dist < 15) {
             ctx.save();
             ctx.translate(this.x, this.y);
             
-            let imgKey = this.type;
-            if (this.type === 'WAREHOUSE') imgKey = 'FACTORY'; 
+            let imgKey = this.type; // Берем ключ прямо из типа здания
 
             let img = Game.loadedImages[imgKey];
-            let hpOffset = this.radius * 1.5; // Поднимаем полоски повыше, чтобы не перекрывали картинку
+            let hpOffset = this.radius * 1.5; 
             
             // 1. РИСУЕМ САМО ЗДАНИЕ С ПРАВИЛЬНЫМИ ПРОПОРЦИЯМИ
             if (img && img.complete && img.naturalHeight !== 0) {
@@ -5541,6 +5544,26 @@ if (dist < 15) {
             }
             ctx.restore();
             ctx.globalAlpha = 1.0; // Сбрасываем прозрачность для полосок
+
+            // --- СПЕЦЭФФЕКТЫ ДЛЯ ПВО ---
+            if (this.type === 'AA_DEFENSE') {
+                // Полоска перезарядки (фиолетовая)
+                if (this.reload > 0) {
+                    ctx.fillStyle = '#000'; ctx.fillRect(this.x - 15, this.y - hpOffset - 6, 30, 4);
+                    ctx.fillStyle = '#f0f'; ctx.fillRect(this.x - 15, this.y - hpOffset - 6, 30 * (1 - this.reload / this.reloadMax), 4);
+                }
+                // Лазерный луч наведения ПВО
+                if (this.aaTarget && this.isPowered) {
+                    ctx.beginPath(); 
+                    ctx.moveTo(this.x, this.y - this.radius);
+                    let tx = (this.aaTarget instanceof Bullet) ? this.aaTarget.visX : this.aaTarget.x;
+                    let ty = (this.aaTarget instanceof Bullet) ? this.aaTarget.visY : this.aaTarget.y;
+                    ctx.lineTo(tx, ty); 
+                    ctx.strokeStyle = `rgba(255, 255, 0, ${this.aaCharge/20})`; 
+                    ctx.lineWidth = 3; 
+                    ctx.stroke();
+                }
+            }
 
             // --- 2. ПОЛОСКА ЗДОРОВЬЯ ---
             ctx.fillStyle = 'red'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30, 4);
@@ -5584,6 +5607,12 @@ if (dist < 15) {
                 ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.stroke(); 
             }
             if (Game.selection.includes(this)) {
+                // Круг радиуса стрельбы для ПВО
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; 
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI*2); ctx.stroke();
             }

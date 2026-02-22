@@ -3768,6 +3768,22 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                 e.life--;
             }
 
+                // --- НОВОЕ: ФИЗИКА ГОРЯЩИХ ОБЛОМКОВ (ДЛЯ ВЕРТОЛЕТОВ) ---
+            else if (e.type === 'debris') {
+                ctx.save();
+                ctx.translate(e.x, e.y);
+                ctx.rotate(e.life * 0.1); // Обломки вращаются пока падают
+                ctx.fillStyle = e.color || '#333'; 
+                // Рисуем неровные куски металла
+                ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size*0.6); 
+                ctx.restore();
+                
+                e.x += e.vx;
+                e.y += e.vy;
+                e.vy += 0.35; // Гравитация
+                e.life--;
+            }
+
 // --- ЯДЕРНЫЕ ЭФФЕКТЫ ---
             else if (e.type === 'nuke_flash') {
                 ctx.save();

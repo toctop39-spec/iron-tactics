@@ -4764,18 +4764,6 @@ if (dist < 15) {
             return; // Завершаем отрисовку, чтобы не рисовался старый текст и эмодзи
         }
 
-            // Полоска здоровья
-            let hpOffset = this.radius + 10;
-            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
-            
-            // Если лодка выделена - рисуем круг
-            if (Game.selection.includes(this)) {
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 5, 0, Math.PI*2); ctx.stroke();
-            }
-            return; // Завершаем отрисовку, эмодзи для лодки нам не нужны!
-        }
-
     // --- КРАСИВАЯ МОДЕЛЬ ТАНКА ---
         if (this.type === 'TANK') {
             ctx.save();

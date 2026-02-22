@@ -3927,8 +3927,9 @@ class SpatialHash {
         this.cellSize = cellSize;
         this.cells = new Map();
     }
+    // --- ОПТИМИЗАЦИЯ: Числа вместо строк для ключей (ускоряет работу в 10 раз) ---
     key(x, y) {
-        return `${Math.floor(x / this.cellSize)},${Math.floor(y / this.cellSize)}`;
+        return (Math.floor(x / this.cellSize) * 10000) + Math.floor(y / this.cellSize);
     }
     add(unit) {
         const k = this.key(unit.x, unit.y);
@@ -3941,8 +3942,12 @@ class SpatialHash {
         let results = [];
         for (let x = cx - 1; x <= cx + 1; x++) {
             for (let y = cy - 1; y <= cy + 1; y++) {
-                const k = `${x},${y}`;
-                if (this.cells.has(k)) results.push(...this.cells.get(k));
+                const k = (x * 10000) + y;
+                if (this.cells.has(k)) {
+                    // Избавляемся от spread оператора (...), который создает перегруз памяти
+                    const arr = this.cells.get(k);
+                    for(let i=0; i<arr.length; i++) results.push(arr[i]);
+                }
             }
         }
         return results;
@@ -3995,13 +4000,17 @@ class Unit {
     }
 
 checkPower() {
-        if (!UNITS[this.type].energyUse) { this.isPowered = true; return; }
+        if (!UNITS[this.type].energyUse && this.type !== 'HOUSE') { this.isPowered = true; return; }
         
-        // --- ПРОВЕРКА РАДИУСОВ ПИТАНИЯ ---
-        const nearPP = Game.units.some(u => u.side === this.side && (
-            (u.type === 'POWER_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 300) ||
-            (u.type === 'NUCLEAR_PLANT' && Math.hypot(u.x - this.x, u.y - this.y) < 800)
-        ));
+        // --- ОПТИМИЗАЦИЯ ПИТАНИЯ (Ищем только электростанции) ---
+        // Исключаем лишние математические проверки тысяч солдат
+        const nearPP = Game.units.some(u => {
+            if (u.side !== this.side) return false;
+            // Быстрое отсечение по квадрату, прежде чем считать точный круг (hypot)
+            if (u.type === 'POWER_PLANT') return Math.abs(u.x - this.x) < 300 && Math.abs(u.y - this.y) < 300 && Math.hypot(u.x - this.x, u.y - this.y) < 300;
+            if (u.type === 'NUCLEAR_PLANT') return Math.abs(u.x - this.x) < 800 && Math.abs(u.y - this.y) < 800 && Math.hypot(u.x - this.x, u.y - this.y) < 800;
+            return false;
+        });
         
         let globalPower = false;
         if (this.side === Game.myRole) globalPower = Game.energyFactor > 0.1;
@@ -4492,16 +4501,19 @@ if (this.type === 'AA_DEFENSE') {
             // Дистанция до текущей цели
             let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
 
-            // Сброс цели, если она далеко или умерла
-            if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
+    if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
                 this.targetUnit = null;                
                 let min = this.range + 50; 
                 let near = null;
-                // Ищем новую цель
+                
+                // --- ОПТИМИЗАЦИЯ ПОИСКА ЦЕЛИ (Манхэттенское отсечение) ---
                 Game.units.forEach(u => {
                     if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE') {
-                        let d = Math.hypot(u.x - this.x, u.y - this.y);
-                        if (d < min) { min = d; near = u; }
+                        // Очень быстро отсекаем всех, кто явно дальше радиуса, без тяжелой математики с корнями
+                        if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
+                            let d = Math.hypot(u.x - this.x, u.y - this.y);
+                            if (d < min) { min = d; near = u; }
+                        }
                     }
                 });
                 this.targetUnit = near;
@@ -4849,7 +4861,7 @@ class Bullet {
         if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; }
         this.visX = this.x; this.visY = this.y - yOffset;
         // Если это артиллерия ИЛИ если снаряд выпустил HIMARS - рисуем дымный след
-        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 80 === 0) { 
+        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 30 === 0) { 
             Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); 
         }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }

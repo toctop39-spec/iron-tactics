@@ -3755,13 +3755,15 @@ onRight(e) {
             ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(m.x - m.radius*0.3, m.y - m.radius*0.3, m.radius*0.35, 0, Math.PI*2); ctx.fill();
         });
 
-        // --- КЭШ ТЕРРИТОРИИ ---
+// --- КЭШ ТЕРРИТОРИИ ---
         if (this.territoryMode !== 0) {
             const margin = 100;
             const dist = Math.hypot(this.camera.x - this.lastTerritoryCam.x, this.camera.y - this.lastTerritoryCam.y);
             const needUpdate = (this.frameCount - this.lastTerritoryTime > 10) || (dist > 50);
             if (needUpdate) this.updateTerritoryCache();
-            if (this.territoryCanvas) {
+            
+            // РЕЖИМЫ 1 и 2: Рисуем ПОД базой (на земле)
+            if (this.territoryCanvas && this.territoryMode !== 3) {
                 const dx = (this.lastTerritoryCam.x - margin); 
                 const dy = (this.lastTerritoryCam.y - margin);
                 ctx.drawImage(this.territoryCanvas, dx, dy);
@@ -3825,6 +3827,14 @@ onRight(e) {
         ground.forEach(u => u.draw(ctx));     // Солдаты и танки
         flying.forEach(u => u.draw(ctx));     // Авиация перекрывает всё на земле
         this.bullets.forEach(b => b.draw(ctx)); // Снаряды летят поверх вообще всего
+
+        // --- РЕЖИМ 3 (ПОЛИТИКА): Рисуем ПОВЕРХ армии и зданий ---
+        if (this.territoryMode === 3 && this.territoryCanvas) {
+            const margin = 100;
+            const dx = (this.lastTerritoryCam.x - margin); 
+            const dy = (this.lastTerritoryCam.y - margin);
+            ctx.drawImage(this.territoryCanvas, dx, dy);
+        }
 
 for (let i = this.effects.length - 1; i >= 0; i--) {
             const e = this.effects[i];

@@ -2652,7 +2652,10 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
             this.bots.forEach(bot => bot.update());
 // --- ВСТАВИТЬ ЭТОТ БЛОК ---
-            this.spatialGrid = new SpatialHash(150);
+           if (!this.spatialGrid) {
+                this.spatialGrid = new SpatialHash(150);
+            }
+            this.spatialGrid.cells.clear(); // Быстро очищаем старую сетку
             this.units.forEach(u => this.spatialGrid.add(u));
             if (this.isSpectator && this.frameCount % 30 === 0) {
                 const hud = document.getElementById('spectator-hud');

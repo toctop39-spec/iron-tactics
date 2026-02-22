@@ -1574,27 +1574,25 @@ const Tutorial = {
 };
 
 // --- МЕНЕДЖЕР ЗВУКОВ ---
+// --- МЕНЕДЖЕР ЗВУКОВ ---
 const SoundManager = {
     sounds: {},
     bgm: null,
     lastPlayed: {},
     
     init() {
-        // Создаем звуки в памяти
         this.sounds.explosion = new Audio('explosion.mp3');
         this.sounds.nuke = new Audio('nuke-explosion.mp3');
         this.sounds.tankFire = new Audio('tanksound.mp3');
         this.sounds.steps = new Audio('steps.mp3');
         this.sounds.driving = new Audio('driving.mp3');
+        this.sounds.shoot = new Audio('Shoot.mp3'); // НОВЫЙ ЗВУК СТРЕЛЬБЫ
         
-        // Фоновая музыка
         this.bgm = new Audio('GameMusic.mp3');
         this.bgm.loop = true;
-        this.bgm.volume = 0.3; // Громкость музыки (30%)
+        this.bgm.volume = 0.3; 
 
-// Браузер разрешает музыку только после первого клика игрока
         const startMusic = () => {
-            // Включаем музыку, ТОЛЬКО если игрок сейчас находится в меню
             if (Game.state === 'MENU') {
                 this.bgm.play().catch(e => {});
             }
@@ -1603,16 +1601,39 @@ const SoundManager = {
         document.addEventListener('click', startMusic);
     },
 
-    // Функция умного воспроизведения
-    // throttleMs - минимальная задержка между одинаковыми звуками (чтобы не оглохнуть)
+    // НОВОЕ: Вычисляем громкость относительно наших юнитов
+    getVolumeByDistance(x, y, maxDist = 1500, maxVol = 1.0) {
+        // Определяем, за кого мы играем
+        let mySide = Game.isMultiplayer ? Game.myRole : 'player';
+        // Ищем всех наших юнитов (и солдат, и здания)
+        let myUnits = Game.units.filter(u => u.side === mySide);
+        
+        if (myUnits.length === 0) return 0; // Если наших на карте нет, ничего не слышим
+
+        // Ищем ближайшего к источнику звука
+        let minDist = Infinity;
+        for (let u of myUnits) {
+            let d = Math.hypot(u.x - x, u.y - y);
+            if (d < minDist) minDist = d;
+        }
+
+        if (minDist >= maxDist) return 0; // Слишком далеко
+        
+        // Чем ближе, тем громче. Используем квадратичное затухание для реалистичности
+        let factor = 1 - (minDist / maxDist);
+        return Math.max(0, Math.min(maxVol, maxVol * factor * factor));
+    },
+
     play(name, throttleMs = 0, volume = 1.0) {
+        if (volume <= 0.01) return; // Не играем звуки, если их всё равно не слышно
+        
         if (throttleMs > 0) {
             const now = Date.now();
             if (this.lastPlayed[name] && now - this.lastPlayed[name] < throttleMs) return;
             this.lastPlayed[name] = now;
         }
         if (this.sounds[name]) {
-            const snd = this.sounds[name].cloneNode(); // Клонируем, чтобы звуки могли накладываться
+            const snd = this.sounds[name].cloneNode(); 
             snd.volume = volume;
             snd.play().catch(e => {});
         }
@@ -4512,8 +4533,17 @@ if (this.type === 'AA_DEFENSE') {
                             }
                         } 
                  // Остальные
+                      // Остальные
                         else {
-                            if (this.type === 'TANK') SoundManager.play('tankFire', 100, 0.5); // ЗВУК ВЫСТРЕЛА ТАНКА
+                            // Вычисляем громкость: слышно на расстоянии до 1500 пикселей
+                            let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
+                            
+                            if (this.type === 'TANK') {
+                                SoundManager.play('tankFire', 100, vol);
+                            } else {
+                                // Все остальные (Пехота, Снайперы, Лодки, Грады) стреляют звуком Shoot.mp3
+                                SoundManager.play('shoot', 100, vol); 
+                            }
                             
                             let splashR = (this.type === 'TANK') ? 60 : 0;
                             Game.bullets.push(new Bullet(this.x, this.y, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
@@ -4609,15 +4639,16 @@ if (dist < 15) {
             this.x += (dx / dist) * currentSpeed; 
             this.y += (dy / dist) * currentSpeed; 
             
-            // --- ЗВУКИ ДВИЖЕНИЯ ---
-            if (UNITS[this.type] && UNITS[this.type].isInfantry || this.isBuilder) {
-                // Шаги звучат макс. 1 раз в 400 мс (чтобы толпа не топала как пулемет)
-                SoundManager.play('steps', 400, 0.15); 
-            } else if (this.type === 'TANK' || this.type === 'GRAD' || this.type === 'HIMARS') {
-                // Гул техники макс. 1 раз в 600 мс
-                SoundManager.play('driving', 600, 0.2);
+    // --- ЗВУКИ ДВИЖЕНИЯ ---
+            // Шаги и моторы слышны ТОЛЬКО если это наша армия
+            let mySide = Game.isMultiplayer ? Game.myRole : 'player';
+            if (this.side === mySide) {
+                if (UNITS[this.type] && UNITS[this.type].isInfantry || this.isBuilder) {
+                    SoundManager.play('steps', 400, 0.15); 
+                } else if (this.type === 'TANK' || this.type === 'GRAD' || this.type === 'HIMARS') {
+                    SoundManager.play('driving', 600, 0.2);
+                }
             }
-        }
 
 // --- ПЕРЕВОЗКА ПАССАЖИРОВ НА ЛОДКЕ ---
         if (this.type === 'BOAT' && (this.x !== prevX || this.y !== prevY)) {
@@ -4822,8 +4853,11 @@ hit() {
         // Проверяем, попал ли снаряд в воду
         const isWaterHit = MapUtils.isWater(this.x, this.y);
 
-        if (this.isNuke) {
-            SoundManager.play('nuke', 0, 1.0);
+if (this.isNuke) {
+            // Ядерку слышно на всю карту (до 4000 пикселей), громкость 100%
+            let nukeVol = SoundManager.getVolumeByDistance(this.x, this.y, 4000, 1.0);
+            SoundManager.play('nuke', 0, nukeVol); 
+            // ... (дальше идет вспышка и урон ядерки)
             // --- ЭПИЧНАЯ АНИМАЦИЯ ЯДЕРКИ ---
             // 1. Ослепительная вспышка (белый экран)
             Game.effects.push({ type: 'nuke_flash', x: this.x, y: this.y, life: 50 });
@@ -4846,8 +4880,10 @@ hit() {
             if (isWaterHit) {
                 Game.effects.push({ type: 'splash_ring', x: this.x, y: this.y, radius: 5, maxRadius: this.splashRadius || 20, life: 40, color: 'rgba(200, 255, 255, 0.8)' });
                 for(let k=0; k<5; k++) Game.effects.push({ type: 'water_particle', x: this.x, y: this.y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 30 });
-            } else {
-                SoundManager.play('explosion', 80, 0.4); // ЗВУК ВЗРЫВА (громкость 40%, макс 1 раз в 80мс)
+      } else {
+                // Обычный взрыв слышно в радиусе 1500 пикселей, громкость до 40%
+                let expVol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
+                SoundManager.play('explosion', 80, expVol); 
                 
                 if (this.arty || this.splashRadius > 0) Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: (this.splashRadius || 10), life: 20});
                 Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});

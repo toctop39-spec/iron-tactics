@@ -4906,7 +4906,7 @@ if (dist < 15) {
             return; // Чтобы не рисовался текст/эмодзи
         }
 
-       // --- КРАСИВАЯ МОДЕЛЬ ГРАДА И HIMARS (РЕАЛИЗМ) ---
+   // --- КРАСИВАЯ МОДЕЛЬ ГРАДА И HIMARS (С 3D-АНИМАЦИЕЙ ПОДЪЕМА) ---
         if (this.type === 'GRAD' || this.type === 'HIMARS') {
             ctx.save();
             ctx.translate(this.x, this.y);
@@ -4917,15 +4917,15 @@ if (dist < 15) {
             ctx.ellipse(4, 6, this.radius * 1.8, this.radius * 1.1, this.angle || 0, 0, Math.PI*2);
             ctx.fill();
 
-            // --- 1. ШАССИ (Длинный грузовик, 3 оси) ---
+            // --- 1. ШАССИ (Одинаково мощное для обеих машин) ---
             ctx.save();
             ctx.rotate(this.angle || 0);
             
             let isHimars = this.type === 'HIMARS';
-            let cW = this.radius * 2.8; // Делаем машину длиннее
+            let cW = this.radius * 2.8; 
             let cH = this.radius * 1.2;
             
-            // Колеса: 1 ось спереди, 2 оси сзади под установкой
+            // Колеса: 1 ось спереди, 2 оси сзади
             ctx.fillStyle = '#0f0f0f';
             let wW = 14; let wH = 7; let wDist = cH / 2 + 1;
             [cW*0.35, -cW*0.15, -cW*0.4].forEach(wx => {
@@ -4937,45 +4937,33 @@ if (dist < 15) {
             ctx.fillStyle = '#222';
             ctx.fillRect(-cW/2, -cH*0.3, cW, cH*0.6);
 
-            // КАБИНА (Отличается для Града и Хаймарса)
-            if (isHimars) {
-                // HIMARS: Широкая бронекабина
-                ctx.fillStyle = '#4a554a'; // Военно-зеленый/серый
-                ctx.fillRect(cW*0.1, -cH*0.45, cW*0.4, cH*0.9);
-                // Бронированные стекла (узкие щели)
-                ctx.fillStyle = '#112233';
-                ctx.fillRect(cW*0.4, -cH*0.35, 5, cH*0.7); // Лобовое
-                ctx.fillRect(cW*0.15, -cH*0.46, 12, 2); // Левое
-                ctx.fillRect(cW*0.15, cH*0.44, 12, 2); // Правое
-            } else {
-                // ГРАД: Классический капотный грузовик (Урал/КрАЗ)
-                ctx.fillStyle = this.color;
-                ctx.fillRect(cW*0.15, -cH*0.4, cW*0.35, cH*0.8); // Кабина
-                ctx.fillRect(cW*0.5, -cH*0.25, cW*0.15, cH*0.5); // Капот двигателя
-                
-                // Стекла (широкие)
-                ctx.fillStyle = '#112233';
-                ctx.fillRect(cW*0.43, -cH*0.35, 6, cH*0.7); // Лобовое
-                ctx.fillRect(cW*0.2, -cH*0.41, 14, 3); // Левое
-                ctx.fillRect(cW*0.2, cH*0.38, 14, 3); // Правое
-                
-                // Фары на капоте
-                ctx.fillStyle = '#ffaa00';
-                ctx.beginPath(); ctx.arc(cW*0.6, -cH*0.15, 2, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cW*0.6, cH*0.15, 2, 0, Math.PI*2); ctx.fill();
-            }
+            // КАБИНА (Теперь у Града такая же бронированная кабина, только в цвет фракции)
+            ctx.fillStyle = isHimars ? '#4a554a' : this.color;
+            ctx.fillRect(cW*0.1, -cH*0.45, cW*0.4, cH*0.9);
+            
+            // Бронированные стекла (узкие щели)
+            ctx.fillStyle = '#112233';
+            ctx.fillRect(cW*0.4, -cH*0.35, 5, cH*0.7); // Лобовое
+            ctx.fillRect(cW*0.15, -cH*0.46, 12, 2);    // Левое
+            ctx.fillRect(cW*0.15, cH*0.44, 12, 2);     // Правое
 
             ctx.restore(); // Конец шасси
 
-            // --- 2. РАКЕТНАЯ УСТАНОВКА (Поворачивается к цели!) ---
+            // --- 2. РАКЕТНАЯ УСТАНОВКА (С 3D-АНИМАЦИЕЙ ПОДЪЕМА!) ---
             ctx.save();
             
             if (this.turretAngle === undefined) this.turretAngle = this.angle || 0;
             let targetAngle = this.angle || 0; 
             
-            if (this.gradSeq > 0 && this.gradTarget) {
+            // ЛОГИКА АНИМАЦИИ: Готовимся ли мы стрелять?
+            let isAiming = (Game.state === 'ARTY' && Game.selection.includes(this)); // Игрок нажал ЗАЛП и ищет цель
+            let isPreparing = (this.gradSeq > 0); // Идет 6-секундный отсчет до выстрела
+            if (isHimars && this.targetUnit) isPreparing = true; // Хаймарс поднимает трубы при виде врага
+            
+            // Наведение на цель
+            if (isPreparing && this.gradTarget) {
                 targetAngle = Math.atan2(this.gradTarget.y - this.y, this.gradTarget.x - this.x);
-            } else if (this.type === 'HIMARS' && this.targetUnit) {
+            } else if (isHimars && this.targetUnit) {
                 targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
             }
             
@@ -4986,63 +4974,76 @@ if (dist < 15) {
             
             ctx.rotate(this.turretAngle);
 
-            // Поворотный механизм (круг сзади кабины)
+            // Поворотный механизм (лежит на раме, не поднимается)
             let centerX = -cW*0.15;
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath(); ctx.arc(centerX, 0, this.radius*0.6, 0, Math.PI*2); ctx.fill();
 
+            // --- 3D ЭФФЕКТ ПОДЪЕМА (ELEVATION) ---
+            let targetElev = (isAiming || isPreparing) ? 1 : 0;
+            if (this.podElev === undefined) this.podElev = 0;
+            
+            // Плавное изменение высоты
+            if (this.podElev < targetElev) this.podElev = Math.min(1, this.podElev + 0.05); // Быстро поднимается (гидравлика)
+            if (this.podElev > targetElev) this.podElev = Math.max(0, this.podElev - 0.005); // Очень плавно опускается после выстрела
+            
+            ctx.translate(centerX, 0); // Переносим центр координат к механизму
+            
+            // Тень под поднятой установкой (добавляет глубины)
+            if (this.podElev > 0) {
+                ctx.fillStyle = `rgba(0,0,0,${this.podElev * 0.5})`;
+                ctx.fillRect(-this.radius, -this.radius*0.6, this.radius*2, this.radius*1.2);
+            }
+
+            // Увеличиваем масштаб и сдвигаем назад, создавая иллюзию подъема вверх
+            ctx.scale(1 + this.podElev * 0.15, 1 + this.podElev * 0.15);
+            ctx.translate(-this.podElev * 8, 0);
+
+            // --- ОТРИСОВКА САМИХ ТРУБ ---
             if (isHimars) {
-                // HIMARS ПОД: Массивный прямоугольный контейнер
                 let podW = this.radius * 1.6;
                 let podH = this.radius * 1.2;
                 
                 ctx.fillStyle = '#3a443a';
-                ctx.fillRect(centerX - podW*0.3, -podH/2, podW, podH);
+                ctx.fillRect(-podW*0.3, -podH/2, podW, podH);
                 ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
-                ctx.strokeRect(centerX - podW*0.3, -podH/2, podW, podH);
+                ctx.strokeRect(-podW*0.3, -podH/2, podW, podH);
                 
-                // Декоративные панели сверху (чтобы не было просто ровным квадратом)
                 ctx.fillStyle = '#2a332a';
-                ctx.fillRect(centerX - podW*0.2, -podH*0.3, podW*0.6, podH*0.6);
+                ctx.fillRect(-podW*0.2, -podH*0.3, podW*0.6, podH*0.6);
 
-                // 6 Толстых ракет (вычисляем честное количество)
                 let slots = 6;
                 let rocketsToDraw = Math.ceil((this.ammo / this.maxAmmo) * slots);
                 let slotIndex = 0;
                 
                 for(let ry = -podH/2 + 2; ry < podH/2 - 1; ry += podH/slots) {
                     if (slotIndex < rocketsToDraw) {
-                        ctx.fillStyle = '#ff5500'; // Яркая боеголовка
-                        ctx.fillRect(centerX + podW*0.7 - 6, ry + 1, 8, podH/slots - 4); 
+                        ctx.fillStyle = '#ff5500'; 
+                        ctx.fillRect(podW*0.7 - 6, ry + 1, 8, podH/slots - 4); 
                     }
                     slotIndex++;
                 }
 
             } else {
-                // ГРАД ПОД: Пакет открытых направляющих труб
                 let tubeL = this.radius * 1.8;
                 let rackW = this.radius * 1.3;
                 
-                // Основание пакета
                 ctx.fillStyle = '#333';
-                ctx.fillRect(centerX - tubeL*0.4, -rackW/2, tubeL, rackW);
+                ctx.fillRect(-tubeL*0.4, -rackW/2, tubeL, rackW);
 
-                // Рисуем ряды труб (примерно 8 рядов сверху)
                 let rows = 8;
                 let rocketsToDraw = Math.ceil((this.ammo / this.maxAmmo) * rows);
                 let rowIdx = 0;
                 
                 for(let ty = -rackW/2; ty < rackW/2 - 1; ty += rackW/rows) {
-                    // Сама железная труба
                     ctx.fillStyle = '#444';
-                    ctx.fillRect(centerX - tubeL*0.4, ty, tubeL, rackW/rows - 1);
-                    ctx.fillStyle = '#222'; // Тень внутри трубы
-                    ctx.fillRect(centerX + tubeL*0.6 - 4, ty + 1, 4, rackW/rows - 3);
+                    ctx.fillRect(-tubeL*0.4, ty, tubeL, rackW/rows - 1);
+                    ctx.fillStyle = '#222'; 
+                    ctx.fillRect(tubeL*0.6 - 4, ty + 1, 4, rackW/rows - 3);
 
-                    // Оранжевая боеголовка ракеты внутри трубы
                     if (rowIdx < rocketsToDraw) {
                         ctx.fillStyle = '#ffaa00';
-                        ctx.fillRect(centerX + tubeL*0.6 - 2, ty + 1, 6, rackW/rows - 3);
+                        ctx.fillRect(tubeL*0.6 - 2, ty + 1, 6, rackW/rows - 3);
                     }
                     rowIdx++;
                 }

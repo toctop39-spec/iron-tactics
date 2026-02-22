@@ -350,7 +350,7 @@ const UNITS = {
     SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 15, buildTime: 5, isInfantry: true },
     
     // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
-    TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
+    TANK:    { type:'unit', name: 'Танк',   emoji: '🚜',  
                cost: 5000, resCost: { iron: 35, chem: 2 }, // <--- НОВАЯ ЦЕНА
                hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 25, buildTime: 20 },
     
@@ -3980,6 +3980,9 @@ class Unit {
         this.nukeTimer = 0; this.spawnedCount = 0; this.level = 0; this.nukeTarget = null;
         this.prevX = x; this.prevY = y; this.stuckTimer = 0;
         this.autoTarget = null;
+        this.turretAngle = 0; // Куда смотрит башня
+        this.recoil = 0;      // Отдача дула
+        this.trackOffset = 0; // Анимация гусениц
 
         // --- ИНИЦИАЛИЗАЦИЯ СКЛАДА ---
         if (this.type === 'WAREHOUSE') {
@@ -4144,6 +4147,24 @@ attemptAutoProduction() {
    update() {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
         this.checkPower();
+
+       // --- ЛОГИКА ТАНКА (Отдача и поворот башни) ---
+        if (this.type === 'TANK') {
+            if (this.recoil > 0) this.recoil -= 1; // Дуло плавно возвращается
+            
+            let targetAngle = this.angle || 0; // Если нет врага - башня смотрит прямо
+            if (this.targetUnit && this.targetUnit.hp > 0) {
+                targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
+            } else if (this.target) {
+                targetAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            }
+            
+            // Плавный поворот башни
+            let diff = targetAngle - this.turretAngle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            this.turretAngle += diff * 0.15; 
+        }
 
         // --- ЛОГИКА СТРОИТЕЛЯ (ЗАСТРЕВАНИЕ) ---
         if (this.isBuilder && this.assignedSite) {
@@ -4557,6 +4578,7 @@ if (this.type === 'AA_DEFENSE') {
                             
                             if (this.type === 'TANK') {
                                 SoundManager.play('tankFire', 100, vol);
+                                this.recoil = 12;
                             } else {
                                 // Все остальные (Пехота, Снайперы, Лодки, Грады) стреляют звуком Shoot.mp3
                                 SoundManager.play('shoot', 100, vol); 
@@ -4597,6 +4619,9 @@ _movePhysics() {
         
         let prevX = this.x; // Сохраняем старую позицию (для перевозки)
         let prevY = this.y;
+
+    // --- КРУТИМ ГУСЕНИЦЫ ---
+            if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
 
         // --- ЛОГИКА ВОДЫ ---
         if (!this.isFlying) {
@@ -4726,6 +4751,82 @@ if (dist < 15) {
             ctx.stroke();
 
             ctx.restore();
+
+            // --- КРАСИВАЯ МОДЕЛЬ ТАНКА ---
+        if (this.type === 'TANK') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            // 1. ХОДОВАЯ И КОРПУС (вращаются по вектору движения)
+            ctx.save();
+            ctx.rotate(this.angle || 0);
+            
+            // Темный фон гусениц
+            ctx.fillStyle = '#111';
+            let tW = this.radius * 2.2;
+            let tH = this.radius * 0.55;
+            let tDist = this.radius * 0.75;
+            ctx.fillRect(-tW/2, -tDist - tH/2, tW, tH);
+            ctx.fillRect(-tW/2, tDist - tH/2, tW, tH);
+            
+            // Анимация самих траков (бегущие полоски)
+            ctx.fillStyle = '#4a4a4a';
+            let offset = (this.trackOffset || 0) % 8;
+            for(let i = -tW/2 + offset; i < tW/2; i += 8) {
+                if (i > -tW/2 && i < tW/2 - 2) {
+                    ctx.fillRect(i, -tDist - tH/2, 3, tH);
+                    ctx.fillRect(i, tDist - tH/2, 3, tH);
+                }
+            }
+            
+            // Броня корпуса (цвет вашей базы!)
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.radius * 0.9, -this.radius * 0.7, this.radius * 1.8, this.radius * 1.4);
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+            ctx.strokeRect(-this.radius * 0.9, -this.radius * 0.7, this.radius * 1.8, this.radius * 1.4);
+            
+            // Детали (решетка радиатора сзади)
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(-this.radius * 0.8, -this.radius * 0.5, 8, this.radius);
+            ctx.restore(); // Конец ходовой
+
+            // 2. БАШНЯ (вращается к цели)
+            ctx.save();
+            ctx.rotate(this.turretAngle || 0);
+            
+            // Дуло (сдвигается назад при выстреле)
+            let recoilOut = this.recoil || 0;
+            ctx.fillStyle = '#555';
+            ctx.fillRect(10 - recoilOut, -4, this.radius * 1.6, 8); // Ствол пушки
+            ctx.fillRect(10 + this.radius * 1.6 - recoilOut - 5, -6, 12, 12); // Дульный тормоз на конце
+            
+            // Сама башня (круглая, в цвет базы)
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Командирский люк
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(-6, -6, this.radius * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore(); // Конец башни
+            
+            ctx.restore(); // Конец танка
+
+            // Полоска здоровья (стандартная)
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            
+            // Круг выделения
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return; // Завершаем отрисовку, чтобы не рисовался старый текст и эмодзи
+        }
 
             // Полоска здоровья
             let hpOffset = this.radius + 10;

@@ -4516,22 +4516,39 @@ attemptAutoProduction() {
             }
         }
 
- // --- ЛОГИКА HIMARS ---
+// --- ЛОГИКА HIMARS (ПРО + ПВО) ---
         if (this.isHIMARS) {
              if (this.reload > 0) this.reload--;
              if (this.reload <= 0 && this.ammo > 0) {
-                 let target = null;
                  
-                 // HIMARS больше не отвлекается на ядерки!
-                 // Ищем только авиацию (вертолеты)
+                 // 1. ПРИОРИТЕТ: Ищем крылатые ракеты (Радиус перехвата огромный)
+                 let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
+                 
+                 if (cruise) {
+                     this.ammo--;
+                     this.reload = 40; // Быстрая перезарядка после перехвата
+                     cruise.dead = true; // Сбиваем ракету в воздухе
+                     this.podElev = 1; // Задираем трубы
+                     
+                     // Красивый взрыв в небе
+                     SoundManager.play('explosion', 100, SoundManager.getVolumeByDistance(cruise.x, cruise.y, 1500, 0.7));
+                     Game.effects.push({x: cruise.x, y: cruise.y, char: '💥', life: 30, size: 50});
+                     Game.effects.push({type: 'shockwave', x: cruise.x, y: cruise.y, radius: 20, maxRadius: 150, life: 30, color: 'rgba(255, 100, 0, 0.6)'});
+                     for(let k=0; k<20; k++) {
+                         Game.effects.push({type: 'smoke', x: cruise.x, y: cruise.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 40 + Math.random()*30});
+                         Game.effects.push({type: 'dirt', x: cruise.x, y: cruise.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*10, size: 3, life: 30, color: '#ffaa00'});
+                     }
+                     return; // Выходим, чтобы не стрелять еще и по вертолетам одновременно
+                 }
+
+                 // 2. Если крылатых ракет нет - ищем вертолеты
+                 let target = null;
                  const air = Game.units.filter(u => u.side !== this.side && u.isFlying && u.hp > 0 && Math.hypot(u.x - this.x, u.y - this.y) < this.range);
                  if (air.length > 0) target = air[0];
                  
-                 // Огонь
                  if (target) {
                      this.ammo--;
                      this.reload = this.reloadMax;
-                     // Выпускаем самонаводящуюся ракету
                      Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, this.damage, this.side, false, target, this, 30, false, 1, 10));
                      Game.effects.push({x: this.x, y: this.y - 40, char: '🚀', life: 30});
                  }
@@ -4638,7 +4655,7 @@ if (this.type === 'AA_DEFENSE') {
     // Поиск новой цели
     if (!this.aaTarget && this.reload <= 0) {
         // 1. Ищем ракеты в радиусе
-        const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
+        const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && !b.isCruise && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
         
         // УМНЫЙ ФИЛЬТР: Проверяем траекторию. Летит ли на НАШУ территорию?
         const dangerousRockets = rockets.filter(r => {

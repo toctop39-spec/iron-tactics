@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <style>
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&display=swap');
-
 body { margin: 0; overflow: hidden; background: #050a14; font-family: 'Exo 2', sans-serif; user-select: none; }
 canvas { display: block; cursor: crosshair; }
 
@@ -2463,30 +2462,28 @@ loadLevel(lvlId) {
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
         
-    // --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ С ФИЗИКОЙ ---
-        const treeNoiseScale = 0.0025; // Насколько крупными будут пятна лесов (меньше = крупнее)
-        const gridSize = 40; // Плотность посадки деревьев
+ // --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ С ФИЗИКОЙ ---
+        const treeNoiseScale = 0.008; // ИЗМЕНЕНО: Леса будут встречаться намного чаще
+        const gridSize = 40; 
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
         
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                // Небольшой случайный сдвиг, чтобы деревья не стояли идеально по сетке
+                // Небольшой случайный сдвиг
                 let dx = c * gridSize + (MapUtils.random() - 0.5) * gridSize;
                 let dy = r * gridSize + (MapUtils.random() - 0.5) * gridSize;
                 
                 if (!this.isIslandMode || !MapUtils.isWater(dx, dy)) {
                     if (!MapUtils.checkMountain(dx, dy, 30)) {
                         
-                        // Используем генератор шума, чтобы понять, есть ли тут лес
                         let forestVal = SimplexNoise.noise(dx * treeNoiseScale, dy * treeNoiseScale);
                         
-                        // Если значение шума высокое — спавним ФИЗИЧЕСКОЕ ДЕРЕВО
-                        if (forestVal > 15) { 
+                        // ИЗМЕНЕНО: Снизили порог с 15 до 10, чтобы деревьев было больше
+                        if (forestVal > 10) { 
                             let tree = new Unit('TREE', dx, dy, 'neutral');
-                            this.units.push(tree); // Добавляем в общий массив юнитов!
+                            this.units.push(tree); 
                         } 
-                        // Если леса нет, с малым шансом кидаем мелкий декор на землю
                         else if (MapUtils.random() > 0.95) {
                             this.decor.push({x: dx, y: dy, char: (MapUtils.random() > 0.5 ? '🌿' : '🪨')});
                         }
@@ -2494,7 +2491,7 @@ loadLevel(lvlId) {
                 }
             }
         }
-   },
+ },
 
     startGameUI(title) {
         document.getElementById('menu-screen').classList.add('hidden');
@@ -3817,17 +3814,17 @@ onRight(e) {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
 
-        // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ ---
-        if (this.isIslandMode) {
-            // Режим архипелага (заливаем всё водой)
-            const gradient = ctx.createRadialGradient(
-                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
-                canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
-            );
-            gradient.addColorStop(0, '#050a14');
-            gradient.addColorStop(1, '#020408');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
+     // 1. Анимированный фон (вода / космос)
+        const time = this.frameCount * 0.002;
+        const gradient = ctx.createRadialGradient(
+            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 100,
+            canvas.width/2 + this.camera.x, canvas.height/2 + this.camera.y, 2000
+        );
+        gradient.addColorStop(0, '#050a14');
+        gradient.addColorStop(1, '#020408');
+        ctx.fillStyle = gradient;
+        // Заливаем весь мир фоном воды
+        ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         } else {
             // Стандартный/Гигантский режим (заливаем нашей новой текстурой земли)
             if (this.groundPattern) {

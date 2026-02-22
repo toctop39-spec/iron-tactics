@@ -4661,13 +4661,14 @@ if (dist < 15) {
 
                 if (u.side === this.side && u !== this && !u.isFlying && u.type !== 'BOAT' && !isBuilding) {
                     if (Math.hypot(u.x - prevX, u.y - prevY) < this.radius + 10) {
-                        u.x += dxMove;
-                        u.y += dyMove;
-                           }
+                                u.x += dxMove;
+                                u.y += dyMove;
+                            }
                         }
                     });
                 }
             }
+        }
 
     draw(ctx) {
 // --- КРАСИВАЯ МОДЕЛЬ ЛОДКИ ---

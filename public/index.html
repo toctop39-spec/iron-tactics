@@ -4522,22 +4522,26 @@ attemptAutoProduction() {
              if (this.reload <= 0 && this.ammo > 0) {
                  
                  // 1. ПРИОРИТЕТ: Ищем крылатые ракеты. 
-                 // Проверяем !b.targetedByHIMARS, чтобы несколько Хаймарсов не стреляли по одной ракете!
                  let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && !b.targetedByHIMARS && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
                  
                  if (cruise) {
                      this.ammo--;
                      this.reload = 40; 
                      this.podElev = 1; 
-                     cruise.targetedByHIMARS = true; // "Метка смерти", чтобы другие Хаймарсы её игнорировали
+                     cruise.targetedByHIMARS = true; 
 
-                     // ВЫПУСКАЕМ РАКЕТУ-ПЕРЕХВАТЧИК (Скорость 20 - невероятно быстрая)
                      let interceptor = new Bullet(this.x, this.y, cruise.x, cruise.y, 0, this.side, false, null, this, 0, false, 1, 20);
-                     interceptor.isInterceptor = true; // Специальный флаг
-                     interceptor.targetBullet = cruise; // Указываем, за кем гнаться
-                     Game.bullets.push(interceptor);
+                     interceptor.isInterceptor = true; 
+                     interceptor.targetBullet = cruise; 
                      
-                     // Звук и эффект запуска с самого Хаймарса
+                     // --- ШАНС ПРОМАХА 30% ---
+                     interceptor.willMiss = Math.random() < 0.3; 
+                     if (interceptor.willMiss) {
+                         // Если эта ракета промажет, снимаем метку с цели, чтобы другой Хаймарс на базе попытался её сбить!
+                         cruise.targetedByHIMARS = false; 
+                     }
+                     
+                     Game.bullets.push(interceptor);
                      SoundManager.play('shoot', 100, SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.5));
                      Game.effects.push({x: this.x, y: this.y - 40, char: '🚀', life: 30});
                      
@@ -5613,30 +5617,48 @@ class Bullet {
     updateAngle(targetX, targetY) { let d = Math.hypot(targetX - this.x, targetY - this.y); if (d === 0) d = 1; this.dx = (targetX - this.x) / d; this.dy = (targetY - this.y) / d; }
     update() {
 
-        // --- НОВОЕ: ЛОГИКА РАКЕТЫ-ПЕРЕХВАТЧИКА ---
+    // --- НОВОЕ: ЛОГИКА РАКЕТЫ-ПЕРЕХВАТЧИКА ---
         if (this.isInterceptor && this.targetBullet) {
             if (this.targetBullet.dead) { this.dead = true; return; } // Если цель уже сбили
             
-            // Наводимся на летящую крылатую ракету
-            this.tx = this.targetBullet.x; 
-            this.ty = this.targetBullet.y; 
-            this.updateAngle(this.tx, this.ty);
-            this.dist = Math.hypot(this.tx - this.x, this.ty - this.y);
-            
-            // Если догнали - БУМ!
-            if (this.dist < this.speed + 15) {
-                this.targetBullet.dead = true; // Уничтожаем крылатую ракету
-                this.dead = true;              // Исчезаем сами
-                
-                // Эффект огромного взрыва высоко в небе
-                SoundManager.play('explosion', 100, SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.7));
-                Game.effects.push({x: this.x, y: this.y, char: '💥', life: 30, size: 50});
-                Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 150, life: 30, color: 'rgba(255, 100, 0, 0.6)'});
-                for(let k=0; k<20; k++) {
-                    Game.effects.push({type: 'smoke', x: this.x, y: this.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 40 + Math.random()*30});
-                    Game.effects.push({type: 'dirt', x: this.x, y: this.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*10, size: 3, life: 30, color: '#ffaa00'});
+            if (this.willMiss) {
+                // Если суждено промазать - выбираем случайную точку "в молоко" и летим туда
+                if (!this.missOffset) {
+                    this.missOffset = { x: (Math.random()-0.5)*200, y: (Math.random()-0.5)*200 - 50 };
+                    this.tx = this.targetBullet.x + this.missOffset.x;
+                    this.ty = this.targetBullet.y + this.missOffset.y;
+                    this.updateAngle(this.tx, this.ty);
                 }
-                return;
+                
+                // Летим мимо и самоликвидируемся в небе
+                this.dist = Math.hypot(this.tx - this.x, this.ty - this.y);
+                if (this.dist < this.speed + 10) {
+                    this.dead = true;
+                    Game.effects.push({x: this.x, y: this.y, char: '💨', life: 20}); // Просто облачко дыма от промаха
+                    return;
+                }
+            } else {
+                // ИДЕАЛЬНОЕ НАВЕДЕНИЕ: Целимся в КОРПУС ракеты (чуть выше тени: y - 25)
+                this.tx = this.targetBullet.x; 
+                this.ty = this.targetBullet.y - 25; 
+                this.updateAngle(this.tx, this.ty);
+                this.dist = Math.hypot(this.tx - this.x, this.ty - this.y);
+                
+                // Если догнали - БУМ!
+                if (this.dist < this.speed + 15) {
+                    this.targetBullet.dead = true; // Уничтожаем крылатую ракету
+                    this.dead = true;              // Исчезаем сами
+                    
+                    // Эффект огромного взрыва высоко в небе
+                    SoundManager.play('explosion', 100, SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.7));
+                    Game.effects.push({x: this.x, y: this.y, char: '💥', life: 30, size: 50});
+                    Game.effects.push({type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 150, life: 30, color: 'rgba(255, 100, 0, 0.6)'});
+                    for(let k=0; k<20; k++) {
+                        Game.effects.push({type: 'smoke', x: this.x, y: this.y, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 40 + Math.random()*30});
+                        Game.effects.push({type: 'dirt', x: this.x, y: this.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*10, size: 3, life: 30, color: '#ffaa00'});
+                    }
+                    return;
+                }
             }
         }
         

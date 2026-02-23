@@ -3860,13 +3860,6 @@ draw() {
             ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
             ctx.imageSmoothingEnabled = true;
         }
-
-// 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
-        if (this.isIslandMode && MapUtils.bgCanvas) {
-            ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль
-            ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
-            ctx.imageSmoothingEnabled = true;
-        }
         
         // --- РИСУЕМ ЛАНДШАФТ ---
         MapUtils.lakes.forEach(l => {

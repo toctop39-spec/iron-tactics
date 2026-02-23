@@ -1792,6 +1792,9 @@ setFilter(type) {
     patterns: {}, 
 
     updateTerritoryCache() {
+
+        if (u.type === 'TREE') return;
+        
         const margin = 100; 
         const w = canvas.width + margin * 2;
         const h = canvas.height + margin * 2;

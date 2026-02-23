@@ -2013,6 +2013,25 @@ const searchMargin = RADIUS_PX + 50;
     myRole: 'player', 
     territoryMode: 1,
 
+    // --- НАЧАЛО: КЭШ ПРОВОДОВ ---
+    powerLinesCache: [],  
+    powerGridDirty: true, 
+
+    updatePowerLinesCache() {
+        this.powerLinesCache = [];
+        this.units.forEach(u => {
+            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
+                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
+                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < range);
+                
+                neighbors.forEach(n => {
+                    this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
+                });
+            }
+        });
+        this.powerGridDirty = false; 
+    },
+
 // Добавь эти свойства и методы в начало объекта Game:
 autoReload: false,
 toggleAutoReload() {
@@ -3057,8 +3076,11 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
             
 // Удаляем мертвых
             let lenBefore = this.units.length;
+           // Удаляем мертвых и обновляем провода
+            let lenBefore = this.units.length;
             this.units = this.units.filter(u => u.hp > 0);
-            if (this.units.length !== lenBefore) this.powerGridDirty = true; // Обновляем сеть при уничтожении
+            if (this.units.length !== lenBefore) this.powerGridDirty = true;
+        
             
             if (this.selectedProducer && (this.selectedProducer.hp <= 0 || this.selectedProducer.side !== this.myRole)) {
                 this.selectedProducer = null;
@@ -3903,11 +3925,10 @@ draw() {
         this.decor.forEach(d => { if (d.x > this.camera.x && d.x < this.camera.x + canvas.width) ctx.fillText(d.char, d.x, d.y); });
         
    
-    // --- ОТРИСОВКА ПРОВОДОВ ЭЛЕКТРОПЕРЕДАЧ (ОПТИМИЗИРОВАННО) ---
+// --- ОТРИСОВКА ПРОВОДОВ ЭЛЕКТРОПЕРЕДАЧ (ОПТИМИЗИРОВАННО) ---
         ctx.lineWidth = 2;
         const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
         
-        // Пересчитываем сеть, только если изменилось количество зданий
         if (this.powerGridDirty) this.updatePowerLinesCache();
 
         this.powerLinesCache.forEach(line => {
@@ -3917,7 +3938,6 @@ draw() {
                 if (bot) factor = bot.energyFactor; 
             }
             
-            // Провод серый, если не хватает энергии или электростанция уничтожена
             if (factor < 0.5 || line.source.hp <= 0) { 
                 ctx.strokeStyle = '#555'; 
             } else {

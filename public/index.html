@@ -2008,20 +2008,28 @@ updatePowerLinesForSide(side) {
         // Очищаем старые провода ТОЛЬКО для переданной фракции
         this.powerLinesCache = this.powerLinesCache.filter(line => line.side !== side);
 
-        this.units.forEach(u => {
-            if (u.side === side && (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') && u.hp > 0) {
-                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
-                
-                const neighbors = this.units.filter(n => 
-                    n.side === u.side && n !== u && n.hp > 0 &&
-                    (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE') && 
-                    Math.hypot(n.x - u.x, n.y - u.y) < range
-                );
-                
-                neighbors.forEach(n => {
+        // 1. ОПТИМИЗАЦИЯ: Сразу отсеиваем всю армию! Собираем только тех, кому нужна энергия
+        const powerConsumers = this.units.filter(n => 
+            n.side === side && n.hp > 0 && 
+            (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE')
+        );
+
+        // 2. Ищем только электростанции
+        const powerPlants = this.units.filter(u => 
+            u.side === side && u.hp > 0 && 
+            (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT')
+        );
+
+        // 3. Соединяем
+        powerPlants.forEach(u => {
+            let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
+            
+            // Теперь мы перебираем не ВСЕХ юнитов, а только небольшую горстку зданий!
+            powerConsumers.forEach(n => {
+                if (n !== u && Math.hypot(n.x - u.x, n.y - u.y) < range) {
                     this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
-                });
-            }
+                }
+            });
         });
     },
 

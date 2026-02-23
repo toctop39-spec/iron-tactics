@@ -5242,10 +5242,6 @@ _movePhysics() {
             this.walkFrame += currentSpeed * 0.4; 
         }
 
-        let dx = this.target.x - this.x;
-        let dy = this.target.y - this.y;
-        let dist = Math.hypot(dx, dy);
-
   // --- ПЛАВНЫЙ ПОВОРОТ ДЛЯ ВСЕЙ ТЕХНИКИ ---
         if (dist > 0.1) {
             let targetAngle = Math.atan2(dy, dx);

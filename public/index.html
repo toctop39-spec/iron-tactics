@@ -5235,22 +5235,37 @@ if (dist < 15) {
 
     draw(ctx) {
 
-                    // --- ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
-        if (this.side === Game.myRole && this.target && !this.isProducer) {
+     // --- ПОЛНАЯ ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
+        if (Game.selection.includes(this) && this.target && !this.isProducer) {
             ctx.save();
             ctx.beginPath();
+            
+            // Начинаем от самого юнита
             ctx.moveTo(this.x, this.y);
+            
+            // Линия к ближайшей точке
             ctx.lineTo(this.target.x, this.target.y);
             
-            // Рисуем полупрозрачную пунктирную линию
+            // Если есть очередь точек (вейпоинты), ведем линию через них все
+            if (this.pathQueue && this.pathQueue.length > 0) {
+                for (let i = 0; i < this.pathQueue.length; i++) {
+                    ctx.lineTo(this.pathQueue[i].x, this.pathQueue[i].y);
+                }
+            }
+            
             ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)'; 
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]); 
             ctx.stroke();
 
-            // Рисуем кружок-маркер на конце пути
+            // Ищем САМУЮ ПОСЛЕДНЮЮ точку маршрута, чтобы нарисовать там кружок
+            let finalPoint = this.target;
+            if (this.pathQueue && this.pathQueue.length > 0) {
+                finalPoint = this.pathQueue[this.pathQueue.length - 1];
+            }
+
             ctx.beginPath();
-            ctx.arc(this.target.x, this.target.y, 4, 0, Math.PI * 2);
+            ctx.arc(finalPoint.x, finalPoint.y, 4, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
             ctx.fill();
             

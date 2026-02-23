@@ -2797,7 +2797,7 @@ update() {
         const speed = 15;
 
     // --- ОПТИМИЗИРОВАННЫЙ РАСЧЕТ ПРОВОДОВ ---
-        if (this.frameCount % 10 === 0) {
+        if (this.frameCount % 100 === 0) {
             if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
             if (this.powerUpdateIndex === undefined) this.powerUpdateIndex = 0;
             
@@ -4573,6 +4573,37 @@ attemptAutoProduction() {
 
        // --- ЛОГИКА ТАНКА (Отдача и поворот башни) ---
         if (this.type === 'TANK') {
+            // === ФИЗИКА СНОСА ДЕРЕВЬЕВ ===
+            if (!this.originalSpeed) this.originalSpeed = this.speed;
+            this.speed = this.originalSpeed;
+            let crushingTree = false;
+
+            // Ищем деревья рядом (используя твою быструю сетку SpatialHash)
+            let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+            for (let obj of neighbors) {
+                if (obj.type === 'TREE' && obj.hp > 0) {
+                    // Дистанция 25 (радиус танка 22 + небольшой запас)
+                    if (Math.hypot(this.x - obj.x, this.y - obj.y) < 25) {
+                        crushingTree = true;
+                        if (!obj.bendStartTime) obj.bendStartTime = Date.now();
+
+                        // Если прошла 1 секунда (1000 мс) — дерево ломается
+                        if (Date.now() - obj.bendStartTime > 1000) {
+                            obj.hp = 0; 
+                            // Добавляем твои крутые эффекты разлетающихся кусков земли и пыли
+                            for(let i=0; i<6; i++) {
+                                Game.effects.push({type: 'dirt', x: obj.x, y: obj.y, vx: (Math.random()-0.5)*15, vy: -Math.random()*15, size: 3 + Math.random()*3, life: 40, color: '#4a3022'});
+                            }
+                            Game.effects.push({type: 'smoke', x: obj.x, y: obj.y, life: 30});
+                        }
+                        break; // Давим только одно дерево за раз
+                    }
+                }
+            }
+            // Если танк прямо сейчас гнет дерево — он буксует (скорость 30%)
+            if (crushingTree) this.speed = this.originalSpeed * 0.3;
+            // ================================
+
             if (this.recoil > 0) this.recoil -= 1; // Дуло плавно возвращается
             
             let targetAngle = this.angle || 0; // Если нет врага - башня смотрит прямо
@@ -5393,6 +5424,13 @@ if (dist < 15) {
         if (this.type === 'TREE') {
             ctx.save();
             ctx.translate(this.x, this.y);
+
+            // === АНИМАЦИЯ ПАДЕНИЯ ===
+            if (this.bendStartTime) {
+                let progress = (Date.now() - this.bendStartTime) / 1000;
+                if (progress > 1) progress = 1;
+                ctx.rotate(progress * (Math.PI / 2)); // Дерево валится на 90 градусов
+            }
 
             // Тень на земле
             ctx.fillStyle = 'rgba(0,0,0,0.4)';

@@ -2486,7 +2486,6 @@ loadLevel(lvlId) {
      if (typeof SoundManager !== 'undefined' && SoundManager.bgm) {
             SoundManager.bgm.pause();
         }
-     this.powerGridDirty = true;
         this.units = []; this.bullets = [];
         this.selection = []; this.constructions = []; this.effects = []; this.bots = [];
         this.buffs = [];
@@ -3985,8 +3984,7 @@ draw() {
 // --- ОТРИСОВКА ПРОВОДОВ ЭЛЕКТРОПЕРЕДАЧ (ОПТИМИЗИРОВАННО) ---
         ctx.lineWidth = 2;
         const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
-        
-        if (this.powerGridDirty) this.updatePowerLinesCache();
+    
 
         this.powerLinesCache.forEach(line => {
             let factor = (line.side === 'player') ? Game.energyFactor : 1;

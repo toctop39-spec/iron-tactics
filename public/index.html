@@ -5406,65 +5406,112 @@ if (dist < 15) {
             return; // ВАЖНО: Выходим сразу, чтобы не рисовались значки и ХП!
         }
 
-   // --- 3D МОДЕЛИ ПЕХОТЫ И СТРОИТЕЛЕЙ (ОДИНАКОВЫЕ В КАМУФЛЯЖЕ) ---
+// --- 3D МОДЕЛИ ПЕХОТЫ И СТРОИТЕЛЕЙ (С УЛУЧШЕННОЙ АНИМАЦИЕЙ И ОРУЖИЕМ) ---
         if (this.isBuilder || (UNITS[this.type] && UNITS[this.type].isInfantry)) {
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.rotate(this.angle || 0);
 
-            // Фиксированный визуальный размер для всех людей (теперь снайперы не будут гигантами!)
             let drawRad = 8; 
 
-            // Вычисляем анимацию шагов
+            // Сложная математика шагов для реалистичности
             let isMoving = this.target && Math.hypot(this.target.x - this.x, this.target.y - this.y) > 2;
-            let swing = isMoving ? Math.sin(this.walkFrame || 0) : 0;
-            let swingCos = isMoving ? Math.cos(this.walkFrame || 0) : 0;
+            let swing = isMoving ? Math.sin(this.walkFrame || 0) : 0;         // Движение ног (-1 до 1)
+            let sway = isMoving ? Math.cos(this.walkFrame || 0) : 0;          // Покачивание плеч (-1 до 1)
+            let bob = isMoving ? Math.abs(Math.sin(this.walkFrame || 0)) : 0; // Пружинистость тела (0 до 1)
 
             if (this.inWater) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.beginPath(); ctx.arc(0, 0, drawRad + 3 + swingCos * 2, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(0, 0, drawRad + 3 + sway * 2, 0, Math.PI*2); ctx.fill();
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.stroke();
-                ctx.scale(1 + swingCos * 0.05, 1 + swingCos * 0.05);
+                ctx.scale(1 + sway * 0.05, 1 + sway * 0.05); // Дыхание на воде
             } else {
                 ctx.fillStyle = 'rgba(0,0,0,0.4)';
                 ctx.beginPath(); ctx.ellipse(2, 2, drawRad * 1.3, drawRad * 1.1, 0, 0, Math.PI*2); ctx.fill();
 
-                // НОГИ
+                // НОГИ (Сделали шаг чуть шире)
                 ctx.fillStyle = '#111'; 
-                let legReach = drawRad * 0.8; 
-                ctx.beginPath(); ctx.arc(swing * legReach, -drawRad*0.5, drawRad*0.4, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(-swing * legReach, drawRad*0.5, drawRad*0.4, 0, Math.PI*2); ctx.fill();
+                let legReach = drawRad * 1.2; 
+                ctx.beginPath(); ctx.arc(swing * legReach, -drawRad*0.5, drawRad*0.4, 0, Math.PI*2); ctx.fill(); // Левая
+                ctx.beginPath(); ctx.arc(-swing * legReach, drawRad*0.5, drawRad*0.4, 0, Math.PI*2); ctx.fill(); // Правая
             }
 
-            // ТЕЛО (Универсальный камуфляж для всех)
+            // --- АНИМАЦИЯ ТОРСА (Покачивание и пружинистость) ---
+            ctx.save();
+            ctx.translate(bob * 1.5, 0); // Тело подается вперед при шаге
+            ctx.rotate(sway * 0.15);     // Плечи покачиваются в такт ногам
+
+            // Камуфляж
             let camoGrad = ctx.createLinearGradient(-drawRad, -drawRad, drawRad, drawRad);
-            camoGrad.addColorStop(0, '#3a4f29'); // Темно-зеленый
-            camoGrad.addColorStop(0.5, '#5c5236'); // Грязно-коричневый
+            camoGrad.addColorStop(0, '#3a4f29'); 
+            camoGrad.addColorStop(0.5, '#5c5236'); 
             camoGrad.addColorStop(1, '#2d3b22');
             
             ctx.fillStyle = camoGrad;
             ctx.beginPath(); ctx.ellipse(0, 0, drawRad * 0.8, drawRad * 1.1, 0, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
 
-            // ОРУЖИЕ (Стандартный автомат для всех)
+            // --- ОРУЖИЕ И РУКИ ---
             ctx.save();
-            ctx.translate(drawRad * 0.5, drawRad * 0.4);
-            ctx.fillStyle = '#222'; ctx.fillRect(0, -1.5, drawRad * 2, 3); // Ствол
-            ctx.fillStyle = '#ffccaa';
-            ctx.beginPath(); ctx.arc(2, 0, drawRad*0.35, 0, Math.PI*2); ctx.fill(); // Рука 1
-            ctx.beginPath(); ctx.arc(drawRad*1.2, -1, drawRad*0.35, 0, Math.PI*2); ctx.fill(); // Рука 2
-            ctx.restore();
+            if (this.type === 'BUILDER') {
+                ctx.translate(drawRad * 0.3, drawRad * 0.6);
+                ctx.rotate(isMoving ? sway * 0.5 : 0); 
+                if (this.constructing) ctx.rotate(Math.sin(Game.frameCount * 0.5) * 0.8); 
+                
+                ctx.fillStyle = '#8B4513'; ctx.fillRect(0, -1.5, drawRad*1.5, 3); // Рукоятка
+                ctx.fillStyle = '#777'; ctx.fillRect(drawRad*1.2, -4, 5, 8);      // Боек
+                ctx.fillStyle = '#ffccaa'; ctx.beginPath(); ctx.arc(2, 0, drawRad*0.35, 0, Math.PI*2); ctx.fill(); 
+                ctx.restore();
+                
+                // Вторая рука строителя болтается при ходьбе
+                ctx.fillStyle = '#ffccaa'; 
+                ctx.beginPath(); ctx.arc(isMoving ? -sway*3 : 0, -drawRad*0.6, drawRad*0.35, 0, Math.PI*2); ctx.fill();
+            } else {
+                // Оружие тоже "дышит" вместе с телом
+                ctx.translate(drawRad * 0.5 + bob * 1.5, drawRad * 0.4);
+                
+                if (this.type === 'SNIPER') {
+                    // КРУТАЯ СНАЙПЕРСКАЯ ВИНТОВКА
+                    ctx.fillStyle = '#1a1a1a'; 
+                    ctx.fillRect(-drawRad*0.5, -1.5, drawRad * 3.5, 3); // Длинный темный ствол
+                    ctx.fillStyle = '#0a0a0a'; 
+                    ctx.fillRect(drawRad * 0.5, -3.5, 7, 2);            // Оптический прицел
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(drawRad * 2.5, -2, 4, 4);              // Глушитель
+                } else {
+                    // ОБЫЧНЫЙ АВТОМАТ
+                    ctx.fillStyle = '#222'; 
+                    ctx.fillRect(0, -1.5, drawRad * 2, 3); 
+                }
 
-            // ГОЛОВА (Зеленая каска)
-            ctx.fillStyle = '#2d4c1e';
+                // Руки
+                ctx.fillStyle = '#ffccaa';
+                ctx.beginPath(); ctx.arc(2, 0, drawRad*0.35, 0, Math.PI*2); ctx.fill();           // Задняя
+                ctx.beginPath(); ctx.arc(drawRad*1.2, -1, drawRad*0.35, 0, Math.PI*2); ctx.fill(); // Передняя на цевье
+                ctx.restore();
+            }
+
+            // --- ГОЛОВА ---
+            if (this.type === 'BUILDER') ctx.fillStyle = '#ffcc00';      // Каска
+            else if (this.type === 'SNIPER') ctx.fillStyle = '#1b2e11';  // Темный капюшон
+            else ctx.fillStyle = '#2d4c1e';                              // Обычный шлем
+            
             ctx.beginPath(); ctx.arc(0, 0, drawRad * 0.7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             
             // Лицо
             ctx.fillStyle = '#ffccaa'; 
             ctx.beginPath(); ctx.arc(drawRad * 0.4, 0, drawRad * 0.4, -Math.PI/2.5, Math.PI/2.5); ctx.fill();
-            ctx.restore(); // Возвращаем координаты, чтобы кружок базы не крутился вместе с телом
+            
+            // Спецназовские очки для снайпера
+            if (this.type === 'SNIPER') {
+                ctx.fillStyle = '#050505'; 
+                ctx.fillRect(drawRad * 0.4, -3, 3, 6); 
+            }
 
-            // --- МАРКЕР КОМАНДЫ (ЦВЕТНОЙ КРУЖОК НАД ГОЛОВОЙ) ---
+            ctx.restore(); // Сбрасываем поворот торса
+            ctx.restore(); // Сбрасываем поворот всего юнита
+
+            // --- ЦВЕТНОЙ МАРКЕР КОМАНДЫ (Всегда смотрит вверх) ---
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.fillStyle = this.color;
@@ -5473,7 +5520,7 @@ if (dist < 15) {
             ctx.restore();
 
             // --- ПОЛОСКА ХП И ВЫДЕЛЕНИЕ ---
-            let hpOffset = 20; // Фиксированный отступ для ХП, чтобы было на одной высоте
+            let hpOffset = 20; 
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-10, this.y - hpOffset, 20, 3);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-10, this.y - hpOffset, 20 * (Math.max(0, this.hp)/this.maxHp), 3);
             
@@ -5482,12 +5529,10 @@ if (dist < 15) {
                     ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
                 }
-                // Круг выделения тоже фиксированного размера, чтобы снайпер не выделялся гигантской рамкой
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, 12, 0, Math.PI*2); ctx.stroke();
             }
             return; 
         }
-
         
 // --- КРАСИВАЯ МОДЕЛЬ ЛОДКИ ---
         if (this.type === 'BOAT') {

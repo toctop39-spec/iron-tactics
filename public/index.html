@@ -5198,7 +5198,7 @@ _movePhysics() {
             }
         }
 
-    // --- ЛОГИКА ВОДЫ ---
+// --- ЛОГИКА ВОДЫ ---
         if (!this.isFlying) {
             const terrain = MapUtils.getTerrain(this.x, this.y);
             
@@ -5207,7 +5207,8 @@ _movePhysics() {
                 else { currentSpeed *= 1.5; onWater = true; }
             } else {
                 if (terrain === 'SHALLOW') { currentSpeed *= 0.5; onWater = true; } 
-                else if (terrain === 'DEEP') { currentSpeed *= 0.1; onWater = true; }
+                // ИСПРАВЛЕНО: Теперь на глубине скорость падает только до 25% (а не до 10%)
+                else if (terrain === 'DEEP') { currentSpeed *= 0.25; onWater = true; }
             }
         }
         

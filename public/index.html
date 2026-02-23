@@ -5071,7 +5071,7 @@ if (this.type === 'AA_DEFENSE') {
                 } 
                 // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
                 else if (d <= this.range) {
-                    this.target = null; // Останавливаемся для выстрела
+                    busy = true;
                     let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
                     this.angle = targetAngle; // Поворачиваемся к цели
 

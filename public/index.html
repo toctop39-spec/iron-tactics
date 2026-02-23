@@ -5801,27 +5801,6 @@ let img = Game.loadedImages[imgKey];
                 ctx.fillRect(-this.radius, -this.radius, this.radius*2, this.radius*2);
             }
             ctx.restore();
-            // --- ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
-        if (this.side === Game.myRole && this.target && !this.isProducer) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(this.x, this.y);
-            ctx.lineTo(this.target.x, this.target.y);
-            
-            // Рисуем полупрозрачную пунктирную линию
-            ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)'; 
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]); 
-            ctx.stroke();
-
-            // Рисуем кружок-маркер на конце пути
-            ctx.beginPath();
-            ctx.arc(this.target.x, this.target.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-            ctx.fill();
-            
-            ctx.restore();
-        }
             ctx.globalAlpha = 1.0; // Сбрасываем прозрачность для полосок
 
             // --- СПЕЦЭФФЕКТЫ ДЛЯ ПВО ---
@@ -5938,6 +5917,28 @@ ctx.restore();
                 ctx.fillRect(-this.radius, -this.radius, this.radius*2, this.radius*2);
             }
             ctx.restore();
+
+            // --- ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
+        if (this.side === Game.myRole && this.target && !this.isProducer) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.target.x, this.target.y);
+            
+            // Рисуем полупрозрачную пунктирную линию
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)'; 
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); 
+            ctx.stroke();
+
+            // Рисуем кружок-маркер на конце пути
+            ctx.beginPath();
+            ctx.arc(this.target.x, this.target.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+            ctx.fill();
+            
+            ctx.restore();
+        }
             
             // --- Отрисовка полоски здоровья ---
             let hpOffset = this.radius * 1.2; // Чуть выше поднимем полоску ХП над высокими зданиями

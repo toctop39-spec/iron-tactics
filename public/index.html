@@ -6266,6 +6266,11 @@ hit() {
                     // --- НОВОЕ: ВЫБРОС ЗЕМЛИ ОТ ТАНКОВ И РАКЕТ ---
                     let isRocket = this.splashRadius > 80; // Отличаем ракету от пушки танка
                     let dirtCount = isRocket ? 45 : 20; // Ракета выбивает больше комьев
+
+                    // ЕСЛИ ЭФФЕКТОВ УЖЕ БОЛЬШЕ 300, РЕЖЕМ КОЛИЧЕСТВО НОВОЙ ГРЯЗИ В 5 РАЗ!
+                    if (Game.effects.length > 300) {
+                        dirtCount = Math.floor(dirtCount / 5);
+                    }
                     
                     for (let i = 0; i < dirtCount; i++) {
                         // Ракета: взрыв во все стороны. Танк: фонтан строго вверх.
@@ -6290,8 +6295,11 @@ hit() {
         let range = this.arty ? (UNITS.GRAD.splash || 100) : (this.splashRadius || 15);
         if (this.isNuke) range = 600; // Максимальный радиус поражения ядерки
         if (this.splashRadius > 100 && !this.isNuke) range = 150;
+
+    // Берем только соседей по сетке, а не всю карту! (Если это ядерка, берем всех, так как радиус огромный)
+        let targetsToCheck = (this.isNuke || !Game.spatialGrid) ? Game.units : Game.spatialGrid.getNearby(this);
         
-        Game.units.forEach(u => {
+        targetsToCheck.forEach(u => {
             if (u.side !== this.side && u.type !== 'MINE') {
                 // Считаем дистанцию от центра взрыва до КРАЯ юнита
                 let d = Math.hypot(u.x - this.x, u.y - this.y) - u.radius;

@@ -5242,19 +5242,6 @@ _movePhysics() {
             this.walkFrame += currentSpeed * 0.4; 
         }
 
-// --- РЕАЛИСТИЧНЫЕ ВОЛНЫ ---
-        if (onWater && (this.target || this.pathQueue.length > 0)) {
-            // ИСПРАВЛЕНИЕ: Снизили шанс с 15% до 3% (примерно 2 круга в секунду на лодку)
-            // И добавили защиту от лагов: если эффектов на экране уже больше 200, новые волны не создаются
-            if (Math.random() < 0.03 && Game.effects.length < 200) {
-                Game.effects.push({ 
-                    type: 'ripple', x: this.x, y: this.y + 5, 
-                    radius: 2, maxRadius: 15, life: 50, 
-                    color: 'rgba(255, 255, 255, 0.4)', growSpeed: 0.5
-                });
-            }
-        }
-
         let dx = this.target.x - this.x;
         let dy = this.target.y - this.y;
         let dist = Math.hypot(dx, dy);

@@ -1705,20 +1705,26 @@ startSandbox() {
     powerLinesCache: [],  // Кэш проводов
     powerGridDirty: true, // Флаг: нужно ли пересчитать провода?
 
-    // Функция, которая пересчитывает сеть ТОЛЬКО когда мы её просим
     updatePowerLinesCache() {
         this.powerLinesCache = [];
         this.units.forEach(u => {
             if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
                 let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
-                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < range);
+                
+                // ИСПРАВЛЕНИЕ: Теперь провода видят дома!
+                const neighbors = this.units.filter(n => 
+                    n.side === u.side && 
+                    n !== u && 
+                    (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE') && 
+                    Math.hypot(n.x - u.x, n.y - u.y) < range
+                );
                 
                 neighbors.forEach(n => {
                     this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
                 });
             }
         });
-        this.powerGridDirty = false; // Сбрасываем флаг (сеть актуальна)
+        this.powerGridDirty = false; 
     },
 
 toggleTerritoryMode() {
@@ -2493,6 +2499,7 @@ loadLevel(lvlId) {
      if (typeof SoundManager !== 'undefined' && SoundManager.bgm) {
             SoundManager.bgm.pause();
         }
+     this.powerGridDirty = true;
         this.units = []; this.bullets = [];
         this.selection = []; this.constructions = []; this.effects = []; this.bots = [];
         this.buffs = [];

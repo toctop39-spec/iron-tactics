@@ -1711,11 +1711,14 @@ startSandbox() {
             if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
                 let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
                 
-                // ИСПРАВЛЕНИЕ: Теперь провода видят дома!
+         // ИСПРАВЛЕНИЕ: Теперь игра не крашится, если рядом стоит дерево!
                 const neighbors = this.units.filter(n => 
                     n.side === u.side && 
                     n !== u && 
-                    (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE') && 
+                    (
+                        (UNITS[n.type] && UNITS[n.type].energyUse > 0) || 
+                        n.type === 'HOUSE'
+                    ) && 
                     Math.hypot(n.x - u.x, n.y - u.y) < range
                 );
                 

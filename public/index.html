@@ -1681,6 +1681,10 @@ startSandbox() {
         
         // 1. Сначала очищаем старые данные (это выключит старую песочницу, если она была)
         this.resetGameData(); 
+
+    this.waypointTimer = 0; 
+        this.waypointPath = []; 
+        this.waypointUnits = [];
         
         // 2. А ТЕПЕРЬ ВКЛЮЧАЕМ ЕЁ ДЛЯ НОВОГО ЗАПУСКА!
         this.isSandbox = true; 
@@ -2000,16 +2004,16 @@ const searchMargin = RADIUS_PX + 50;
     myRole: 'player', 
     territoryMode: 1,
 
-    updatePowerLinesCache() {
-        this.powerLinesCache = [];
+updatePowerLinesForSide(side) {
+        // Очищаем старые провода ТОЛЬКО для переданной фракции
+        this.powerLinesCache = this.powerLinesCache.filter(line => line.side !== side);
+
         this.units.forEach(u => {
-            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
+            if (u.side === side && (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') && u.hp > 0) {
                 let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
                 
-                // ИСПРАВЛЕНИЕ: Теперь провода видят дома!
                 const neighbors = this.units.filter(n => 
-                    n.side === u.side && 
-                    n !== u && 
+                    n.side === u.side && n !== u && n.hp > 0 &&
                     (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE') && 
                     Math.hypot(n.x - u.x, n.y - u.y) < range
                 );
@@ -2019,7 +2023,6 @@ const searchMargin = RADIUS_PX + 50;
                 });
             }
         });
-        this.powerGridDirty = false; 
     },
 
 // Добавь эти свойства и методы в начало объекта Game:
@@ -2793,6 +2796,16 @@ update() {
         if (this.clickDelay > 0) this.clickDelay--;
         this.frameCount++;
         const speed = 15;
+
+    // --- ОПТИМИЗИРОВАННЫЙ РАСЧЕТ ПРОВОДОВ ---
+        if (this.frameCount % 10 === 0) {
+            if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
+            if (this.powerUpdateIndex === undefined) this.powerUpdateIndex = 0;
+            
+            let sideToUpdate = this.powerSides[this.powerUpdateIndex % this.powerSides.length];
+            this.updatePowerLinesForSide(sideToUpdate);
+            this.powerUpdateIndex++;
+        }
         
         // --- ДОБАВЛЕНО: УПРАВЛЕНИЕ С ДЖОЙСТИКА ---
         if (MobileControls.active) {
@@ -2807,6 +2820,14 @@ Tutorial.update();
         this.camera.x = Math.max(0, Math.min(this.camera.x, MAP_W - canvas.width));
         this.camera.y = Math.max(0, Math.min(this.camera.y, MAP_H - canvas.height));
         if (this.state === 'BATTLE') {
+
+            // --- ТАЙМЕР ПУТИ (WAYPOINTS) ---
+            if (this.waypointTimer > 0) {
+                this.waypointTimer--;
+                if (this.waypointTimer <= 0 && this.waypointPath && this.waypointPath.length > 0) {
+                    this.executeWaypointPath();
+                }
+            }
 // В функции Game.update(), блок отправки sync_units замени на этот:
 if (this.isMultiplayer && this.frameCount % 15 === 0) { 
     const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({
@@ -3839,19 +3860,25 @@ onRight(e) {
         // 2. Отправляем юнитов в точку (если кто-то выделен)
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
         
-        const cols = Math.ceil(Math.sqrt(this.selection.length || 1));
-        const idsToMove = [];
-        
-        this.selection.forEach((u, i) => {
-            // Здания не пытаются двигаться
-            if (u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) return; 
+     // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
+        const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+
+        if (mobileUnits.length > 0) {
+            if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) {
+                // Если таймер еще идет, добавляем новую точку к существующему маршруту
+                this.waypointPath.push({x: m.x, y: m.y});
+            } else {
+                // Если таймер стоял, начинаем новый маршрут
+                this.waypointPath = [{x: m.x, y: m.y}];
+                this.waypointUnits = [...mobileUnits];
+            }
             
-            const ox = (i % cols) * 35 - (cols*17);
-            const oy = Math.floor(i / cols) * 35 - (cols*17);
-            u.moveCmd(m.x + ox, m.y + oy);
+            // Сбрасываем таймер на 120 кадров (ровно 2 секунды)
+            this.waypointTimer = 120; 
+            
+            // Эффект клика (маркер)
             this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
-            idsToMove.push(u.id);
-        });
+        }
          
         if (this.isMultiplayer && idsToMove.length > 0 && CURRENT_ROOM) {
             this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
@@ -3861,6 +3888,34 @@ onRight(e) {
     _normalizeSelection() {
         const builders = this.selection.filter(s => s.isBuilder);
         if (builders.length > 1) this.selection = this.selection.filter(s => !s.isBuilder).concat([builders[0]]);
+    },
+
+    executeWaypointPath() {
+        if (!this.waypointUnits || this.waypointUnits.length === 0) return;
+        const cols = Math.ceil(Math.sqrt(this.waypointUnits.length || 1));
+        const idsToMove = [];
+        const pathData = [];
+
+        this.waypointUnits.forEach((u, i) => {
+            if (u.hp <= 0) return; 
+            const ox = (i % cols) * 35 - (cols * 17);
+            const oy = Math.floor(i / cols) * 35 - (cols * 17);
+            
+            // Смещаем весь путь для каждого юнита, чтобы они шли ровным строем
+            const unitPath = this.waypointPath.map(pt => ({ x: pt.x + ox, y: pt.y + oy }));
+            u.setPath(unitPath);
+            idsToMove.push(u.id);
+            pathData.push({ id: u.id, path: unitPath });
+        });
+
+        // Отправка в мультиплеер
+        if (this.isMultiplayer && idsToMove.length > 0 && CURRENT_ROOM) {
+            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'path_move', data: pathData });
+        }
+
+        // Сброс
+        this.waypointPath = [];
+        this.waypointUnits = [];
     },
 
 draw() {
@@ -4145,6 +4200,47 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
         ctx.restore();
+    
+    if (this.pendingConstruction && window.mousePos) {
+            let m = window.mousePos;
+            let bType = this.pendingConstruction;
+            let bRad = UNITS[bType].radius;
+            
+            // Проверяем все те же правила, что и при клике строительства
+            let inWater = MapUtils.checkWater(m.x, m.y);
+            let onMountain = MapUtils.checkMountain(m.x, m.y, 40);
+            let owner = this.getTerritoryOwner(m.x, m.y);
+            let GAP = (bType === 'WALL') ? -15 : 30;
+            
+            // Проверяем, не пересекаемся ли мы с другими юнитами или стройками
+            let busy = this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + bRad + GAP) ||
+                       this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP);
+            
+            // Итоговый вердикт: можно тут строить или нет?
+            let isValid = !inWater && !onMountain && (owner === this.myRole) && !busy;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, bRad, 0, Math.PI*2);
+            
+            // Если можно - заливаем зеленым, если нельзя - красным
+            ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
+            ctx.fill();
+            ctx.strokeStyle = isValid ? '#0f0' : '#f00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // БОНУС: Если строим ПВО или СЭС, сразу рисуем пунктиром их радиус действия!
+            if (UNITS[bType].range || UNITS[bType].energyGen) {
+                let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, range, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
     },
 
     renderLoop() { if (!document.hidden) { this.draw(); } requestAnimationFrame(() => this.renderLoop()); },

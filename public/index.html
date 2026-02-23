@@ -436,12 +436,12 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
 };
 
     const HOUSE_UPGRADES = [
-    { name: 'Дом',     emoji: '🏠', cost: 0,      income: 3,    maxSpawn: 3,   energy: 10 }, // Ур 0
-    { name: 'Магазин', emoji: '🏪', cost: 1000,   income: 6,    maxSpawn: 8,   energy: 10 }, // Ур 1 (1000/100 = 10)
-    { name: 'ТЦ',      emoji: '🏬', cost: 3500,   income: 22,   maxSpawn: 25,  energy: 35 }, // Ур 2 (3500/100 = 35)
-    { name: 'Офис',    emoji: '🏢', cost: 12000,  income: 70,   maxSpawn: 80,  energy: 120 },// Ур 3
-    { name: 'Отель',   emoji: '🏨', cost: 35000,  income: 200,  maxSpawn: 250, energy: 140 },// Ур 4 (35000/100 = 350 -> макс 200)
-    { name: 'Банк',    emoji: '🏦', cost: 100000, income: 500, maxSpawn: 0,   energy: 100 } // Ур 5 (Только доход)
+HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 100, hp: 500, radius: 15, constructTime: 5, energyUse: 0, color: '#aaa' },
+    SHOP: { type: 'bldg', name: 'Магазин', emoji: '🏪', cost: 300, hp: 800, radius: 18, constructTime: 8, energyUse: 5, color: '#99a' },
+    MALL: { type: 'bldg', name: 'Торговый центр', emoji: '🏬', cost: 800, hp: 1500, radius: 25, constructTime: 15, energyUse: 15, color: '#88a' },
+    OFFICE: { type: 'bldg', name: 'Бизнес-центр', emoji: '🏢', cost: 1500, hp: 2500, radius: 22, constructTime: 20, energyUse: 25, color: '#77a' },
+    HOTEL: { type: 'bldg', name: 'Отель', emoji: '🏨', cost: 2500, hp: 3500, radius: 25, constructTime: 30, energyUse: 40, color: '#66a' },
+    BANK: { type: 'bldg', name: 'Центральный Банк', emoji: '🏦', cost: 5000, hp: 5000, radius: 20, constructTime: 45, energyUse: 50, color: '#ddaa00' }
 ];
     
 const SILO_AMMO = {
@@ -1781,6 +1781,13 @@ setFilter(type) {
         this.loadedImages['AA_DEFENSE'] = new Image(); this.loadedImages['AA_DEFENSE'].src = 'AA.png';
         this.loadedImages['WAREHOUSE'] = new Image(); this.loadedImages['WAREHOUSE'].src = 'Warehouse.png';
         this.loadedImages['HOSPITAL'] = new Image(); this.loadedImages['HOSPITAL'].src = 'Hospital.png';
+      // --- ГОРОДСКИЕ ЗДАНИЯ ---
+        this.loadedImages['HOUSE'] = new Image(); this.loadedImages['HOUSE'].src = 'House.png';
+        this.loadedImages['SHOP'] = new Image(); this.loadedImages['SHOP'].src = 'Shop.png';
+        this.loadedImages['MALL'] = new Image(); this.loadedImages['MALL'].src = 'Mall.png';
+        this.loadedImages['OFFICE'] = new Image(); this.loadedImages['OFFICE'].src = 'Office.png';
+        this.loadedImages['HOTEL'] = new Image(); this.loadedImages['HOTEL'].src = 'Hotel.png';
+        this.loadedImages['BANK'] = new Image(); this.loadedImages['BANK'].src = 'Bank.png';
   },
 
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
@@ -5599,15 +5606,16 @@ if (dist < 15) {
             return;
         }
 
- // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ (С ПОЛОСКАМИ И АВТО-ПРОИЗВОДСТВОМ) ---
-        // Добавлены WAREHOUSE, AA_DEFENSE и HOSPITAL
-        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL'].includes(this.type)) {
+// --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ ---
+        // Добавили SHOP, MALL, OFFICE, HOTEL, BANK
+        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL', 'HOUSE', 'SHOP', 'MALL', 'OFFICE', 'HOTEL', 'BANK'].includes(this.type)) {
             
             // Полупрозрачность, если нет электричества
             if (!this.isPowered) ctx.globalAlpha = 0.5;
             
             ctx.save();
             ctx.translate(this.x, this.y);
+           
             
             let imgKey = this.type; // Берем ключ прямо из типа здания
 

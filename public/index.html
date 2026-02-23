@@ -392,12 +392,12 @@ FPV: {
 NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 500 },
 SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
-    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 100, hp: 500, radius: 15, constructTime: 5, energyUse: 0, color: '#aaa' },
-    SHOP: { type: 'bldg', name: 'Магазин', emoji: '🏪', cost: 300, hp: 800, radius: 18, constructTime: 8, energyUse: 5, color: '#99a' },
-    MALL: { type: 'bldg', name: 'Торговый центр', emoji: '🏬', cost: 800, hp: 1500, radius: 25, constructTime: 15, energyUse: 15, color: '#88a' },
-    OFFICE: { type: 'bldg', name: 'Бизнес-центр', emoji: '🏢', cost: 1500, hp: 2500, radius: 22, constructTime: 20, energyUse: 25, color: '#77a' },
-    HOTEL: { type: 'bldg', name: 'Отель', emoji: '🏨', cost: 2500, hp: 3500, radius: 25, constructTime: 30, energyUse: 40, color: '#66a' },
-    BANK: { type: 'bldg', name: 'Центральный Банк', emoji: '🏦', cost: 5000, hp: 5000, radius: 20, constructTime: 45, energyUse: 50, color: '#ddaa00' },
+    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 100, hp: 500, radius: 25, constructTime: 5, energyUse: 0, color: '#aaa' },
+    SHOP: { type: 'bldg', name: 'Магазин', emoji: '🏪', cost: 300, hp: 800, radius: 28, constructTime: 8, energyUse: 5, color: '#99a' },
+    MALL: { type: 'bldg', name: 'Торговый центр', emoji: '🏬', cost: 800, hp: 1500, radius: 35, constructTime: 15, energyUse: 15, color: '#88a' },
+    OFFICE: { type: 'bldg', name: 'Бизнес-центр', emoji: '🏢', cost: 1500, hp: 2500, radius: 36, constructTime: 20, energyUse: 25, color: '#77a' },
+    HOTEL: { type: 'bldg', name: 'Отель', emoji: '🏨', cost: 2500, hp: 3500, radius: 37, constructTime: 30, energyUse: 40, color: '#66a' },
+    BANK: { type: 'bldg', name: 'Центральный Банк', emoji: '🏦', cost: 5000, hp: 5000, radius: 30, constructTime: 45, energyUse: 50, color: '#ddaa00' },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
              
@@ -1701,6 +1701,24 @@ startSandbox() {
     level: 1, money: 0, state: 'MENU',
     resources: { iron: 0, chem: 0, chips: 0 }, // НОВОЕ
     selectionFilter: null,
+    powerLinesCache: [],  // Кэш проводов
+    powerGridDirty: true, // Флаг: нужно ли пересчитать провода?
+
+    // Функция, которая пересчитывает сеть ТОЛЬКО когда мы её просим
+    updatePowerLinesCache() {
+        this.powerLinesCache = [];
+        this.units.forEach(u => {
+            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
+                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
+                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < range);
+                
+                neighbors.forEach(n => {
+                    this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
+                });
+            }
+        });
+        this.powerGridDirty = false; // Сбрасываем флаг (сеть актуальна)
+    },
 
 toggleTerritoryMode() {
         this.territoryMode++;
@@ -1823,9 +1841,9 @@ setFilter(type) {
         const RADIUS_PX = 200; 
         const RADIUS_CELLS = Math.ceil(RADIUS_PX / step); 
 
-        const searchMargin = RADIUS_PX + 50;
+const searchMargin = RADIUS_PX + 50;
         const activeUnits = this.units.filter(u => 
-            !u.isFlying && u.type !== 'MINE' &&
+            !u.isFlying && u.type !== 'MINE' && u.type !== 'TREE' && // <-- ИСПРАВЛЕНИЕ: Деревья игнорируются здесь!
             u.x > this.lastTerritoryCam.x - margin - searchMargin && 
             u.x < this.lastTerritoryCam.x - margin + w + searchMargin &&
             u.y > this.lastTerritoryCam.y - margin - searchMargin && 
@@ -3038,8 +3056,10 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 }
             });
             
-            // Удаляем мертвых
+// Удаляем мертвых
+            let lenBefore = this.units.length;
             this.units = this.units.filter(u => u.hp > 0);
+            if (this.units.length !== lenBefore) this.powerGridDirty = true; // Обновляем сеть при уничтожении
             
             if (this.selectedProducer && (this.selectedProducer.hp <= 0 || this.selectedProducer.side !== this.myRole)) {
                 this.selectedProducer = null;
@@ -3890,26 +3910,32 @@ draw() {
         ctx.font = '24px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle='#555';
         this.decor.forEach(d => { if (d.x > this.camera.x && d.x < this.camera.x + canvas.width) ctx.fillText(d.char, d.x, d.y); });
         
+   
+    // --- ОТРИСОВКА ПРОВОДОВ ЭЛЕКТРОПЕРЕДАЧ (ОПТИМИЗИРОВАННО) ---
         ctx.lineWidth = 2;
         const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
-        this.units.forEach(u => {
-            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
-                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
-                const neighbors = this.units.filter(n => n.side === u.side && n !== u && UNITS[n.type].energyUse && Math.hypot(n.x - u.x, n.y - u.y) < range);
-                
-                neighbors.forEach(n => {
-                    let factor = (u.side === 'player') ? Game.energyFactor : 1;
-                    if (u.side !== 'player') { const bot = Game.bots.find(b => b.side === u.side); if (bot) factor = bot.energyFactor; }
-                    if (factor < 0.5) ctx.strokeStyle = '#555'; 
-                    else {
-                        const baseColor = FACTIONS[u.side] ? FACTIONS[u.side].color : '#fff';
-                        ctx.strokeStyle = baseColor;
-                        ctx.globalAlpha = 0.3 + pulse * 0.4;
-                    }
-                    ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(n.x, n.y); ctx.stroke(); ctx.globalAlpha = 1;
-                });
+        
+        // Пересчитываем сеть, только если изменилось количество зданий
+        if (this.powerGridDirty) this.updatePowerLinesCache();
+
+        this.powerLinesCache.forEach(line => {
+            let factor = (line.side === 'player') ? Game.energyFactor : 1;
+            if (line.side !== 'player') { 
+                const bot = Game.bots.find(b => b.side === line.side); 
+                if (bot) factor = bot.energyFactor; 
             }
-        });        if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
+            
+            // Провод серый, если не хватает энергии или электростанция уничтожена
+            if (factor < 0.5 || line.source.hp <= 0) { 
+                ctx.strokeStyle = '#555'; 
+            } else {
+                const baseColor = FACTIONS[line.side] ? FACTIONS[line.side].color : '#fff';
+                ctx.strokeStyle = baseColor;
+                ctx.globalAlpha = 0.3 + pulse * 0.4;
+            }
+            ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke(); ctx.globalAlpha = 1;
+        });
+    if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
 
         this.constructions.forEach(s => {
             ctx.save(); ctx.globalAlpha = 0.55;
@@ -4585,6 +4611,7 @@ attemptAutoProduction() {
                         const newUnit = new Unit(st.type, st.x, st.y, st.owner);
                         newUnit.applyBuffs(); 
                         Game.units.push(newUnit);
+                        Game.powerGridDirty = true;
                         Game.effects.push({x: st.x, y: st.y, char: '🏗️', life: 60});
                         Game.constructions = Game.constructions.filter(s => s !== st);
                     }
@@ -6080,6 +6107,7 @@ hit() {
                              u.loyalty -= damage;
                             if (u.loyalty <= 0) {
                                 u.side = this.side; u.loyalty = u.maxLoyalty * 0.5; u.hp = u.maxHp; u.target = null; u.spawnCooldown = u.spawnMax;
+                                Game.powerGridDirty = true;
                                 Game.effects.push({x: u.x, y: u.y - 50, char: '🚩', life: 80});
                                 Game.effects.push({x: u.x, y: u.y, type: 'shockwave', radius: 50, color: '#ff69b4', life: 30});
                                 if (!Game.isMultiplayer) { const oldBot = Game.bots.find(b => b.side === u.side); if(oldBot) oldBot.checkPanic(); }

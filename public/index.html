@@ -1160,7 +1160,7 @@ manageIndustry() {
 
         houses.forEach(h => {
             // Ограничение: максимум 20 строителей (включая тех, что еще крафтятся)
-            if (totalBuilders < 20 && this.money >= UNITS.BUILDER.cost) { 
+            if (totalBuilders < 10 && this.money >= UNITS.BUILDER.cost) { 
                 this.craft(h, 'BUILDER'); 
                 totalBuilders++; // Мгновенно увеличиваем счетчик, чтобы следующий дом его уже учел!
                 return; 
@@ -3286,7 +3286,7 @@ onDown(e) {
                 if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
 
-                const GAP = (bType === 'WALL') ? -15 : 60;
+                const GAP = (bType === 'WALL') ? -15 : 30;
                 if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
                     this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
                      this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 

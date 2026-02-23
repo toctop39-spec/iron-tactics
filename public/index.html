@@ -2005,6 +2005,28 @@ const searchMargin = RADIUS_PX + 50;
     myRole: 'player', 
     territoryMode: 1,
 
+    updatePowerLinesCache() {
+        this.powerLinesCache = [];
+        this.units.forEach(u => {
+            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
+                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
+                
+                // ИСПРАВЛЕНИЕ: Теперь провода видят дома!
+                const neighbors = this.units.filter(n => 
+                    n.side === u.side && 
+                    n !== u && 
+                    (UNITS[n.type].energyUse > 0 || n.type === 'HOUSE') && 
+                    Math.hypot(n.x - u.x, n.y - u.y) < range
+                );
+                
+                neighbors.forEach(n => {
+                    this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
+                });
+            }
+        });
+        this.powerGridDirty = false; 
+    },
+
 // Добавь эти свойства и методы в начало объекта Game:
 autoReload: false,
 toggleAutoReload() {

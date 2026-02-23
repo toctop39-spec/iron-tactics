@@ -2491,7 +2491,7 @@ loadLevel(lvlId) {
                         let forestVal = SimplexNoise.noise(dx * treeNoiseScale, dy * treeNoiseScale);
                         
                         // ИЗМЕНЕНО: Снизили порог с 15 до 10, чтобы деревьев было больше
-                        if (forestVal > 10) { 
+                        if (forestVal > 0.4) { 
                             let tree = new Unit('TREE', dx, dy, 'neutral');
                             this.units.push(tree); 
                         } 

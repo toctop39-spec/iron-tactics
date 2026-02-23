@@ -3074,8 +3074,6 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 }
             });
             
-// Удаляем мертвых
-            let lenBefore = this.units.length;
            // Удаляем мертвых и обновляем провода
             let lenBefore = this.units.length;
             this.units = this.units.filter(u => u.hp > 0);

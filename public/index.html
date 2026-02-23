@@ -4520,6 +4520,7 @@ resolveCollision() {
             // Лодка не толкает своих пассажиров, а пассажиры не толкают лодку
             if (this.type === 'BOAT' && u.side === this.side && !u.isFlying && u.type !== 'BOAT') return;
             if (u.type === 'BOAT' && this.side === u.side && !this.isFlying && this.type !== 'BOAT') return;
+        if (this.type === 'TANK' && u.type === 'TREE') return;
 
         // Быстрая проверка через квадрат расстояния (без корня)
         let dx = this.x - u.x;

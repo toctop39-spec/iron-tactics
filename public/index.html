@@ -4197,7 +4197,6 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             for (let i = 1; i < this.drawPath.length; i++) ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
             ctx.stroke(); ctx.setLineDash([]);
         }
-        ctx.restore();
     
     if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos;
@@ -4239,6 +4238,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             }
             ctx.restore();
         }
+         ctx.restore();
     },
 
     renderLoop() { if (!document.hidden) { this.draw(); } requestAnimationFrame(() => this.renderLoop()); },

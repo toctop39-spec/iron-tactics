@@ -441,7 +441,14 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 }
 };
 
- const HOUSE_UPGRADES = ['HOUSE', 'SHOP', 'MALL', 'OFFICE', 'HOTEL', 'BANK'];
+const HOUSE_UPGRADES = [
+    { type: 'HOUSE', name: 'Жилой Дом', emoji: '🏠', cost: 100, energy: 0, income: 5, maxSpawn: 4 },
+    { type: 'SHOP', name: 'Магазин', emoji: '🏪', cost: 300, energy: 5, income: 15, maxSpawn: 8 },
+    { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 800, energy: 15, income: 40, maxSpawn: 15 },
+    { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 1500, energy: 25, income: 80, maxSpawn: 25 },
+    { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 2500, energy: 40, income: 150, maxSpawn: 40 },
+    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 5000, energy: 50, income: 300, maxSpawn: 80 }
+];
     
 const SILO_AMMO = {
     ROCKET: { name: 'Ракета',  emoji: '🚀', cost: 1000, reqRes: 'rockets', damage: 300,  speed: 6,   radius: 60,  hp: 500 },
@@ -1705,30 +1712,6 @@ startSandbox() {
     powerLinesCache: [],  // Кэш проводов
     powerGridDirty: true, // Флаг: нужно ли пересчитать провода?
 
-    updatePowerLinesCache() {
-        this.powerLinesCache = [];
-        this.units.forEach(u => {
-            if (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT') {
-                let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
-                
-         // ИСПРАВЛЕНИЕ: Теперь игра не крашится, если рядом стоит дерево!
-                const neighbors = this.units.filter(n => 
-                    n.side === u.side && 
-                    n !== u && 
-                    (
-                        (UNITS[n.type] && UNITS[n.type].energyUse > 0) || 
-                        n.type === 'HOUSE'
-                    ) && 
-                    Math.hypot(n.x - u.x, n.y - u.y) < range
-                );
-                
-                neighbors.forEach(n => {
-                    this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
-                });
-            }
-        });
-        this.powerGridDirty = false; 
-    },
 
 toggleTerritoryMode() {
         this.territoryMode++;
@@ -3565,7 +3548,7 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
                         
                         // ИСПРАВЛЕНИЕ: Берем цену из UNITS
                         const nextType = HOUSE_UPGRADES[next];
-                        const cost = UNITS[nextType].cost; 
+                        const cost = HOUSE_UPGRADES[next].cost;
                         
                         if (this.money >= cost) {
                             this.money -= cost;
@@ -3586,7 +3569,7 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
                 
                 // ИСПРАВЛЕНИЕ: Правильный вывод названия при обновлении
                 let currentType = HOUSE_UPGRADES[f.level || 0];
-                let titleName = UNITS[currentType].name.toUpperCase();
+                let titleName = HOUSE_UPGRADES[f.level || 0].name.toUpperCase();
                 
                 this.updateUI(list, true, titleName + ` (${this.selection.length})`);
             } else {
@@ -3760,7 +3743,7 @@ onUp(e) {
                             
                             // ИСПРАВЛЕНИЕ: Берем имя из UNITS, а не из строки
                             let currentType = HOUSE_UPGRADES[s0.level || 0];
-                            title = UNITS[currentType].name.toUpperCase(); 
+                            title = HOUSE_UPGRADES[s0.level || 0].name.toUpperCase(); 
                         }
                         
                         // Добавляем количество к названию, если выбрано больше одного
@@ -4197,7 +4180,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                     
                     // ИСПРАВЛЕНИЕ: Получаем характеристики следующего уровня из UNITS
                     const nextType = HOUSE_UPGRADES[(u.level || 0) + 1];
-                    const nextStats = UNITS[nextType];
+                    const nextStats = HOUSE_UPGRADES[(u.level || 0) + 1];
                     
                     const div = document.createElement('div'); div.className = 'unit-card'; div.style.borderColor = '#00ff00';
                     div.innerHTML = `<div style="font-size:1.5em">${nextStats.emoji}</div><div style="font-size:0.7em; color:#fff">${nextStats.name}</div><div class="card-price" style="color:#0f0">${nextStats.cost}$</div>`;
@@ -5684,10 +5667,12 @@ if (dist < 15) {
             ctx.save();
             ctx.translate(this.x, this.y);
            
-            
-            let imgKey = this.type; // Берем ключ прямо из типа здания
-
-            let img = Game.loadedImages[imgKey];
+          let imgKey = this.type;
+// Если это дом, берем картинку, соответствующую его уровню
+if (this.type === 'HOUSE') {
+    imgKey = HOUSE_UPGRADES[this.level || 0].type;
+}
+let img = Game.loadedImages[imgKey];
             let hpOffset = this.radius * 1.5; 
             
             // 1. РИСУЕМ САМО ЗДАНИЕ С ПРАВИЛЬНЫМИ ПРОПОРЦИЯМИ

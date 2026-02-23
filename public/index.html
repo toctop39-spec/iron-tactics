@@ -4238,7 +4238,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
               if (u) {
     let displayIcon = u.imageSrc 
         ? `<img src="${u.imageSrc}" style="width: 50px; height: 50px; object-fit: contain; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));">` 
-        : `<div style="font-size:2em">${u.emoji}</div>`;
+        : `<div style="font-size:2em">${u.emoji || '⚙️'}</div>`;
     
     div.innerHTML = `${displayIcon}<div class="card-price">${formatCost(u)}</div>`;
 }
@@ -5762,10 +5762,11 @@ let img = Game.loadedImages[imgKey];
                     ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fill();
                     ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.stroke();
 
-                    ctx.font = '14px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('🔄', 8, -8); 
-                    ctx.font = '16px Arial'; ctx.fillText(uInfo.emoji, 0, 0); 
-                    ctx.restore();
+                  ctx.font = '14px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+ctx.fillText('🔄', 8, -8); 
+ctx.font = '16px Arial'; 
+ctx.fillText(uInfo.emoji || '⚙️', 0, 0); // <--- ИСПРАВЛЕНО ТУТ
+ctx.restore();
                 }
             }
 

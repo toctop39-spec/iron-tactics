@@ -2870,6 +2870,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         }
 
  if (this.frameCount % 60 === 0) {
+     this.powerGridDirty = true;
     if (!this.isSpectator) {
         let income = 0;
         
@@ -3106,7 +3107,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
 if (!this.isSpectator) {
                 const mySelection = this.selection.filter(u => u.side === this.myRole);
-                const grads = mySelection.filter(u => u.type === 'GRAD' && u.hp > 0);
+                const grads = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.hp > 0);
                 document.getElementById('arty-btn').style.display = grads.length > 0 ? 'flex' : 'none';
                 if (grads.length === 0 && this.artyMode) { this.artyMode = false; document.body.style.cursor = 'default'; }
                 
@@ -3312,7 +3313,7 @@ onDown(e) {
             // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
                 if (this.money >= ARTY_COST) {
-                    const capable = this.selection.filter(u => u.type === 'GRAD' && u.ammo > 0 && u.side === this.myRole);
+               const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
                         this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
@@ -5897,40 +5898,7 @@ let img = Game.loadedImages[imgKey];
             ctx.fillStyle = '#000'; ctx.fillRect(this.x-15, this.y - hpOffset - 6, 30, 4);
             ctx.fillStyle = '#0af'; ctx.fillRect(this.x-15, this.y - hpOffset - 6, 30 * (1 - this.spawnCooldown/this.spawnMax), 4);
         }
-        
-// --- ВСТАВИТЬ В КОНЕЦ Unit.draw (перед закрывающей скобкой функции) ---
-        if (this.autoTarget && this.side === Game.myRole) {
-            const uInfo = UNITS[this.autoTarget];
-            if (uInfo) {
-                // Анимация парения
-                const floatY = Math.sin(Game.frameCount * 0.1) * 5;
-                
-                ctx.save();
-                ctx.translate(this.x, this.y - this.radius - 25 + floatY);
-                
-                // Кружочек фона
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.beginPath();
-                ctx.arc(0, 0, 12, 0, Math.PI*2);
-                ctx.fill();
-                
-                // Зеленая обводка (значит включено)
-                ctx.strokeStyle = '#0f0';
-                ctx.lineWidth = 2;
-                ctx.stroke();
 
-                // Иконка
-                ctx.font = '14px Arial';
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('🔄', 8, -8); 
-                ctx.font = '16px Arial';
-                ctx.fillText(uInfo.emoji, 0, 0); 
-                
-                ctx.restore();
-            }
-        }
 
         ctx.globalAlpha = 1.0;
         if (Game.selection.includes(this)) {

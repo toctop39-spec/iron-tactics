@@ -3411,15 +3411,16 @@ onDown(e) {
         }
 
         if (this.state === 'BATTLE') {
-          // 1. СПАВН ПЕСОЧНИЦЫ
+            // 1. СПАВН ПЕСОЧНИЦЫ
             if (this.isSandbox && this.buildType) {
-                // --- ИСПРАВЛЕНИЕ ДЛЯ ПЕСОЧНИЦЫ (КРАСИМ ЗЕМЛЮ) ---
+                // --- ИСПРАВЛЕНИЕ: ДОРОГА В ПЕСОЧНИЦЕ (КРАСИМ ЗЕМЛЮ) ---
                 if (this.buildType === 'ROAD') {
                     MapUtils.buildRoad(m.x, m.y);
                     Game.effects.push({x: m.x, y: m.y, char: '🛣️', life: 20});
                     return;
                 }
-                
+                // --------------------------------------
+
                 const isWater = MapUtils.checkWater(m.x, m.y);
                 const isBoat = this.buildType === 'BOAT';
                 if (isWater && !isBoat && !UNITS[this.buildType].isFlying) { this.showError("ЭТО ВОДА!"); return; }
@@ -3470,21 +3471,20 @@ onDown(e) {
 
             if (this.isSpectator) return;
 
-// 3. СТРОЙКА (Постановка фундамента)
+ // 3. СТРОЙКА (Постановка фундамента)
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
                 const inWater = MapUtils.checkWater(m.x, m.y);
                 const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
                 if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
-                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
-
+                
                 // --- ИСПРАВЛЕНИЕ ДЛЯ СТРОИТЕЛЯ (МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ) ---
                 if (bType === 'ROAD') {
                     if (this.checkCost('ROAD')) {
                         this.payCost('ROAD');
                         MapUtils.buildRoad(m.x, m.y); // Добавляем плитку
                         this.effects.push({x: m.x, y: m.y, char: '🛣️', life: 20});
-                        this.updateUI([]); // Списываем деньги на экране
+                        document.getElementById('money').innerText = Math.floor(this.money); // Списываем деньги на экране без сброса меню!
                         
                         // Отправляем по сети
                         if (this.isMultiplayer && CURRENT_ROOM) {
@@ -3494,9 +3494,14 @@ onDown(e) {
                         this.showError("НЕТ ДЕНЕГ!");
                         this.pendingConstruction = null; 
                         document.body.style.cursor = 'default';
+                        this.updateUI([]); // Закрываем меню, если кончились деньги
                     }
                     return; // ВАЖНО: Выходим, чтобы строитель не бежал ставить фундамент!
                 }
+                // --------------------------------------------------------------
+
+                // Проверка территории для ОБЫЧНЫХ зданий (дорогу можно строить за пределами базы!)
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
 
                 const GAP = (bType === 'WALL') ? -15 : 30;
                 if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||

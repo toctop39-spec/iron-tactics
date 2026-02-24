@@ -542,8 +542,24 @@ const MapUtils = {
         return this.currentSeed / 233280;
     },
 
-  init(forcedSeed) {
-        // Если сервер дал сид - используем его, иначе генерируем новый
+roadGrid: new Set(), // Хранилище построенных плиток дороги
+
+    // Добавляем плитку дороги 30x30
+    buildRoad(x, y) {
+        let cx = Math.floor(x / 30);
+        let cy = Math.floor(y / 30);
+        this.roadGrid.add(cx + "," + cy);
+    },
+
+    // Проверяем, есть ли тут дорога (для скорости танков)
+    checkRoad(x, y) {
+        let cx = Math.floor(x / 30);
+        let cy = Math.floor(y / 30);
+        return this.roadGrid.has(cx + "," + cy);
+    },
+
+    // В функции init() нужно просто очищать сетку при старте:
+    init(forcedSeed) {
         this.seed = forcedSeed !== undefined ? forcedSeed : Math.floor(Math.random() * 1000000);
         this.currentSeed = this.seed; 
         SimplexNoise.init(this.seed);
@@ -551,22 +567,11 @@ const MapUtils = {
         this.lakes = [];
         this.mountains = [];
         this.spawnPoints = [];
+        this.roadGrid = new Set(); // <--- Очищаем дороги новой игры
 
-        if (Game.isIslandMode) {
-            this.calculateSpawns();
-            this.renderBackground();
-        } else {
-            // Указываем генератору базовые точки для прокладки дорог на материке
-            this.spawnPoints = [
-                { x: 300, y: MAP_H/2 },
-                { x: MAP_W - 300, y: MAP_H/2 },
-                { x: MAP_W/2, y: 300 },
-                { x: MAP_W/2, y: MAP_H - 300 }
-            ];
-        }
-
-        this.generateMountains(); // Сначала горы
-        this.generateRoads();     // Потом прокладываем тропинки (в обход гор)
+        if (Game.isIslandMode) this.calculateSpawns();
+        this.generateMountains();
+        this.renderBackground();
     },
 
 getWorldHeight(x, y) {

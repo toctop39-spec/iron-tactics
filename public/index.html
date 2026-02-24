@@ -2382,6 +2382,7 @@ waterOffset: 0,
     init() {
         this.preloadAssets();
         this.generateGroundTexture();
+        this.generateRoadTexture();
         this.resize();
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('keydown', e => this.keys[e.code] = true);
@@ -2406,25 +2407,35 @@ waterOffset: 0,
         event.target.classList.add('active');
     },
 
-    // --- ГЕНЕРАТОР БЕСШОВНОЙ ТЕКСТУРЫ ЗЕМЛИ ---
-    generateGroundTexture() {
-        const size = 300; // Размер одного тайла
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = size; offCanvas.height = size;
-        const oCtx = offCanvas.getContext('2d');
+  // --- ГЕНЕРАТОР ТЕКСТУРЫ ТРОПИНКИ (КЛЯКСА ГРЯЗИ) ---
+    generateRoadTexture() {
+        const size = 60; // Размер кляксы (больше чем клетка 30x30, чтобы края сливались)
+        const off = document.createElement('canvas');
+        off.width = size; off.height = size;
+        const oCtx = off.getContext('2d');
 
-        // Базовый цвет (оливковый/травяной)
-        oCtx.fillStyle = '#3a472d'; 
-        oCtx.fillRect(0, 0, size, size);
+        // Создаем радиальный градиент (мягкие размытые края)
+        const gradient = oCtx.createRadialGradient(size/2, size/2, 5, size/2, size/2, size/2);
+        gradient.addColorStop(0, 'rgba(75, 55, 35, 0.95)'); // Темный плотный центр
+        gradient.addColorStop(0.5, 'rgba(95, 75, 45, 0.6)'); // Полупрозрачный край
+        gradient.addColorStop(1, 'rgba(100, 80, 50, 0)'); // Полностью прозрачный переход
 
-        // Умная функция для рисования пятен, которые не обрываются на краях
-        const drawSeamlessCircle = (x, y, r, color) => {
-            oCtx.fillStyle = color;
-            const offsets = [[0,0], [size,0], [-size,0], [0,size], [0,-size], [size,size], [-size,-size], [size,-size], [-size,size]];
-            offsets.forEach(off => {
-                oCtx.beginPath(); oCtx.arc(x + off[0], y + off[1], r, 0, Math.PI*2); oCtx.fill();
-            });
-        };
+        oCtx.fillStyle = gradient;
+        oCtx.beginPath();
+        // Немного сплющиваем круг, чтобы форма была органичнее
+        oCtx.ellipse(size/2, size/2, size/2, size/2 * 0.9, Math.random(), 0, Math.PI*2);
+        oCtx.fill();
+
+        // Добавляем мелкие камушки для реализма
+        for(let i=0; i<6; i++) {
+            oCtx.fillStyle = 'rgba(40, 30, 20, 0.8)';
+            oCtx.beginPath();
+            oCtx.arc(size/2 + (Math.random()-0.5)*30, size/2 + (Math.random()-0.5)*30, 1+Math.random()*2, 0, Math.PI*2);
+            oCtx.fill();
+        }
+
+        this.roadTexture = off; // Сохраняем готовую картинку в память
+    },
 
         // Рисуем пятна грязи и темной травы (создаем камуфляжный узор)
         for(let i=0; i<350; i++) {
@@ -5789,6 +5800,27 @@ if (dist < 15) {
             }
             
             ctx.restore();
+        }
+
+        // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
+        if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
+            MapUtils.roadGrid.forEach(key => {
+                let [cx, cy] = key.split(',').map(Number);
+                
+                let px = cx * 30; 
+                let py = cy * 30;
+                
+                // Рисуем только те куски тропинки, которые видит камера (чтобы не было лагов)
+                if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
+                    py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
+                    
+                    // Рисуем нашу заготовленную кляксу грязи!
+                    // Сдвигаем на -15, потому что клякса размером 60x60, а игровая клетка 30x30
+                    if (Game.roadTexture) {
+                        ctx.drawImage(Game.roadTexture, px - 15, py - 15);
+                    }
+                }
+            });
         }
 
         if (this.type === 'TREE') {

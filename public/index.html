@@ -3951,8 +3951,7 @@ onRight(e) {
             if (idsToMove.length > 0) {
                 this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
             }
-        }
-    },
+        },
 
     _normalizeSelection() {
         const builders = this.selection.filter(s => s.isBuilder);

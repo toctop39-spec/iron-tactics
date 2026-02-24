@@ -4273,6 +4273,32 @@ draw() {
             });
         }
 
+    // --- НОВОЕ: ОТРИСОВКА ПОСТРОЕННЫХ ПЛИТОК ДОРОГ (ИГРОКОМ) ---
+        if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
+            ctx.fillStyle = 'rgba(60, 65, 70, 0.9)'; // Темный асфальт/бетон
+            ctx.strokeStyle = 'rgba(20, 25, 30, 1)'; 
+            ctx.lineWidth = 2;
+
+            MapUtils.roadGrid.forEach(key => {
+                let [cx, cy] = key.split(',').map(Number);
+                let px = cx * 30; // 30 - это размер плитки из MapUtils
+                let py = cy * 30;
+                
+                // Рисуем только те плитки, которые видит камера (чтобы не лагало)
+                if (px > this.camera.x - 40 && px < this.camera.x + canvas.width + 40 &&
+                    py > this.camera.y - 40 && py < this.camera.y + canvas.height + 40) {
+                    
+                    ctx.fillRect(px, py, 30, 30);
+                    ctx.strokeRect(px, py, 30, 30);
+                    
+                    // Желтая разметка по центру каждой плитки
+                    ctx.fillStyle = 'rgba(255, 200, 0, 0.6)';
+                    ctx.fillRect(px + 12, py + 12, 6, 6);
+                    ctx.fillStyle = 'rgba(60, 65, 70, 0.9)'; // Возвращаем цвет бетона
+                }
+            });
+        }
+
         // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
         if (this.isIslandMode && MapUtils.bgCanvas) {
             ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль

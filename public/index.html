@@ -554,6 +554,7 @@ const MapUtils = {
 
         if (Game.isIslandMode) {
             this.calculateSpawns();
+            this.generateRoads(); // <--- ПРОСТО ДОБАВЬ ЭТУ СТРОЧКУ СЮДА
             this.generateMountains();
             this.renderBackground();
         }
@@ -649,6 +650,51 @@ getWorldHeight(x, y) {
         }
     },
 
+roads: [], // Хранилище дорог
+
+    // Создаем дороги между точками спавна
+    generateRoads() {
+        this.roads = [];
+        if (this.spawnPoints.length < 2) return;
+        
+        // Соединяем каждую базу с соседней (по кругу) и с центром карты
+        for (let i = 0; i < this.spawnPoints.length; i++) {
+            let p1 = this.spawnPoints[i];
+            let p2 = this.spawnPoints[(i + 1) % this.spawnPoints.length];
+            
+            // Дорога к соседу
+            this.roads.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
+            // Дорога в центр (перекресток)
+            this.roads.push({ x1: p1.x, y1: p1.y, x2: MAP_W/2, y2: MAP_H/2 });
+        }
+    },
+
+    // Математика расстояния до отрезка (для проверки, стоим ли мы на дороге)
+    distToSegment(px, py, x1, y1, x2, y2) {
+        let l2 = (x1 - x2) ** 2 + (y1 - y2) ** 2;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2));
+        return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    },
+
+    // Новый умный метод определения грунта под ногами
+    getGroundType(x, y) {
+        // 1. Сначала проверяем воду (если островной режим)
+        if (Game.isIslandMode && this.getWorldHeight(x, y) < 0.48) return 'WATER';
+
+        // 2. Проверяем дороги (ширина дороги 40 пикселей)
+        for (let r of this.roads) {
+            if (this.distToSegment(x, y, r.x1, r.y1, r.x2, r.y2) < 40) return 'ROAD';
+        }
+
+        // 3. Используем отдельный масштаб шума для полей и грязи
+        let biomeNoise = SimplexNoise.noise(x * 0.0015, y * 0.0015);
+        if (biomeNoise > 0.5) return 'MUD';   // Глубокая грязь/болото
+        if (biomeNoise < -0.5) return 'FIELD'; // Пшеничные поля
+
+        return 'NORMAL';
+    },
+    
     checkMountain(x, y, radius) {
         for (let m of this.mountains) {
             if (Math.hypot(x - m.x, y - m.y) < m.radius + radius) return m;
@@ -2515,36 +2561,41 @@ loadLevel(lvlId) {
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
         
- // --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ С ФИЗИКОЙ ---
-        const treeNoiseScale = 0.008; // ИЗМЕНЕНО: Леса будут встречаться намного чаще
-        const gridSize = 40; 
+// --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ И ЛАНДШАФТА ---
+        const treeNoiseScale = 0.004; // Уменьшили масштаб = леса стали большими массивами
+        const gridSize = 35; 
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
         
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                // Небольшой случайный сдвиг
                 let dx = c * gridSize + (MapUtils.random() - 0.5) * gridSize;
                 let dy = r * gridSize + (MapUtils.random() - 0.5) * gridSize;
                 
-                if (!this.isIslandMode || !MapUtils.isWater(dx, dy)) {
+                let groundType = MapUtils.getGroundType(dx, dy);
+                
+                // На дорогах и в воде деревья не растут
+                if (groundType !== 'WATER' && groundType !== 'ROAD') {
                     if (!MapUtils.checkMountain(dx, dy, 30)) {
-                        
                         let forestVal = SimplexNoise.noise(dx * treeNoiseScale, dy * treeNoiseScale);
                         
-                        // ИЗМЕНЕНО: Снизили порог с 15 до 10, чтобы деревьев было больше
-                        if (forestVal > 0.8) { 
+                        // Если это эпицентр леса — сажаем плотно!
+                        if (forestVal > 0.4) { 
                             let tree = new Unit('TREE', dx, dy, 'neutral');
                             this.units.push(tree); 
                         } 
-                        else if (MapUtils.random() > 0.95) {
-                            this.decor.push({x: dx, y: dy, char: (MapUtils.random() > 0.5 ? '🌿' : '🪨')});
+                        // Мелкий декор для полей и грязи
+                        else if (MapUtils.random() > 0.9) {
+                            let icon = '🌿';
+                            if (groundType === 'FIELD') icon = '🌾';
+                            if (groundType === 'MUD') icon = '🟤';
+                            this.decor.push({x: dx, y: dy, char: icon});
                         }
                     }
                 }
             }
         }
- },
+    },
 
     startGameUI(title) {
         document.getElementById('menu-screen').classList.add('hidden');
@@ -4074,6 +4125,33 @@ draw() {
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
 
+    // --- ОТРИСОВКА ДОРОГ ---
+        if (MapUtils.roads && MapUtils.roads.length > 0) {
+            ctx.lineWidth = 40; // Ширина дороги
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'rgba(40, 40, 40, 0.6)'; // Темно-серый асфальт/грунтовка
+            
+            ctx.beginPath();
+            MapUtils.roads.forEach(r => {
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+            });
+            ctx.stroke();
+
+            // Разметка на дорогах (желтый пунктир)
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            MapUtils.roads.forEach(r => {
+                ctx.moveTo(r.x1, r.y1);
+                ctx.lineTo(r.x2, r.y2);
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
         // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
         if (this.isIslandMode && MapUtils.bgCanvas) {
             ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль
@@ -5332,17 +5410,41 @@ _movePhysics() {
     // --- КРУТИМ ГУСЕНИЦЫ ---
             if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
 
-// --- ЛОГИКА ВОДЫ ---
+// --- ЛОГИКА ЛАНДШАФТА (ВОДА, ГРЯЗЬ, ДОРОГИ, ПОЛЯ) ---
         if (!this.isFlying) {
-            const terrain = MapUtils.getTerrain(this.x, this.y);
+            const terrain = MapUtils.getTerrain(this.x, this.y); // Старая проверка для воды
+            const ground = MapUtils.getGroundType(this.x, this.y); // Новая проверка для биомов
             
+            // Лодки
             if (this.type === 'BOAT') {
                 if (terrain === 'LAND') { currentSpeed *= 0.1; onWater = false; } 
                 else { currentSpeed *= 1.5; onWater = true; }
-            } else {
+            } 
+            // Наземные юниты
+            else {
                 if (terrain === 'SHALLOW') { currentSpeed *= 0.5; onWater = true; } 
-                // ИСПРАВЛЕНО: Теперь на глубине скорость падает только до 25% (а не до 10%)
                 else if (terrain === 'DEEP') { currentSpeed *= 0.25; onWater = true; }
+                else {
+                    // Мы на суше. Проверяем грунт!
+                    let isVehicle = ['TANK', 'GRAD', 'HIMARS'].includes(this.type);
+                    
+                    if (ground === 'ROAD') {
+                        currentSpeed *= 1.5; // На дороге все быстрее на 50%
+                    } else if (ground === 'MUD') {
+                        // В грязи техника вязнет страшно, пехоте чуть легче
+                        currentSpeed *= isVehicle ? 0.3 : 0.7; 
+                    } else if (ground === 'FIELD') {
+                        // Поля немного замедляют пехоту (зато там их хуже видно)
+                        currentSpeed *= isVehicle ? 0.9 : 0.6; 
+                    }
+
+                    // --- СТЕЛС (Бонусная механика) ---
+                    // Если пехота в лесу (рядом есть дерево), делаем её полупрозрачной
+                    if (!isVehicle && !this.isBuilder) {
+                        let nearTree = Game.spatialGrid ? Game.spatialGrid.getNearby(this).some(u => u.type === 'TREE' && Math.hypot(u.x - this.x, u.y - this.y) < 40) : false;
+                        this.stealth = nearTree || ground === 'FIELD'; // Прячемся в лесу или в полях
+                    }
+                }
             }
         }
         

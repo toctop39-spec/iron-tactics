@@ -4290,28 +4290,36 @@ draw() {
             });
         }
 
-    // --- НОВОЕ: ОТРИСОВКА ПОСТРОЕННЫХ ПЛИТОК ДОРОГ (ИГРОКОМ) ---
+ // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
-            ctx.fillStyle = 'rgba(60, 65, 70, 0.9)'; // Темный асфальт/бетон
-            ctx.strokeStyle = 'rgba(20, 25, 30, 1)'; 
-            ctx.lineWidth = 2;
-
             MapUtils.roadGrid.forEach(key => {
                 let [cx, cy] = key.split(',').map(Number);
-                let px = cx * 30; // 30 - это размер плитки из MapUtils
-                let py = cy * 30;
                 
-                // Рисуем только те плитки, которые видит камера (чтобы не лагало)
+                // Смещаем координаты в центр нашей "плитки" (30x30)
+                let px = cx * 30 + 15; 
+                let py = cy * 30 + 15;
+                
+                // Рисуем только те куски тропинки, которые видит камера
                 if (px > this.camera.x - 40 && px < this.camera.x + canvas.width + 40 &&
                     py > this.camera.y - 40 && py < this.camera.y + canvas.height + 40) {
                     
-                    ctx.fillRect(px, py, 30, 30);
-                    ctx.strokeRect(px, py, 30, 30);
+                    // 1. Широкая вытоптанная основа (светло-коричневая, полупрозрачная)
+                    ctx.beginPath();
+                    // Радиус 20 (больше чем половина плитки), чтобы соседние круги сливались в единый путь
+                    ctx.arc(px, py, 20, 0, Math.PI * 2); 
+                    ctx.fillStyle = 'rgba(110, 85, 55, 0.4)'; 
+                    ctx.fill();
+
+                    // 2. Центральная "колея" (более темная и плотная грязь)
+                    ctx.beginPath();
+                    ctx.arc(px, py, 12, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(80, 60, 40, 0.6)'; 
+                    ctx.fill();
                     
-                    // Желтая разметка по центру каждой плитки
-                    ctx.fillStyle = 'rgba(255, 200, 0, 0.6)';
-                    ctx.fillRect(px + 12, py + 12, 6, 6);
-                    ctx.fillStyle = 'rgba(60, 65, 70, 0.9)'; // Возвращаем цвет бетона
+                    // 3. Декор: мелкие камешки/следы, чтобы тропа не казалась слишком гладкой
+                    ctx.fillStyle = 'rgba(60, 40, 20, 0.5)';
+                    ctx.fillRect(px - 6, py - 4, 3, 2);
+                    ctx.fillRect(px + 4, py + 5, 2, 3);
                 }
             });
         }

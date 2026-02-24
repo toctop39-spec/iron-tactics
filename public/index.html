@@ -5173,31 +5173,6 @@ _movePhysics() {
     // --- КРУТИМ ГУСЕНИЦЫ ---
             if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
 
-        // --- ЛОГИКА ВОДЫ ---
-        if (!this.isFlying) {
-            const terrain = MapUtils.getTerrain(this.x, this.y);
-            
-            if (this.type === 'BOAT') {
-                // ЛОДКА
-                if (terrain === 'LAND') {
-                    currentSpeed *= 0.1; // Еле ползет по суше
-                    onWater = false;
-                } else {
-                    currentSpeed *= 1.5; // Ускоряется на воде
-                    onWater = true;
-                }
-            } else {
-                // ОСТАЛЬНЫЕ
-                if (terrain === 'SHALLOW') {
-                    currentSpeed *= 0.5;
-                    onWater = true;
-                } else if (terrain === 'DEEP') {
-                    currentSpeed *= 0.1;
-                    onWater = true;
-                }
-            }
-        }
-
 // --- ЛОГИКА ВОДЫ ---
         if (!this.isFlying) {
             const terrain = MapUtils.getTerrain(this.x, this.y);

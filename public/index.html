@@ -5846,132 +5846,162 @@ if (dist < 15) {
             return; // Выходим, чтобы не рисовались полоски ХП
         }
 
-// --- РЕАЛИСТИЧНЫЙ ТЯЖЕЛЫЙ ТАНК (КАМУФЛЯЖ + ВРАЩАЮЩАЯСЯ БАШНЯ) ---
+// --- ТЯЖЕЛЫЙ ОБТ (ОСНОВНОЙ БОЕВОЙ ТАНК) С ПЛАВНОЙ АНИМАЦИЕЙ ---
         if (this.type === 'TANK') {
             ctx.save();
             ctx.translate(this.x, this.y);
-            // Поворот КОРПУСА по направлению движения
-            ctx.rotate(this.angle || 0);
-
-            let tankL = this.radius * 2.2; // Длина корпуса
-            let tankW = this.radius * 1.4; // Ширина корпуса
-            let trackW = tankW * 0.25;     // Ширина одной гусеницы
-
-            // === 1. СОЗДАЕМ КАМУФЛЯЖ (Пятнистый градиент) ===
-            // Используем резкие переходы (stops) для имитации пятен
-            let camoGrad = ctx.createLinearGradient(-tankL, -tankW, tankL, tankW);
-            camoGrad.addColorStop(0.0, '#8B7355'); // Песочный
-            camoGrad.addColorStop(0.3, '#8B7355');
-            camoGrad.addColorStop(0.31, '#4B5320'); // Темно-зеленый
-            camoGrad.addColorStop(0.6, '#4B5320');
-            camoGrad.addColorStop(0.61, '#6F4E37'); // Коричневый
-            camoGrad.addColorStop(1.0, '#6F4E37');
-
-            ctx.strokeStyle = '#2a2a2a';
-            ctx.lineWidth = 1;
-
-            // === 2. ГУСЕНИЦЫ (Темно-серые, по бокам) ===
-            ctx.fillStyle = '#333';
-            // Левая гусеница (верхняя на виде сверху)
-            ctx.fillRect(-tankL/2, -tankW/2, tankL, trackW);
-            // Правая гусеница (нижняя)
-            ctx.fillRect(-tankL/2, tankW/2 - trackW, tankL, trackW);
             
-            // Детализация гусениц (насечки)
-            ctx.strokeStyle = '#111'; ctx.beginPath();
-            for(let i=0; i<tankL; i+=6) {
-                ctx.moveTo(-tankL/2 + i, -tankW/2); ctx.lineTo(-tankL/2 + i, -tankW/2+trackW);
-                ctx.moveTo(-tankL/2 + i, tankW/2-trackW); ctx.lineTo(-tankL/2 + i, tankW/2);
-            }
-            ctx.stroke();
-            ctx.strokeStyle = '#2a2a2a'; // Возвращаем обводку для корпуса
+            // --- 1. ФИЗИКА И ПЛАВНОСТЬ ---
+            // Инициализируем переменные для анимации, если их нет
+            if (typeof this.currTurretAngle === 'undefined') this.currTurretAngle = this.angle || 0;
+            if (typeof this.treadOffset === 'undefined') this.treadOffset = 0;
 
-            // === 3. КОРПУС ТАНКА (Камуфляж) ===
-            ctx.fillStyle = camoGrad;
-            ctx.beginPath();
-            // Задняя часть (прямая)
-            ctx.moveTo(-tankL/2, -tankW/2 + trackW);
-            ctx.lineTo(-tankL/2, tankW/2 - trackW);
-            // Передняя часть (под углом, "щучий нос")
-            ctx.lineTo(tankL/2 - 5, tankW/2 - trackW); // Скос справа
-            ctx.lineTo(tankL/2, 0);                    // Нос
-            ctx.lineTo(tankL/2 - 5, -tankW/2 + trackW);// Скос слева
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            // Моторный отсек сзади (решетки вентиляции)
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.fillRect(-tankL/2 + 2, -tankW/4, tankL/4, tankW/2);
-            ctx.beginPath();
-            for(let i=0; i<5; i++) { // Рисуем ребра решетки
-                 ctx.moveTo(-tankL/2+4 + i*3, -tankW/4+2); ctx.lineTo(-tankL/2+4 + i*3, tankW/4-2);
-            }
-            ctx.stroke();
-
-            // Маркер цвета команды на корме
-            ctx.fillStyle = this.color;
-            ctx.beginPath(); ctx.arc(-tankL/2 + 5, 0, 4, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.stroke();
-
-            // === 4. БАШНЯ И ОРУДИЕ (Вращаются независимо!) ===
-            ctx.save(); // Сохраняем состояние корпуса
-
-            // Вычисляем угол поворота башни относительно корпуса
-            let turretRelAngle = 0;
-            if (this.target) {
-                // Если есть цель - смотрим на неё
-                let globalTargetAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-                turretRelAngle = globalTargetAngle - (this.angle || 0);
-            }
-            ctx.rotate(turretRelAngle); // Поворачиваем слой башни
-
-            let turretL = tankL * 0.6;
-            let turretW = tankW * 0.7;
-            ctx.translate(-tankL*0.05, 0); // Башня чуть смещена назад
-
-            // Форма башни (угловатая, современная)
-            ctx.fillStyle = camoGrad;
-            ctx.beginPath();
-            ctx.moveTo(-turretL/2, -turretW/2); // Зад лево
-            ctx.lineTo(turretL/4, -turretW/2);  // Бок лево
-            ctx.lineTo(turretL/2, -turretW/4);  // Лоб скос лево
-            ctx.lineTo(turretL/2, turretW/4);   // Лоб скос право
-            ctx.lineTo(turretL/4, turretW/2);   // Бок право
-            ctx.lineTo(-turretL/2, turretW/2);  // Зад право
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            // Командирский люк на башне
-            ctx.fillStyle = '#3a3a3a';
-            ctx.beginPath(); ctx.arc(-turretL/4, 0, turretW*0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-
-            // Главное орудие (Ствол)
-            ctx.fillStyle = '#4a4a4a'; // Ствол темнее корпуса
-            let gunL = tankL * 0.8;
-            let gunW = tankW * 0.12;
-            ctx.fillRect(turretL/2, -gunW/2, gunL, gunW); // Сам ствол
+            let hullAngle = this.angle || 0;
             
-            // Дульный тормоз на конце ствола (утолщение)
-            ctx.fillRect(turretL/2 + gunL, -gunW*0.8, gunW*1.2, gunW*1.6);
-
-            ctx.restore(); // Восстанавливаем поворот корпуса
-            ctx.restore(); // Восстанавливаем глобальные координаты
-
-            // --- ПОЛОСКА ХП И ВЫДЕЛЕНИЕ (Стандартное) ---
-            let hpOffset = this.radius + 15;
-            ctx.fillStyle = 'red'; ctx.fillRect(this.x-10, this.y - hpOffset, 20, 3);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-10, this.y - hpOffset, 20 * (Math.max(0, this.hp)/this.maxHp), 3);
+            // ПЛАВНЫЙ ПОВОРОТ БАШНИ (С инерцией)
+            let targetGlobalAngle = hullAngle; // По умолчанию смотрит прямо
+            if (this.target && !this.dead) {
+                 // Вычисляем угол на цель
+                 targetGlobalAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+            }
+            // Вычисляем разницу углов и нормализуем её (чтобы крутился по короткому пути)
+            let angleDiff = targetGlobalAngle - this.currTurretAngle;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
             
-            if (Game.selection.includes(this)) {
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, tankL*0.8, 0, Math.PI*2); ctx.stroke();
-                if (this.range > 0) {
-                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range, 0, Math.PI*2);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+            // Скорость поворота башни (градусов за кадр)
+            const turretRotSpeed = 0.04; 
+            if (Math.abs(angleDiff) > turretRotSpeed) {
+                this.currTurretAngle += Math.sign(angleDiff) * turretRotSpeed;
+            } else {
+                this.currTurretAngle = targetGlobalAngle; // Довернули точно
+            }
+
+            // АНИМАЦИЯ ГУСЕНИЦ (Если танк двигается)
+            let isMoving = this.pathQueue && this.pathQueue.length > 0;
+            if (isMoving) {
+                this.treadOffset -= 1.5; // Скорость перемотки траков
+                if (this.treadOffset < -10) this.treadOffset += 10; // Зацикливаем
+            }
+
+            // --- 2. РАЗМЕРЫ И КАМУФЛЯЖ ---
+            let tankL = this.radius * 2.6; // Увеличили размер
+            let tankW = this.radius * 1.6;
+            let trackW = tankW * 0.22;
+
+            // Сложный пятнистый камуфляж (наложение слоев)
+            let baseColor = '#4B5320'; // Армейский зеленый
+            
+            // Функция для рисования корпуса с камуфляжем
+            const drawCamoBody = (w, h) => {
+                ctx.fillStyle = baseColor; ctx.fillRect(-w/2, -h/2, w, h);
+                // Пятна (коричневые и песочные)
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = '#6F4E37'; 
+                ctx.beginPath(); ctx.moveTo(-w/2, -h/4); ctx.lineTo(w/4, -h/2); ctx.lineTo(w/2, h/4); ctx.fill();
+                ctx.globalAlpha = 0.4;
+                ctx.fillStyle = '#8B7355';
+                ctx.beginPath(); ctx.moveTo(w/2, -h/2); ctx.lineTo(-w/4, h/2); ctx.lineTo(-w/2, h/4); ctx.fill();
+                ctx.globalAlpha = 1.0;
+            };
+
+            // Поворачиваем КОРПУС
+            ctx.rotate(hullAngle);
+
+            // --- 3. ОТРИСОВКА ГУСЕНИЦ (С АНИМАЦИЕЙ) ---
+            ctx.fillStyle = '#2a2a2a'; // Темная резина/металл
+            // Левая и правая основа
+            ctx.fillRect(-tankL/2 - 2, -tankW/2, tankL+4, trackW);
+            ctx.fillRect(-tankL/2 - 2, tankW/2 - trackW, tankL+4, trackW);
+
+            // Анимированные траки (насечки)
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.beginPath();
+            for(let i = this.treadOffset; i < tankL + 5; i+=7) {
+                let xPos = -tankL/2 + i;
+                if (xPos > -tankL/2 && xPos < tankL/2) {
+                     ctx.moveTo(xPos, -tankW/2); ctx.lineTo(xPos, -tankW/2+trackW);
+                     ctx.moveTo(xPos, tankW/2-trackW); ctx.lineTo(xPos, tankW/2);
                 }
             }
-            return; // Выходим, чтобы не рисовался старый прямоугольник
+            ctx.stroke();
+
+            // --- 4. КОРПУС (V-образный лоб) ---
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; // Тень под корпусом
+            ctx.beginPath();
+            ctx.moveTo(-tankL/2+5, -tankW/2+trackW);
+            ctx.lineTo(tankL/2-10, -tankW/2+trackW); // Борт
+            ctx.lineTo(tankL/2+5, 0); // Нос
+            ctx.lineTo(tankL/2-10, tankW/2-trackW); // Борт
+            ctx.lineTo(-tankL/2+5, tankW/2-trackW); // Корма
+            ctx.closePath();
+            ctx.save(); ctx.clip(); drawCamoBody(tankL, tankW); ctx.restore(); // Применяем камуфляж
+            ctx.strokeStyle = '#1a2210'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.restore(); // Убираем тень
+
+            // Детали корпуса: Решетки МТО сзади
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(-tankL/2+5, -tankW/4, tankL/5, tankW/2);
+            // Блоки динамической защиты (ДЗ) на лбу корпуса
+            ctx.fillStyle = '#3a4230';
+            ctx.fillRect(tankL/2-20, -tankW/3, 10, tankW/1.5);
+
+            // Маркер цвета команды
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.arc(-tankL/2 + 10, 0, 4, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='#fff'; ctx.stroke();
+
+            // --- 5. БАШНЯ (Вращается плавно) ---
+            ctx.rotate(this.currTurretAngle - hullAngle); // Поворот относительно корпуса
+            ctx.translate(-tankL*0.05, 0); // Смещение башни назад
+
+            let turretL = tankL * 0.55;
+            let turretW = tankW * 0.65;
+
+            // Форма башни (современная угловатая)
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 3; // Тень от башни на корпус
+            ctx.beginPath();
+            ctx.moveTo(-turretL/2, -turretW/2);
+            ctx.lineTo(turretL/6, -turretW/2 - 2); // Расширение сбоку
+            ctx.lineTo(turretL/2+5, -turretW/5); // Лоб скос
+            ctx.lineTo(turretL/2+5, turretW/5); // Лоб скос
+            ctx.lineTo(turretL/6, turretW/2 + 2); // Расширение сбоку
+            ctx.lineTo(-turretL/2, turretW/2);
+            ctx.closePath();
+            ctx.save(); ctx.clip(); drawCamoBody(turretL+10, turretW+5); ctx.restore();
+            ctx.stroke();
+            ctx.restore();
+
+            // "Кирпичи" ДЗ на башне
+            ctx.fillStyle = '#333b28';
+            ctx.fillRect(0, -turretW/2-1, turretL/3, 4); // Борт
+            ctx.fillRect(0, turretW/2-3, turretL/3, 4); // Борт
+            ctx.fillRect(turretL/4, -turretW/4, 8, turretW/2); // Лоб
+
+            // Командирский люк и пулемет на крыше
+            ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(-turretL/4, 0, 6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#111'; ctx.fillRect(-turretL/4, -2, 12, 2); // Пулемет
+
+            // ГЛАВНОЕ ОРУДИЕ
+            let gunL = tankL * 0.9;
+            ctx.fillStyle = '#2b3322'; // Ствол темнее
+            ctx.fillRect(turretL/2, -4, gunL, 8); // Ствол
+            ctx.fillStyle = '#3a4230';
+            ctx.fillRect(turretL/2 + 10, -5, 15, 10); // Эжектор (утолщение)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(turretL/2 + gunL, -6, 12, 12); // Дульный тормоз
+
+            ctx.restore();
+
+            // --- ПОЛОСКА ХП И ВЫДЕЛЕНИЕ ---
+            let hpOffset = this.radius + 20;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, tankL*0.9, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
         }
 
    // --- КРАСИВАЯ МОДЕЛЬ ГРАДА И HIMARS (С 3D-АНИМАЦИЕЙ ПОДЪЕМА) ---

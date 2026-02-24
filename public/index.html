@@ -3868,33 +3868,38 @@ onRight(e) {
         // 2. Отправляем юнитов в точку (если кто-то выделен)
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
 
-    // 1. ВЫСАДКА ДЕСАНТА (выделена лодка + клик по суше)
+    if (!this.running) return;
+        const rect = this.canvas.getBoundingClientRect();
+        const m = {
+            x: (e.clientX - rect.left) / this.scale + this.camera.x,
+            y: (e.clientY - rect.top) / this.scale + this.camera.y
+        };
+
+        // 1. СНАЧАЛА ОБЪЯВЛЯЕМ ПЕРЕМЕННЫЕ (Что находится под курсором)
+        const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+        const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+
+        // 2. ВЫСАДКА ДЕСАНТА (Если выделена лодка и мы кликнули НЕ по лодке, а на воду/сушу)
         const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
         if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
             selectedBoats.forEach(b => {
                 if (b.passengers && b.passengers.length > 0) {
                     b.passengers.forEach(p => {
-                        // Создаем НОВОГО солдата на берегу
                         let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
                         newTroop.hp = p.hp; 
                         this.units.push(newTroop);
                     });
-                    b.passengers = []; // Очищаем лодку
+                    b.passengers = [];
                     this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
                 }
             });
             if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
         }
-        
-  // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
+
+        // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
         const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
 
-        // === НОВОЕ: УМНЫЙ КЛИК ПО ЛОДКЕ И ДЕРЕВУ ===
-        // Ищем лодку или дерево под курсором
-        const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
-        const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
-
-        // 2. ПОСАДКА В ЛОДКУ
+        // 3. ПОСАДКА В ЛОДКУ
         if (clickedBoat) {
             let infantry = mobileUnits.filter(u => UNITS[u.type].isInfantry || u.isBuilder);
             if (infantry.length > 0) {
@@ -3903,9 +3908,9 @@ onRight(e) {
                 return;
             }
         } 
-        // 3. РУБКА ДЕРЕВА
+        // 4. РУБКА ДЕРЕВА
         else if (clickedTree) {
-            let builders = mobileUnits.filter(u => u.isBuilder);
+            let builders = mobileUnits.filter(u => u.isBuilder || u.type === 'BUILDER');
             if (builders.length > 0) {
                 builders.forEach(u => { u.targetUnit = clickedTree; u.target = {x: clickedTree.x, y: clickedTree.y}; });
                 this.effects.push({x: clickedTree.x, y: clickedTree.y, char: '🪓', life: 30});

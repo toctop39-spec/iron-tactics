@@ -3741,7 +3741,8 @@ onUp(e) {
                 // Запускается, если мы кликнули без протягивания, ИЛИ если рамка пустая
                 if (!isDrag || (isDrag && newSelection.length === 0)) {
                     // Ищем юнита под курсором с запасом +15 пикселей (чтобы легче было попасть по турелям)
-                    let target = this.units.slice().reverse().find(u => Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+                    // Деревья больше нельзя случайно выделить мышкой
+let target = this.units.slice().reverse().find(u => u.type !== 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
                     
                     if (target && (target.side === this.myRole || this.isSandbox)) {
                         newSelection = [target];
@@ -3886,8 +3887,49 @@ onRight(e) {
             if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
         }
         
-     // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
+  // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
         const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+
+        // === НОВОЕ: УМНЫЙ КЛИК ПО ЛОДКЕ И ДЕРЕВУ ===
+        // Ищем лодку или дерево под курсором
+        const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+        const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+
+        // 1. ВЫСАДКА ДЕСАНТА (выделена лодка + клик по суше)
+        const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
+        if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
+            selectedBoats.forEach(b => {
+                if (b.passengers && b.passengers.length > 0) {
+                    b.passengers.forEach(p => {
+                        let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
+                        newTroop.hp = p.hp; 
+                        this.units.push(newTroop);
+                    });
+                    b.passengers = [];
+                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
+                }
+            });
+            if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
+        }
+
+        // 2. ПОСАДКА В ЛОДКУ
+        if (clickedBoat) {
+            let infantry = mobileUnits.filter(u => UNITS[u.type].isInfantry || u.isBuilder);
+            if (infantry.length > 0) {
+                infantry.forEach(u => { u.targetUnit = clickedBoat; u.target = {x: clickedBoat.x, y: clickedBoat.y}; });
+                this.effects.push({x: clickedBoat.x, y: clickedBoat.y, char: '📥', life: 30});
+                return;
+            }
+        } 
+        // 3. РУБКА ДЕРЕВА
+        else if (clickedTree) {
+            let builders = mobileUnits.filter(u => u.isBuilder);
+            if (builders.length > 0) {
+                builders.forEach(u => { u.targetUnit = clickedTree; u.target = {x: clickedTree.x, y: clickedTree.y}; });
+                this.effects.push({x: clickedTree.x, y: clickedTree.y, char: '🪓', life: 30});
+                return;
+            }
+        }{
 
         if (mobileUnits.length > 0) {
             if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) {
@@ -4599,15 +4641,13 @@ attemptAutoProduction() {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
         this.checkPower();
 
-       // --- ЛОГИКА РУБКИ ЛЕСА ---
+   // --- ЛОГИКА РУБКИ ЛЕСА ---
         if (this.isBuilder || this.type === 'BUILDER') {
-            if (this.target && !this.targetUnit) {
-               let tree = Game.units.find(u => u.type === 'TREE' && Math.hypot(u.x - this.target.x, u.y - this.target.y) < 15);
-               if (tree) this.targetUnit = tree;
-            }
             if (this.targetUnit && this.targetUnit.type === 'TREE' && this.targetUnit.hp > 0) {
-                if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 25) { 
-                    this.constructing = true; this.target = null; // Включаем анимацию молотка
+                // Если подошли достаточно близко
+                if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 35) { 
+                    this.constructing = true; 
+                    this.target = null; // Стоим и бьем
                     if (Game.frameCount % 30 === 0) {
                         this.targetUnit.hp -= 20; 
                         for(let i=0; i<3; i++) Game.effects.push({type: 'dirt', x: this.targetUnit.x, y: this.targetUnit.y, vx: (Math.random()-0.5)*5, vy: -Math.random()*5, size: 2, life: 20, color: '#d2b48c'});
@@ -4616,8 +4656,30 @@ attemptAutoProduction() {
                         }
                     }
                     return; 
-                } else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
-            } else if (!this.assignedSite) this.constructing = false;
+                } else {
+                    // Иначе продолжаем идти к дереву
+                    this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                }
+            } else if (!this.assignedSite) {
+                this.constructing = false;
+            }
+        }
+
+        // --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
+        if ((UNITS[this.type].isInfantry || this.isBuilder) && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
+            // Если подошли близко к лодке
+            if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 40) { 
+                if (!this.targetUnit.passengers) this.targetUnit.passengers = [];
+                if (this.targetUnit.passengers.length < 6) {
+                    this.targetUnit.passengers.push(this);
+                    this.hp = 0; // Солдат садится в лодку (исчезает с карты)
+                    Game.selection = Game.selection.filter(u => u !== this); 
+                    return;
+                }
+            } else {
+                // Если лодка уплывает — догоняем её!
+                this.target = {x: this.targetUnit.x, y: this.targetUnit.y}; 
+            }
         }
 
         // --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---

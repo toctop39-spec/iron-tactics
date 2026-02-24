@@ -4331,7 +4331,7 @@ draw() {
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
 
-    // --- ВСТАВЛЯТЬ СЮДА: ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
+    // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
             MapUtils.roadGrid.forEach(key => {
                 let [cx, cy] = key.split(',').map(Number);
@@ -4339,11 +4339,10 @@ draw() {
                 let px = cx * 30; 
                 let py = cy * 30;
                 
-                // Рисуем только те куски тропинки, которые видит камера
+                // Здесь this.camera.x сработает идеально, потому что мы внутри объекта Game!
                 if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
                     py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
                     
-                    // Рисуем нашу заготовленную кляксу грязи!
                     if (Game.roadTexture) {
                         ctx.drawImage(Game.roadTexture, px - 15, py - 15);
                     }
@@ -5808,26 +5807,6 @@ if (dist < 15) {
             }
             
             ctx.restore();
-        }
-
-// --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
-        if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
-            MapUtils.roadGrid.forEach(key => {
-                let [cx, cy] = key.split(',').map(Number);
-                
-                let px = cx * 30; 
-                let py = cy * 30;
-                
-                // Рисуем только те куски тропинки, которые видит камера
-                if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
-                    py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
-                    
-                    // Рисуем нашу заготовленную кляксу грязи!
-                    if (Game.roadTexture) {
-                        ctx.drawImage(Game.roadTexture, px - 15, py - 15);
-                    }
-                }
-            });
         }
 
         if (this.type === 'TREE') {

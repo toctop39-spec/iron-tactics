@@ -412,6 +412,7 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     },
 
     WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
+    ROAD: { type: 'bldg', name: 'Дорога', emoji: '🛣️', cost: 15, radius: 15, constructTime: 0, color: '#555' },
 
     TREE: { type: 'bldg', name: 'Дерево', hp: 80, radius: 12, color: '#2d4c1e', isInvulnerable: false },
     
@@ -2861,6 +2862,12 @@ else if (cmd.type === 'build_start') {
             const shooter = this.units.find(u => u.id === cmd.id);
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
         }
+
+            // --- СИНХРОНИЗАЦИЯ ДОРОГ ---
+        else if (cmd.type === 'build_road') {
+            MapUtils.buildRoad(cmd.x, cmd.y);
+            Game.effects.push({x: cmd.x, y: cmd.y, char: '🛣️', life: 20});
+        }
 // === 1. НОВИЧОК ПРОСИТ ДАННЫЕ ===
         else if (cmd.type === 'request_sync') {
             // Если запрос пришел не от меня - значит зашел новичок.
@@ -3456,13 +3463,34 @@ onDown(e) {
 
             if (this.isSpectator) return;
 
-            // 3. СТРОЙКА (Постановка фундамента)
+ // 3. СТРОЙКА (Постановка фундамента)
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
                 const inWater = MapUtils.checkWater(m.x, m.y);
                 const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
                 if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+
+                // --- НОВОЕ: МГНОВЕННАЯ СТРОЙКА ДОРОГИ ---
+                if (bType === 'ROAD') {
+                    if (this.checkCost('ROAD')) {
+                        this.payCost('ROAD');
+                        MapUtils.buildRoad(m.x, m.y); // Добавляем в сетку
+                        Game.effects.push({x: m.x, y: m.y, char: '🛣️', life: 20});
+                        this.updateUI([]); // Обновляем баланс на экране
+                        
+                        // Отправляем по сети другим игрокам
+                        if (this.isMultiplayer && CURRENT_ROOM) {
+                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: m.x, y: m.y });
+                        }
+                    } else {
+                        this.showError("НЕТ ДЕНЕГ!");
+                        this.pendingConstruction = null; document.body.style.cursor = 'default';
+                    }
+                    return; // ВАЖНО: Выходим, чтобы не ставился обычный фундамент
+                }
+                
+                // ... дальше идет старый код (const GAP = ...)
 
                 const GAP = (bType === 'WALL') ? -15 : 30;
                 if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
@@ -4054,7 +4082,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
-                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'], true, "ПОСТРОЙКИ");
+                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");;
                     }
                     else {
                         // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---

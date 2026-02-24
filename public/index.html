@@ -3393,13 +3393,15 @@ menuAction(type) {
                 if (nearby.length === 0) { this.showError("В ЗОНЕ ПОГРУЗКИ НИКОГО НЕТ!"); return; }
 
                 let loadedCount = 0; let killedIds = [];
+                let removedUnits = []; // <-- НОВЫЙ МАССИВ ДЛЯ ТИХОГО УДАЛЕНИЯ
 
                 // 1. Пробуем посадить ТЕХНИКУ (если есть все 4 свободных места)
                 if (currentWeight === 0) {
                     let vehicle = nearby.find(u => ['TANK', 'GRAD', 'HIMARS'].includes(u.type));
                     if (vehicle) {
                         boat.passengers.push({ type: vehicle.type, hp: vehicle.hp, level: vehicle.level });
-                        vehicle.hp = 0; vehicle.dead = true; killedIds.push(vehicle.id);
+                        removedUnits.push(vehicle); // Просто помечаем на удаление
+                        killedIds.push(vehicle.id);
                         loadedCount++; currentWeight += 4;
                     }
                 }
@@ -3411,7 +3413,8 @@ menuAction(type) {
                         if (!['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
                             if (currentWeight + 1 <= 4) {
                                 boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
-                                u.hp = 0; u.dead = true; killedIds.push(u.id);
+                                removedUnits.push(u); // Просто помечаем на удаление
+                                killedIds.push(u.id);
                                 loadedCount++; currentWeight += 1;
                             }
                         }
@@ -3419,6 +3422,12 @@ menuAction(type) {
                 }
 
                 if (loadedCount > 0) {
+                    // === ТИХОЕ УДАЛЕНИЕ БЕЗ ВЗРЫВОВ ===
+                    // Стираем их с карты и из выделения напрямую, в обход механики смерти
+                    this.units = this.units.filter(u => !removedUnits.includes(u));
+                    this.selection = this.selection.filter(u => !removedUnits.includes(u));
+                    // ===================================
+
                     this.showError(`ПОГРУЖЕНО В ЛОДКУ: ${loadedCount}`);
                     Game.effects.push({x: boat.x, y: boat.y - 30, char: '📥', life: 30});
                     if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });

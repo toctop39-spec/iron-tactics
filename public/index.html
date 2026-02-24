@@ -437,8 +437,7 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     BOAT_LOAD: { type: 'action', name: 'ПОСАДИТЬ', emoji: '📥', cost: 0 },
     BOAT_UNLOAD: { type: 'action', name: 'ВЫСАДИТЬ', emoji: '📤', cost: 0 }
     
-    // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ ---
-    DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 }
+    // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ -
 };
 
 const HOUSE_UPGRADES = [
@@ -4730,33 +4729,6 @@ attemptAutoProduction() {
             }
         }
 
-
-
-        if (isPerson && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
-            let dist = Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y);
-            
-            if (dist < 45) { // Увеличили радиус захвата до 45 пикселей (с запасом!)
-                if (!this.targetUnit.passengers) this.targetUnit.passengers = [];
-                
-                if (this.targetUnit.passengers.length < 6) {
-                    // Спасаем данные юнита в лодку
-                    this.targetUnit.passengers.push({ type: this.type, hp: this.hp });
-                    
-                    // ГАРАНТИРОВАННОЕ УДАЛЕНИЕ ЮНИТА С КАРТЫ
-                    this.dead = true; 
-                    this.hp = 0;
-                    Game.selection = Game.selection.filter(u => u !== this);
-                    
-                    return; // Прерываем апдейт, так как юнита больше нет на земле
-                } else {
-                    this.targetUnit = null; // Лодка полная — отменяем приказ
-                }
-            } else {
-                // Если лодка чуть сдвинулась — догоняем её
-                this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
-                if (typeof busy !== 'undefined') busy = false; // Снимаем паузу
-            }
-        }
 
        // --- ЛОГИКА ТАНКА (Отдача и поворот башни) ---
         if (this.type === 'TANK') {

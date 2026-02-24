@@ -2407,18 +2407,16 @@ waterOffset: 0,
         event.target.classList.add('active');
     },
 
- // --- ГЕНЕРАТОР БЕСШОВНОЙ ТЕКСТУРЫ ЗЕМЛИ ---
+// --- ГЕНЕРАТОР БЕСШОВНОЙ ТЕКСТУРЫ ЗЕМЛИ ---
     generateGroundTexture() {
-        const size = 300; // Размер одного тайла
+        const size = 300; 
         const offCanvas = document.createElement('canvas');
         offCanvas.width = size; offCanvas.height = size;
         const oCtx = offCanvas.getContext('2d');
 
-        // Базовый цвет (оливковый/травяной)
         oCtx.fillStyle = '#3a472d'; 
         oCtx.fillRect(0, 0, size, size);
 
-        // Умная функция для рисования пятен, которые не обрываются на краях
         const drawSeamlessCircle = (x, y, r, color) => {
             oCtx.fillStyle = color;
             const offsets = [[0,0], [size,0], [-size,0], [0,size], [0,-size], [size,size], [-size,-size], [size,-size], [-size,size]];
@@ -2427,88 +2425,55 @@ waterOffset: 0,
             });
         };
 
-        // Рисуем пятна грязи и темной травы (создаем камуфляжный узор)
-        for(let i=0; i<350; i++) {
+        for (let i = 0; i < 350; i++) {
             let x = Math.random() * size;
             let y = Math.random() * size;
             let r = Math.random() * 15 + 5;
             
             let color = '';
             let rand = Math.random();
-            if (rand < 0.33) color = `rgba(92, 77, 60, ${Math.random()*0.4})`;      // Коричневая грязь
-            else if (rand < 0.66) color = `rgba(45, 56, 35, ${Math.random()*0.4})`; // Темная зелень
-            else color = `rgba(104, 95, 71, ${Math.random()*0.3})`;                 // Сухая земля
+            if (rand < 0.33) color = `rgba(92, 77, 60, ${Math.random()*0.4})`;      
+            else if (rand < 0.66) color = `rgba(45, 56, 35, ${Math.random()*0.4})`; 
+            else color = `rgba(104, 95, 71, ${Math.random()*0.3})`;                 
             
             drawSeamlessCircle(x, y, r, color);
         }
         
-        // Мелкий шум (камушки, веточки, песчинки)
-        for(let i=0; i<6000; i++) {
+        for (let i = 0; i < 6000; i++) {
             let x = Math.random() * size;
             let y = Math.random() * size;
             oCtx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)';
             oCtx.fillRect(x, y, 2, 2);
         }
 
-        // Сохраняем готовую текстуру в память игры
         this.groundPattern = document.getElementById('gameCanvas').getContext('2d').createPattern(offCanvas, 'repeat');
     },
 
     // --- ГЕНЕРАТОР ТЕКСТУРЫ ТРОПИНКИ (КЛЯКСА ГРЯЗИ) ---
     generateRoadTexture() {
-        const size = 60; // Размер кляксы
+        const size = 60; 
         const off = document.createElement('canvas');
         off.width = size; off.height = size;
         const oCtx = off.getContext('2d');
 
-        // Создаем радиальный градиент (мягкие размытые края)
         const gradient = oCtx.createRadialGradient(size/2, size/2, 5, size/2, size/2, size/2);
-        gradient.addColorStop(0, 'rgba(75, 55, 35, 0.95)'); // Темный плотный центр
-        gradient.addColorStop(0.5, 'rgba(95, 75, 45, 0.6)'); // Полупрозрачный край
-        gradient.addColorStop(1, 'rgba(100, 80, 50, 0)'); // Полностью прозрачный переход
+        gradient.addColorStop(0, 'rgba(75, 55, 35, 0.95)'); 
+        gradient.addColorStop(0.5, 'rgba(95, 75, 45, 0.6)'); 
+        gradient.addColorStop(1, 'rgba(100, 80, 50, 0)'); 
 
         oCtx.fillStyle = gradient;
         oCtx.beginPath();
-        // Немного сплющиваем круг, чтобы форма была органичнее
         oCtx.ellipse(size/2, size/2, size/2, size/2 * 0.9, Math.random(), 0, Math.PI*2);
         oCtx.fill();
 
-        // Добавляем мелкие камушки для реализма
-        for(let i=0; i<6; i++) {
+        for (let i = 0; i < 6; i++) {
             oCtx.fillStyle = 'rgba(40, 30, 20, 0.8)';
             oCtx.beginPath();
             oCtx.arc(size/2 + (Math.random()-0.5)*30, size/2 + (Math.random()-0.5)*30, 1+Math.random()*2, 0, Math.PI*2);
             oCtx.fill();
         }
 
-        this.roadTexture = off; // Сохраняем готовую картинку в память
-    },
-
-        // Рисуем пятна грязи и темной травы (создаем камуфляжный узор)
-        for(let i=0; i<350; i++) {
-            let x = Math.random() * size;
-            let y = Math.random() * size;
-            let r = Math.random() * 15 + 5;
-            
-            let color = '';
-            let rand = Math.random();
-            if (rand < 0.33) color = `rgba(92, 77, 60, ${Math.random()*0.4})`;      // Коричневая грязь
-            else if (rand < 0.66) color = `rgba(45, 56, 35, ${Math.random()*0.4})`; // Темная зелень
-            else color = `rgba(104, 95, 71, ${Math.random()*0.3})`;                 // Сухая земля
-            
-            drawSeamlessCircle(x, y, r, color);
-        }
-        
-        // Мелкий шум (камушки, веточки, песчинки)
-        for(let i=0; i<6000; i++) {
-            let x = Math.random() * size;
-            let y = Math.random() * size;
-            oCtx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)';
-            oCtx.fillRect(x, y, 2, 2);
-        }
-
-        // Сохраняем готовую текстуру в память игры
-        this.groundPattern = document.getElementById('gameCanvas').getContext('2d').createPattern(offCanvas, 'repeat');
+        this.roadTexture = off; 
     },
 
     getTerritoryOwner(x, y) {

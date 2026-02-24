@@ -4318,29 +4318,25 @@ draw() {
             ctx.fillStyle = '#243b29'; // Запасной цвет
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
-// --- ОТРИСОВКА ГРУНТОВЫХ ТРОПИНОК ---
-        if (MapUtils.roadPaths && MapUtils.roadPaths.length > 0) {
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
 
-            MapUtils.roadPaths.forEach(path => {
-                if (path.length < 2) return;
+    // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
+        if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
+            MapUtils.roadGrid.forEach(key => {
+                let [cx, cy] = key.split(',').map(Number);
                 
-                // 1. Основа тропинки (широкая, полупрозрачная вытоптанная земля)
-                ctx.lineWidth = 28; 
-                ctx.strokeStyle = 'rgba(100, 80, 50, 0.35)'; 
-                ctx.beginPath();
-                ctx.moveTo(path[0].x, path[0].y);
-                for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-                ctx.stroke();
-
-                // 2. Центральная колея (узкая, более темная грязь от танков)
-                ctx.lineWidth = 12;
-                ctx.strokeStyle = 'rgba(70, 50, 30, 0.4)';
-                ctx.beginPath();
-                ctx.moveTo(path[0].x, path[0].y);
-                for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-                ctx.stroke();
+                let px = cx * 30; 
+                let py = cy * 30;
+                
+                // Рисуем только те куски тропинки, которые видит камера (чтобы не было лагов)
+                if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
+                    py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
+                    
+                    // Рисуем нашу заготовленную кляксу грязи!
+                    // Сдвигаем на -15, потому что клякса размером 60x60, а игровая клетка 30x30
+                    if (Game.roadTexture) {
+                        ctx.drawImage(Game.roadTexture, px - 15, py - 15);
+                    }
+                }
             });
         }
 

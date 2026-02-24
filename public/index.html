@@ -3565,24 +3565,11 @@ onDown(e) {
                     this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
                 }
 
-                // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
+   // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
                 if (bType === 'ROAD') {
-                    if (this.checkCost('ROAD')) {
-                        this.payCost('ROAD');
-                        MapUtils.buildRoad(m.x, m.y); 
-                        this.effects.push({x: m.x, y: m.y, char: '🟤', life: 20});
-                        document.getElementById('money').innerText = Math.floor(this.money); 
-                        
-                        if (this.isMultiplayer && CURRENT_ROOM) {
-                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: m.x, y: m.y });
-                        }
-                    } else {
-                        this.showError("НЕТ ДЕНЕГ!");
-                        this.pendingConstruction = null; 
-                        document.body.style.cursor = 'default';
-                        this.updateUI([]); 
-                    }
-                    return; // Выходим, чтобы строитель не бежал ставить фундамент
+                    // НАЧИНАЕМ ПРОТЯЖКУ ДОРОГИ
+                    this.roadDragStart = { x: m.x, y: m.y };
+                    return; // Выходим, ждем onUp
                 }
 
                 // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
@@ -4046,8 +4033,45 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
     },
 
 onUp(e) {
-        if (!this.dragStart) return; // Если клик был заблокирован, выходим
+        if (!this.dragStart && !this.roadDragStart) return; 
         const m = this.getMouse(e);
+        
+        // === НОВОЕ: ПОСТРОЙКА ДОРОГИ ПРОТЯЖКОЙ ===
+        if (this.roadDragStart) {
+            const start = this.roadDragStart;
+            this.roadDragStart = null; // Сбрасываем
+
+            let dx = m.x - start.x;
+            let dy = m.y - start.y;
+            let dist = Math.hypot(dx, dy);
+            
+            // Ставим плитку дороги каждые 30 пикселей
+            let stepsCount = Math.max(1, Math.floor(dist / 30)); 
+            let costTotal = stepsCount * UNITS.ROAD.cost;
+
+            if (this.money >= costTotal) {
+                for (let i = 0; i <= stepsCount; i++) {
+                    let px = start.x + (dx * (i / stepsCount));
+                    let py = start.y + (dy * (i / stepsCount));
+                    
+                    // Строим только на своей территории и не на воде/горах
+                    if (this.getTerritoryOwner(px, py) === this.myRole && !MapUtils.checkWater(px, py) && !MapUtils.checkMountain(px, py, 10)) {
+                        MapUtils.buildRoad(px, py); 
+                        this.effects.push({x: px, y: py, char: '🟤', life: 20});
+                        
+                        if (this.isMultiplayer && CURRENT_ROOM) {
+                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: px, y: py });
+                        }
+                    }
+                }
+                this.money -= costTotal; // Списываем деньги за весь кусок разом
+                document.getElementById('money').innerText = Math.floor(this.money); 
+            } else {
+                this.showError(`НЕТ ДЕНЕГ! (Нужно: ${costTotal}$)`);
+            }
+            return;
+        }
+        // ... дальше идет оригинальный код onUp (const w = m.x - this.dragStart.x; ...)
         const w = m.x - this.dragStart.x;
         const h = m.y - this.dragStart.y;
         
@@ -4264,29 +4288,49 @@ onRight(e) {
             }
         }
 
-        // --- ДВИЖЕНИЕ В ТОЧКУ (Система вейпоинтов) ---
-        if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) {
-            // Если таймер еще идет, добавляем новую точку к существующему маршруту
-            this.waypointPath.push({x: m.x, y: m.y});
-        } else {
-            // Если таймер стоял, начинаем новый маршрут
-            this.waypointPath = [{x: m.x, y: m.y}];
-            this.waypointUnits = [...mobileUnits];
-        }
-        
-        // Сбрасываем таймер на 120 кадров (ровно 2 секунды)
-        this.waypointTimer = 120; 
+ // --- СТАРЫЙ КОД (УДАЛИТЬ И ЗАМЕНИТЬ) ---
+        // if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) { ... }
+        // ... вплоть до конца функции onRight
+
+        // --- НОВЫЙ КОД (КЛАССИЧЕСКИЙ SHIFT-КЛИК) ---
+        const isShift = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
+        const cols = Math.ceil(Math.sqrt(mobileUnits.length || 1));
+        const pathData = [];
+        const idsToMove = [];
+
+        mobileUnits.forEach((u, i) => {
+            // Расчет позиции для построения "квадратом", чтобы юниты не толпились
+            const ox = (i % cols) * 35 - (cols * 17);
+            const oy = Math.floor(i / cols) * 35 - (cols * 17);
+            const tx = m.x + ox;
+            const ty = m.y + oy;
+
+            if (isShift) {
+                // Если зажат Shift - добавляем точку в очередь
+                if (u.target) {
+                    u.pathQueue.push({x: tx, y: ty});
+                } else {
+                    u.moveTo(tx, ty);
+                }
+            } else {
+                // Обычный клик - сбрасываем старый маршрут и идем в новую точку
+                u.pathQueue = [];
+                u.moveTo(tx, ty);
+            }
+
+            idsToMove.push(u.id);
+            // Собираем полный маршрут для отправки по сети
+            pathData.push({ id: u.id, path: u.target ? [{x: u.target.x, y: u.target.y}, ...u.pathQueue] : [{x: tx, y: ty}] });
+        });
+
         this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
          
-// --- МУЛЬТИПЛЕЕР (Отправка приказа на сервер) ---
-        if (this.isMultiplayer && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
-            // Собираем ID юнитов, которым отдали приказ
-            let idsToMove = mobileUnits.map(u => u.id).filter(id => id !== undefined);
-            if (idsToMove.length > 0) {
-                this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
-            }
-        } // <-- ЗАКРЫВАЕТ БЛОК IF
-    }, // <-- ЗАКРЫВАЕТ ФУНКЦИЮ onRight И СТАВИТ ЗАПЯТУЮ
+        // --- МУЛЬТИПЛЕЕР (Отправка приказа на сервер) ---
+        if (this.isMultiplayer && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM && idsToMove.length > 0) {
+            // Отправляем готовую очередь точек (path_move) вместо обычного move
+            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'path_move', data: pathData });
+        }
+    }, // <-- КОНЕЦ ФУНКЦИИ onRight
 
     _normalizeSelection() {
         const builders = this.selection.filter(s => s.isBuilder);
@@ -4620,6 +4664,28 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.beginPath(); ctx.moveTo(this.drawPath[0].x, this.drawPath[0].y);
             for (let i = 1; i < this.drawPath.length; i++) ctx.lineTo(this.drawPath[i].x, this.drawPath[i].y);
             ctx.stroke(); ctx.setLineDash([]);
+        }
+
+    // --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ ---
+        if (this.roadDragStart && window.mousePos) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.7)';
+            ctx.lineWidth = 15;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(this.roadDragStart.x, this.roadDragStart.y);
+            ctx.lineTo(window.mousePos.x, window.mousePos.y);
+            ctx.stroke();
+            
+            // Подсчет стоимости на лету
+            let dist = Math.hypot(window.mousePos.x - this.roadDragStart.x, window.mousePos.y - this.roadDragStart.y);
+            let cost = Math.max(1, Math.floor(dist / 30)) * UNITS.ROAD.cost; 
+            
+            ctx.fillStyle = this.money >= cost ? '#0f0' : '#f00';
+            ctx.font = 'bold 20px Arial';
+            ctx.shadowColor = '#000'; ctx.shadowBlur = 4; // Тень для читаемости
+            ctx.fillText(`$${cost}`, window.mousePos.x + 20, window.mousePos.y - 20);
+            ctx.restore();
         }
     
     if (this.pendingConstruction && window.mousePos) {

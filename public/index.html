@@ -431,6 +431,11 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
     WH_DEPOSIT: { type: 'action', name: 'ПОЛОЖИТЬ ВСЕ', emoji: '📥', cost: 0 },
     WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 },
+
+    // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ И ЛОДОК ---
+    DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 },
+    BOAT_LOAD: { type: 'action', name: 'ПОСАДИТЬ', emoji: '📥', cost: 0 },
+    BOAT_UNLOAD: { type: 'action', name: 'ВЫСАДИТЬ', emoji: '📤', cost: 0 }
     
     // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ ---
     DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 }
@@ -3367,6 +3372,80 @@ onDown(e) {
 menuAction(type) {
         this.clickDelay = 20;
 
+    // === ЛОГИКА ПОСАДКИ И ВЫСАДКИ В ЛОДКУ ===
+        if (type === 'BOAT_LOAD' || type === 'BOAT_UNLOAD') {
+            const boat = this.selection[0];
+            if (!boat || boat.type !== 'BOAT') return;
+            if (!boat.passengers) boat.passengers = [];
+
+            if (type === 'BOAT_LOAD') {
+                let loadRadius = 120; // Радиус погрузки вокруг лодки
+                let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'GRAD', 'HIMARS'].includes(p.type) ? 4 : 1), 0);
+                
+                if (currentWeight >= 4) { this.showError("ЛОДКА ПОЛНАЯ!"); return; }
+
+                // Ищем своих юнитов вокруг лодки
+                let nearby = this.units.filter(u => 
+                    u.side === this.myRole && u.hp > 0 && u !== boat && !u.isFlying && u.type !== 'BOAT' && !u.isProducer && 
+                    !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type) &&
+                    Math.hypot(u.x - boat.x, u.y - boat.y) <= loadRadius
+                );
+
+                if (nearby.length === 0) { this.showError("В ЗОНЕ ПОГРУЗКИ НИКОГО НЕТ!"); return; }
+
+                let loadedCount = 0; let killedIds = [];
+
+                // 1. Пробуем посадить ТЕХНИКУ (если есть все 4 свободных места)
+                if (currentWeight === 0) {
+                    let vehicle = nearby.find(u => ['TANK', 'GRAD', 'HIMARS'].includes(u.type));
+                    if (vehicle) {
+                        boat.passengers.push({ type: vehicle.type, hp: vehicle.hp, level: vehicle.level });
+                        vehicle.hp = 0; vehicle.dead = true; killedIds.push(vehicle.id);
+                        loadedCount++; currentWeight += 4;
+                    }
+                }
+
+                // 2. Если технику не посадили, забиваем места ПЕХОТОЙ
+                if (loadedCount === 0) {
+                    for (let i = 0; i < nearby.length; i++) {
+                        let u = nearby[i];
+                        if (!['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
+                            if (currentWeight + 1 <= 4) {
+                                boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
+                                u.hp = 0; u.dead = true; killedIds.push(u.id);
+                                loadedCount++; currentWeight += 1;
+                            }
+                        }
+                    }
+                }
+
+                if (loadedCount > 0) {
+                    this.showError(`ПОГРУЖЕНО В ЛОДКУ: ${loadedCount}`);
+                    Game.effects.push({x: boat.x, y: boat.y - 30, char: '📥', life: 30});
+                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });
+                    
+                    let menuItems = ['BOAT_LOAD', 'BOAT_UNLOAD'];
+                    this.updateUI(menuItems, true, `ЛОДКА (Мест: ${4 - currentWeight}/4)`);
+                } else {
+                    this.showError("ТЕХНИКА ЗАНИМАЕТ 4 МЕСТА!");
+                }
+            } 
+            else if (type === 'BOAT_UNLOAD') {
+                if (boat.passengers.length === 0) { this.showError("ЛОДКА ПУСТАЯ!"); return; }
+                if (MapUtils.getTerrain(boat.x, boat.y) === 'DEEP') { this.showError("СЛИШКОМ ГЛУБОКО ДЛЯ ВЫСАДКИ!"); return; }
+
+                boat.passengers.forEach(p => {
+                    let newTroop = new Unit(p.type, boat.x + (Math.random()-0.5)*70, boat.y + (Math.random()-0.5)*70, this.myRole);
+                    newTroop.hp = p.hp; if (p.level) newTroop.level = p.level;
+                    this.units.push(newTroop);
+                });
+                boat.passengers = [];
+                Game.effects.push({x: boat.x, y: boat.y - 30, char: '📤', life: 40});
+                this.updateUI(['BOAT_LOAD'], true, `ЛОДКА (Мест: 4/4)`);
+            }
+            return;
+        }
+
 // --- РАСПУСК АРМИИ ---
         if (type === 'DISBAND_ARMY') {
             let count = 0;
@@ -3766,13 +3845,28 @@ let target = this.units.slice().reverse().find(u => u.type !== 'TREE' && Math.hy
 
                     // УМНАЯ ПРОВЕРКА: Все ли выделенные здания — одинаковые заводы/дома?
                     const allSameProducer = this.selection.every(u => u.isProducer && u.type === s0.type);
-
-                    if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
+if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         this.openWarehouseMenu(s0);
                     }
                     else if (this.selection.length === 1 && s0.type === 'HOSPITAL') {
                         this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
                     }
+                    // === НОВОЕ: МЕНЮ ДЛЯ ЛОДКИ ===
+                    else if (this.selection.length === 1 && s0.type === 'BOAT') {
+                        let menuItems = ['BOAT_LOAD'];
+                        if (s0.passengers && s0.passengers.length > 0) menuItems.push('BOAT_UNLOAD');
+                        
+                        // Считаем вес (Техника = 4 места, Пехота = 1 место)
+                        let weight = 0;
+                        if (s0.passengers) {
+                            s0.passengers.forEach(p => { weight += (['TANK', 'GRAD', 'HIMARS'].includes(p.type)) ? 4 : 1; });
+                        }
+                        this.updateUI(menuItems, true, `ЛОДКА (Мест: ${4 - weight}/4)`);
+                    }
+                    // ==============================
+                    // --- НОВАЯ ЛОГИКА ДЛЯ МАССОВОГО ВЫДЕЛЕНИЯ ДОМОВ И ЗАВОДОВ ---
+
+                        
                     // --- НОВАЯ ЛОГИКА ДЛЯ МАССОВОГО ВЫДЕЛЕНИЯ ДОМОВ И ЗАВОДОВ ---
                     else if (allSameProducer) {
                         this.selectedProducer = s0; // Берем первый как шаблон
@@ -3883,38 +3977,12 @@ onRight(e) {
         const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
         const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
 
-        // --- ВЫСАДКА ДЕСАНТА С ЛОДОК ---
-        const selectedBoats = this.selection.filter(u => u.type === 'BOAT');
-        if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
-            selectedBoats.forEach(b => {
-                if (b.passengers && b.passengers.length > 0) {
-                    b.passengers.forEach(p => {
-                        let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
-                        newTroop.hp = p.hp; 
-                        this.units.push(newTroop);
-                    });
-                    b.passengers = [];
-                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
-                }
-            });
-            // Если высадили, лодки не плывут на берег
-            if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
-        }
+      
 
         // Оставляем только тех, кто может ходить (убираем здания)
         const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
         
         if (mobileUnits.length === 0) return;
-
-        // --- ПОСАДКА В ЛОДКУ ---
-        if (clickedBoat) {
-            let infantry = mobileUnits.filter(u => (UNITS[u.type] && UNITS[u.type].isInfantry) || u.isBuilder || u.type === 'BUILDER');
-            if (infantry.length > 0) {
-                infantry.forEach(u => { u.targetUnit = clickedBoat; u.target = {x: clickedBoat.x, y: clickedBoat.y}; });
-                this.effects.push({x: clickedBoat.x, y: clickedBoat.y, char: '📥', life: 30});
-                return; // Солдаты получили приказ, выходим
-            }
-        } 
         
         // --- РУБКА ДЕРЕВА ---
         if (clickedTree) {
@@ -4662,9 +4730,7 @@ attemptAutoProduction() {
             }
         }
 
-// --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
-        // 1. Безопасная проверка: пехота ли это (без риска ошибки скрипта)
-        let isPerson = ['INFANTRY', 'SNIPER', 'BUILDER', 'RPG'].includes(this.type) || this.isBuilder;
+
 
         if (isPerson && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
             let dist = Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y);
@@ -5738,17 +5804,29 @@ if (dist < 15) {
 
             ctx.restore();
 
-            // --- ПОЛОСКА ХП И ВЫДЕЛЕНИЕ ---
-            // (Оставляем стандартный код, чтобы он не потерялся)
-            let hpOffset = this.radius + 15;
+  let hpOffset = this.radius + 15;
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-10, this.y - hpOffset, 20, 3);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-10, this.y - hpOffset, 20 * (Math.max(0, this.hp)/this.maxHp), 3);
             
             if (Game.selection.includes(this)) {
+                // Белая обводка самой лодки
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, boatLen*0.9, 0, Math.PI*2); ctx.stroke();
+                
+                // === НОВОЕ: Зона погрузки (голубой пунктир) ===
+                if (this.side === Game.myRole) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 120, 0, Math.PI*2); // 120 - радиус из кода посадки
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
             }
             return; // Выходим, чтобы не рисовался эмодзи
-        }
+
 
         // --- 3D МОДЕЛЬ ДЕРЕВА ---
         if (this.type === 'TREE') {

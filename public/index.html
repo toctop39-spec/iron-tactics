@@ -346,17 +346,17 @@ const formatCost = (u) => {
 };
 
 const UNITS = {
-    SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 125, dmg: 15, range: 140, speed: 0.35, reload: 40, color: '#44aaff', radius: 8, buildTime: 5, isInfantry: true },
-    SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 15, buildTime: 5, isInfantry: true },
+    SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 125, dmg: 15, range: 140, speed: 0.35, reload: 40, color: '#44aaff', radius: 4, buildTime: 5, isInfantry: true },
+    SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 8, buildTime: 5, isInfantry: true },
     
 // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
     TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
                cost: 5000, resCost: { iron: 35, chem: 2 }, 
-               hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 22, buildTime: 20 },
+               hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 11, buildTime: 20 },
     
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
-               hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 27, buildTime: 15, maxAmmo: 4, splash: 100 },
+               hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 13, buildTime: 15, maxAmmo: 4, splash: 100 },
 
 BOAT: { 
         type:'unit', name: 'Лодка', cost: 1500, imageSrc: 'https://static.vecteezy.com/system/resources/previews/024/554/198/original/gray-boat-on-the-sea-png.png', resCost: { iron: 25, chem: 5 }, 
@@ -367,7 +367,7 @@ HIMARS: {
    type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png',
    cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
    hp: 200, dmg: 2400, range: 1200, speed: 0.65, reload: 80,
-   color: '#004400', radius: 26, buildTime: 20,
+   color: '#004400', radius: 13, buildTime: 20,
    maxAmmo: 10, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
    isArty: true,
    isHIMARS: true
@@ -380,12 +380,12 @@ FPV: {
         type:'unit', name: 'FPV Дрон', emoji: '🛩️', imageSrc: 'FPV.png', 
         cost: 300, resCost: { iron: 20, chips: 1 }, 
         hp: 30, dmg: 400, range: 400, speed: 2.2, color: '#ff3300', 
-        radius: 12, buildTime: 10, isFlying: true, isKamikaze: true, splash: 80 
+        radius: 7, buildTime: 10, isFlying: true, isKamikaze: true, splash: 80 
     },
     
     HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
                   resCost: { iron: 80, chips: 4, chem: 8 }, 
-                  hp: 700, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 22, buildTime: 25, isFlying: true, maxAmmo: 30 },
+                  hp: 700, dmg: 40, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 11, buildTime: 25, isFlying: true, maxAmmo: 30 },
     
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 7, buildTime: 5, isBuilder: true },
     

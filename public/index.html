@@ -3895,23 +3895,6 @@ onRight(e) {
         const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
         const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
 
-        // 1. ВЫСАДКА ДЕСАНТА (выделена лодка + клик по суше)
-        const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
-        if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
-            selectedBoats.forEach(b => {
-                if (b.passengers && b.passengers.length > 0) {
-                    b.passengers.forEach(p => {
-                        let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
-                        newTroop.hp = p.hp; 
-                        this.units.push(newTroop);
-                    });
-                    b.passengers = [];
-                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
-                }
-            });
-            if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
-        }
-
         // 2. ПОСАДКА В ЛОДКУ
         if (clickedBoat) {
             let infantry = mobileUnits.filter(u => UNITS[u.type].isInfantry || u.isBuilder);

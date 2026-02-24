@@ -546,7 +546,7 @@ const MapUtils = {
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
 // Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
-    buildRoad(x, y) {
+buildRoad(x, y) {
         // Умная защита: создаем хранилище, если его нет
         if (!this.roadGrid) { this.roadGrid = new Set(); }
         
@@ -554,48 +554,41 @@ roadGrid: new Set(), // Хранилище построенных плиток �
         let cy = Math.floor(y / 30);
         const gridKey = cx + "," + cy;
 
-        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз (чтобы не было черных пятен)
+        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз
         if (this.roadGrid.has(gridKey)) return;
 
         this.roadGrid.add(gridKey);
 
-        // --- МАГИЯ ТЕКСТУРЫ ---
-        // Мы рисуем прямо на сохраненном холсте фона!
+        // --- МАГИЯ ТЕКСТУРЫ (ИСПРАВЛЕНО МАСШТАБИРОВАНИЕ) ---
         if (this.bgCanvas) {
             const ctx = this.bgCanvas.getContext('2d');
             
-            // Немного рандомизируем центр и радиус кляксы, чтобы не было идеальной сетки
-            const rx = x + (Math.random() - 0.5) * 15;
-            const ry = y + (Math.random() - 0.5) * 15;
-            // Радиус побольше (35-45), чтобы кляксы сильно перекрывали друг друга
-            const radius = 35 + Math.random() * 10; 
+            // ВАЖНО: bgCanvas отрендерен в масштабе 0.5, 
+            // поэтому все координаты и размеры для него нужно умножать на scale!
+            const scale = 0.5; 
+            
+            const rx = (x + (Math.random() - 0.5) * 15) * scale;
+            const ry = (y + (Math.random() - 0.5) * 15) * scale;
+            const radius = (35 + Math.random() * 10) * scale; 
 
-            // Создаем радиальный градиент: темная грязь в центре, прозрачность по краям
-            const gradient = ctx.createRadialGradient(rx, ry, 10, rx, ry, radius);
-            // Цвет: темно-коричневая грязь, почти непрозрачная в центре
+            const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
             gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
-            // Цвет: средний коричневый, полупрозрачный
             gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
-            // Цвет: полностью прозрачный край, чтобы смешаться с травой
             gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
 
-            // Включаем режим наложения "Умножение" или оставляем обычный.
-            // Обычный (source-over) с прозрачностью дает хороший эффект "загрязнения" поверх травы.
             ctx.globalCompositeOperation = 'source-over';
-            
             ctx.fillStyle = gradient;
             ctx.beginPath();
-            // Рисуем не идеальный круг, а немного сплюснутый, чтобы было естественнее
             ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2);
             ctx.fill();
 
-            // Добавляем пару случайных "камешков" или комьев земли для текстуры
+            // Камешки тоже уменьшаем
             for(let i=0; i<3; i++) {
                 ctx.fillStyle = 'rgba(50, 40, 30, 0.6)';
-                const px = rx + (Math.random() - 0.5) * 30;
-                const py = ry + (Math.random() - 0.5) * 30;
+                const px = rx + (Math.random() - 0.5) * 30 * scale;
+                const py = ry + (Math.random() - 0.5) * 30 * scale;
                 ctx.beginPath();
-                ctx.arc(px, py, 2 + Math.random()*3, 0, Math.PI*2);
+                ctx.arc(px, py, (2 + Math.random()*3) * scale, 0, Math.PI*2);
                 ctx.fill();
             }
         }

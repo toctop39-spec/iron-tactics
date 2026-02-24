@@ -545,18 +545,61 @@ const MapUtils = {
 
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
-    // Добавляем плитку дороги 30x30
+// Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
     buildRoad(x, y) {
-        // УМНАЯ ЗАЩИТА: Если хранилища нет, создаем его прямо сейчас
-        if (!this.roadGrid) {
-            this.roadGrid = new Set();
-        }
+        // Умная защита: создаем хранилище, если его нет
+        if (!this.roadGrid) { this.roadGrid = new Set(); }
         
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
-        this.roadGrid.add(cx + "," + cy);
-    },
+        const gridKey = cx + "," + cy;
 
+        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз (чтобы не было черных пятен)
+        if (this.roadGrid.has(gridKey)) return;
+
+        this.roadGrid.add(gridKey);
+
+        // --- МАГИЯ ТЕКСТУРЫ ---
+        // Мы рисуем прямо на сохраненном холсте фона!
+        if (this.bgCanvas) {
+            const ctx = this.bgCanvas.getContext('2d');
+            
+            // Немного рандомизируем центр и радиус кляксы, чтобы не было идеальной сетки
+            const rx = x + (Math.random() - 0.5) * 15;
+            const ry = y + (Math.random() - 0.5) * 15;
+            // Радиус побольше (35-45), чтобы кляксы сильно перекрывали друг друга
+            const radius = 35 + Math.random() * 10; 
+
+            // Создаем радиальный градиент: темная грязь в центре, прозрачность по краям
+            const gradient = ctx.createRadialGradient(rx, ry, 10, rx, ry, radius);
+            // Цвет: темно-коричневая грязь, почти непрозрачная в центре
+            gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
+            // Цвет: средний коричневый, полупрозрачный
+            gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
+            // Цвет: полностью прозрачный край, чтобы смешаться с травой
+            gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
+
+            // Включаем режим наложения "Умножение" или оставляем обычный.
+            // Обычный (source-over) с прозрачностью дает хороший эффект "загрязнения" поверх травы.
+            ctx.globalCompositeOperation = 'source-over';
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            // Рисуем не идеальный круг, а немного сплюснутый, чтобы было естественнее
+            ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Добавляем пару случайных "камешков" или комьев земли для текстуры
+            for(let i=0; i<3; i++) {
+                ctx.fillStyle = 'rgba(50, 40, 30, 0.6)';
+                const px = rx + (Math.random() - 0.5) * 30;
+                const py = ry + (Math.random() - 0.5) * 30;
+                ctx.beginPath();
+                ctx.arc(px, py, 2 + Math.random()*3, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+    },
 
     // Проверяем, есть ли тут дорога (для скорости танков)
     checkRoad(x, y) {
@@ -4287,40 +4330,6 @@ draw() {
                 ctx.moveTo(path[0].x, path[0].y);
                 for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
                 ctx.stroke();
-            });
-        }
-
- // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
-        if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
-            MapUtils.roadGrid.forEach(key => {
-                let [cx, cy] = key.split(',').map(Number);
-                
-                // Смещаем координаты в центр нашей "плитки" (30x30)
-                let px = cx * 30 + 15; 
-                let py = cy * 30 + 15;
-                
-                // Рисуем только те куски тропинки, которые видит камера
-                if (px > this.camera.x - 40 && px < this.camera.x + canvas.width + 40 &&
-                    py > this.camera.y - 40 && py < this.camera.y + canvas.height + 40) {
-                    
-                    // 1. Широкая вытоптанная основа (светло-коричневая, полупрозрачная)
-                    ctx.beginPath();
-                    // Радиус 20 (больше чем половина плитки), чтобы соседние круги сливались в единый путь
-                    ctx.arc(px, py, 20, 0, Math.PI * 2); 
-                    ctx.fillStyle = 'rgba(110, 85, 55, 0.4)'; 
-                    ctx.fill();
-
-                    // 2. Центральная "колея" (более темная и плотная грязь)
-                    ctx.beginPath();
-                    ctx.arc(px, py, 12, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(80, 60, 40, 0.6)'; 
-                    ctx.fill();
-                    
-                    // 3. Декор: мелкие камешки/следы, чтобы тропа не казалась слишком гладкой
-                    ctx.fillStyle = 'rgba(60, 40, 20, 0.5)';
-                    ctx.fillRect(px - 6, py - 4, 3, 2);
-                    ctx.fillRect(px + 4, py + 5, 2, 3);
-                }
             });
         }
 

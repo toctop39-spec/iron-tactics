@@ -652,20 +652,82 @@ getWorldHeight(x, y) {
 
 roads: [], // Хранилище дорог
 
-    // Создаем дороги между точками спавна
+ roadPaths: [], // Теперь храним не прямые линии, а цепочки точек
+
     generateRoads() {
-        this.roads = [];
+        this.roadPaths = [];
         if (this.spawnPoints.length < 2) return;
-        
-        // Соединяем каждую базу с соседней (по кругу) и с центром карты
+
+        const step = 60; // Шаг сетки (чем меньше, тем точнее, но дольше грузится)
+
+        // Проверка: можно ли тут топтать тропинку?
+        const isWalkable = (cx, cy) => {
+            const px = cx * step;
+            const py = cy * step;
+            if (px < 0 || px > MAP_W || py < 0 || py > MAP_H) return false;
+            if (this.getWorldHeight(px, py) < 0.48) return false; // Обходим воду
+            if (this.checkMountain(px, py, 30)) return false;     // Обходим горы
+            return true;
+        };
+
+        // Тот самый алгоритм поиска пути (A*)
+        const findPath = (startPx, endPx) => {
+            let start = { x: Math.floor(startPx.x / step), y: Math.floor(startPx.y / step) };
+            let end = { x: Math.floor(endPx.x / step), y: Math.floor(endPx.y / step) };
+
+            let openSet = [start];
+            let cameFrom = new Map();
+            let gScore = new Map();
+            let fScore = new Map();
+
+            const hash = (p) => p.x + "," + p.y;
+            gScore.set(hash(start), 0);
+            fScore.set(hash(start), Math.hypot(end.x - start.x, end.y - start.y));
+
+            let attempts = 0;
+
+            while (openSet.length > 0 && attempts < 1500) {
+                attempts++;
+                openSet.sort((a, b) => (fScore.get(hash(a)) || Infinity) - (fScore.get(hash(b)) || Infinity));
+                let current = openSet.shift();
+
+                // Если подошли достаточно близко к цели
+                if (Math.hypot(current.x - end.x, current.y - end.y) < 3) { 
+                    let path = [];
+                    let curr = current;
+                    while (cameFrom.has(hash(curr))) {
+                        path.push({ x: curr.x * step, y: curr.y * step });
+                        curr = cameFrom.get(hash(curr));
+                    }
+                    return path.reverse();
+                }
+
+                // Идем в 8 направлениях
+                const dirs = [[0,1], [1,0], [0,-1], [-1,0], [1,1], [-1,-1], [1,-1], [-1,1]];
+                for (let d of dirs) {
+                    let neighbor = { x: current.x + d[0], y: current.y + d[1] };
+                    if (!isWalkable(neighbor.x, neighbor.y)) continue;
+
+                    let tentative_gScore = (gScore.get(hash(current)) || Infinity) + Math.hypot(d[0], d[1]);
+                    if (tentative_gScore < (gScore.get(hash(neighbor)) || Infinity)) {
+                        cameFrom.set(hash(neighbor), current);
+                        gScore.set(hash(neighbor), tentative_gScore);
+                        fScore.set(hash(neighbor), tentative_gScore + Math.hypot(end.x - neighbor.x, end.y - neighbor.y));
+                        if (!openSet.some(p => p.x === neighbor.x && p.y === neighbor.y)) {
+                            openSet.push(neighbor);
+                        }
+                    }
+                }
+            }
+            return []; // Если путь преграждает океан — дороги не будет
+        };
+
+        // Соединяем базы соседей по кругу
         for (let i = 0; i < this.spawnPoints.length; i++) {
             let p1 = this.spawnPoints[i];
             let p2 = this.spawnPoints[(i + 1) % this.spawnPoints.length];
-            
-            // Дорога к соседу
-            this.roads.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
-            // Дорога в центр (перекресток)
-            this.roads.push({ x1: p1.x, y1: p1.y, x2: MAP_W/2, y2: MAP_H/2 });
+            let path = findPath(p1, p2);
+            if (path.length > 0) this.roadPaths.push(path);
         }
     },
 
@@ -677,20 +739,22 @@ roads: [], // Хранилище дорог
         return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
     },
 
-    // Новый умный метод определения грунта под ногами
     getGroundType(x, y) {
-        // 1. Сначала проверяем воду (если островной режим)
         if (Game.isIslandMode && this.getWorldHeight(x, y) < 0.48) return 'WATER';
 
-        // 2. Проверяем дороги (ширина дороги 40 пикселей)
-        for (let r of this.roads) {
-            if (this.distToSegment(x, y, r.x1, r.y1, r.x2, r.y2) < 40) return 'ROAD';
+        // Проверяем, стоим ли мы на проложенной тропинке (радиус 25 пикселей)
+        if (this.roadPaths) {
+            for (let path of this.roadPaths) {
+                for (let pt of path) {
+                    if (Math.hypot(x - pt.x, y - pt.y) < 25) return 'ROAD';
+                }
+            }
         }
 
-        // 3. Используем отдельный масштаб шума для полей и грязи
+        // Шум для полей и грязи
         let biomeNoise = SimplexNoise.noise(x * 0.0015, y * 0.0015);
-        if (biomeNoise > 0.5) return 'MUD';   // Глубокая грязь/болото
-        if (biomeNoise < -0.5) return 'FIELD'; // Пшеничные поля
+        if (biomeNoise > 0.5) return 'MUD';
+        if (biomeNoise < -0.5) return 'FIELD';
 
         return 'NORMAL';
     },
@@ -4124,32 +4188,30 @@ draw() {
             ctx.fillStyle = '#243b29'; // Запасной цвет
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
-
-    // --- ОТРИСОВКА ДОРОГ ---
-        if (MapUtils.roads && MapUtils.roads.length > 0) {
-            ctx.lineWidth = 40; // Ширина дороги
+// --- ОТРИСОВКА ГРУНТОВЫХ ТРОПИНОК ---
+        if (MapUtils.roadPaths && MapUtils.roadPaths.length > 0) {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.strokeStyle = 'rgba(40, 40, 40, 0.6)'; // Темно-серый асфальт/грунтовка
-            
-            ctx.beginPath();
-            MapUtils.roads.forEach(r => {
-                ctx.moveTo(r.x1, r.y1);
-                ctx.lineTo(r.x2, r.y2);
-            });
-            ctx.stroke();
 
-            // Разметка на дорогах (желтый пунктир)
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
-            ctx.setLineDash([20, 20]);
-            ctx.beginPath();
-            MapUtils.roads.forEach(r => {
-                ctx.moveTo(r.x1, r.y1);
-                ctx.lineTo(r.x2, r.y2);
+            MapUtils.roadPaths.forEach(path => {
+                if (path.length < 2) return;
+                
+                // 1. Основа тропинки (широкая, полупрозрачная вытоптанная земля)
+                ctx.lineWidth = 28; 
+                ctx.strokeStyle = 'rgba(100, 80, 50, 0.35)'; 
+                ctx.beginPath();
+                ctx.moveTo(path[0].x, path[0].y);
+                for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+                ctx.stroke();
+
+                // 2. Центральная колея (узкая, более темная грязь от танков)
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = 'rgba(70, 50, 30, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(path[0].x, path[0].y);
+                for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+                ctx.stroke();
             });
-            ctx.stroke();
-            ctx.setLineDash([]);
         }
 
         // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)

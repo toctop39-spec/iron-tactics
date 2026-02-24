@@ -3574,36 +3574,55 @@ onDown(e) {
 // 3. СТРОЙКА (Постановка фундамента)
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
+                const m = this.getMouse(e); // Уточняем координаты
+                
+                // Проверки ландшафта
                 const inWater = MapUtils.checkWater(m.x, m.y);
                 const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
-                if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 
-                // 1. ЕДИНАЯ ПРОВЕРКА ТЕРРИТОРИИ (Теперь дорогу нельзя строить за пределами своей базы)
+                if (inWater || onMountain) { 
+                    this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); 
+                    return; 
+                }
+
+                // --- ЛОГИКА ДОРОГИ (МГНОВЕННО И КРАСИВО) ---
+                if (bType === 'ROAD') {
+                    // Проверяем территорию и наложение
+                    if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+                    if (MapUtils.checkRoad(m.x, m.y)) return;
+
+                    if (this.checkCost('ROAD')) {
+                        this.payCost('ROAD');
+                        MapUtils.buildRoad(m.x, m.y);
+                        this.effects.push({x: m.x, y: m.y, char: '🟤', life: 15});
+                        if (this.isMultiplayer && CURRENT_ROOM) {
+                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: m.x, y: m.y });
+                        }
+                    }
+                    return; // Не сбрасываем pendingConstruction, чтобы можно было рисовать дальше
+                }
+
+                // --- ЛОГИКА ОБЫЧНЫХ ЗДАНИЙ ---
                 if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+                if (MapUtils.checkRoad(m.x, m.y)) { this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return; }
 
-                // 2. ЕДИНАЯ ПРОВЕРКА НАЛОЖЕНИЯ (Нельзя строить прямо поверх танков и зданий)
                 const GAP = (bType === 'WALL') ? -15 : 30;
-                if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
-                    this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
-                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 
+                if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP)) {
+                    this.showError("СЛИШКОМ БЛИЗКО!"); return;
                 }
 
-                // 3. НОВОЕ: ЗАПРЕТ ПОСТРОЙКИ ЗДАНИЙ НА ТРОПИНКАХ
-                if (bType !== 'ROAD' && MapUtils.checkRoad(m.x, m.y)) {
-                    this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
-                }
-
-                // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
                 const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (!builder) { this.showError("НЕТ СТРОИТЕЛЯ!"); return; }
+                
                 if (this.checkCost(bType)) {
-                    this.payCost(bType); this.updateUI([]); 
+                    this.payCost(bType);
                     const site = { id: Date.now() + Math.random(), type: bType, x: m.x, y: m.y, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
-                    this.constructions.push(site); builder.assignSite(site);
-                    this.pendingConstruction = null; document.body.style.cursor = 'default';
-                    this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
-                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id, builderId: builder.id });
-                } else this.showError("НЕТ ДЕНЕГ!");
+                    this.constructions.push(site); 
+                    builder.assignSite(site);
+                    this.pendingConstruction = null; 
+                    document.body.style.cursor = 'default';
+                    this.updateUI([]); 
+                }
                 return;
             }
               
@@ -4044,10 +4063,12 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
     onMove(e) { 
         if (this.isDrawingPath) {
             const m = this.getMouse(e);
+            
             if (e.buttons === 1 && this.pendingConstruction === 'ROAD') {
             this.tryBuildRoad(m.x, m.y);
             return; // Прерываем функцию, чтобы не рисовалась зеленая рамка выделения!
         }
+            
             const last = this.drawPath[this.drawPath.length - 1];
             if (Math.hypot(m.x - last.x, m.y - last.y) > 30) {
                 this.drawPath.push({x: m.x, y: m.y});

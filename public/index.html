@@ -3826,16 +3826,25 @@ let target = this.units.slice().reverse().find(u => u.type !== 'TREE' && Math.hy
     },
 
 onRight(e) {
-        if (this.state !== 'BATTLE' || this.isSpectator) return;
-    // --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ---
+        // 1. БАЗОВЫЕ ПРОВЕРКИ
+        if (!this.running || this.isSpectator) return;
+
+        // 2. ВЫЧИСЛЯЕМ КООРДИНАТЫ МЫШИ (Делаем это сразу!)
+        const rect = this.canvas.getBoundingClientRect();
+        const m = {
+            x: (e.clientX - rect.left) / this.scale + this.camera.x,
+            y: (e.clientY - rect.top) / this.scale + this.camera.y
+        };
+
+        // 3. --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ('PLACE') ---
         if (this.state === 'PLACE') {
-            // Ищем нашего юнита под курсором
-            const target = this.units.slice().reverse().find(u => u.side === 'player' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+            // Ищем нашего юнита под курсором (используем this.myRole для надежности)
+            const target = this.units.slice().reverse().find(u => u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
             if (target) {
                 target.hp = 0; // Удаляем юнита
-                this.money += UNITS[target.type].cost; // Возвращаем деньги
+                this.money += (UNITS[target.type].cost || 0); // Возвращаем деньги
                 
-                // Возвращаем ресурсы, если они были потрачены (например, на танк)
+                // Возвращаем ресурсы, если они были потрачены
                 if (UNITS[target.type].resCost) {
                     if (UNITS[target.type].resCost.iron) this.resources.iron += UNITS[target.type].resCost.iron;
                     if (UNITS[target.type].resCost.chem) this.resources.chem += UNITS[target.type].resCost.chem;
@@ -3843,16 +3852,22 @@ onRight(e) {
                 }
                 
                 Game.effects.push({x: target.x, y: target.y, char: '💵', life: 30});
-                const data = LEVELS.find(l => l.id === this.level);
-                if (data) this.updateUI(data.unlock);
+                
+                // Обновляем UI
+                if (typeof LEVELS !== 'undefined') {
+                    const data = LEVELS.find(l => l.id === this.level);
+                    if (data) this.updateUI(data.unlock);
+                } else {
+                    if (this.updateUI) this.updateUI();
+                }
             }
-            return;
+            return; // Выходим, так как дальше идут приказы для боя
         }
 
-        // Если мы не в бою и не в расстановке - выходим
+        // 4. Если мы не в бою - выходим
         if (this.state !== 'BATTLE') return;
         
-        // 1. Сбрасываем спец-режимы (прицел, постройка и т.д.)
+        // --- СБРОС СПЕЦ-РЕЖИМОВ ---
         this.artyMode = false; 
         this.pendingConstruction = null; 
         this.buildType = null; 
@@ -3861,24 +3876,19 @@ onRight(e) {
         Game.pendingAutoSelect = null;
         document.body.style.cursor = 'default';
         
-        if (this.isSandbox && this.selection.length === 0) this.openSandboxMenu();
+        if (this.isSandbox && this.selection.length === 0 && typeof this.openSandboxMenu === 'function') {
+            this.openSandboxMenu();
+        }
 
-        // 2. Отправляем юнитов в точку (если кто-то выделен)
+        // --- ФИЛЬТРАЦИЯ ВЫДЕЛЕНИЯ ---
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
 
-    if (!this.running) return;
-        const rect = this.canvas.getBoundingClientRect();
-        const m = {
-            x: (e.clientX - rect.left) / this.scale + this.camera.x,
-            y: (e.clientY - rect.top) / this.scale + this.camera.y
-        };
-
-        // 1. СНАЧАЛА ОБЪЯВЛЯЕМ ПЕРЕМЕННЫЕ (Что находится под курсором)
+        // Ищем интерактивные объекты под курсором
         const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
         const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
 
-        // 2. ВЫСАДКА ДЕСАНТА (Если выделена лодка и мы кликнули НЕ по лодке, а на воду/сушу)
-        const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
+        // --- ВЫСАДКА ДЕСАНТА С ЛОДОК ---
+        const selectedBoats = this.selection.filter(u => u.type === 'BOAT');
         if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
             selectedBoats.forEach(b => {
                 if (b.passengers && b.passengers.length > 0) {
@@ -3891,50 +3901,56 @@ onRight(e) {
                     this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
                 }
             });
+            // Если высадили, лодки не плывут на берег
             if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
         }
 
-        // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
+        // Оставляем только тех, кто может ходить (убираем здания)
         const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+        
+        if (mobileUnits.length === 0) return;
 
-        // 3. ПОСАДКА В ЛОДКУ
+        // --- ПОСАДКА В ЛОДКУ ---
         if (clickedBoat) {
-            let infantry = mobileUnits.filter(u => UNITS[u.type].isInfantry || u.isBuilder);
+            let infantry = mobileUnits.filter(u => (UNITS[u.type] && UNITS[u.type].isInfantry) || u.isBuilder || u.type === 'BUILDER');
             if (infantry.length > 0) {
                 infantry.forEach(u => { u.targetUnit = clickedBoat; u.target = {x: clickedBoat.x, y: clickedBoat.y}; });
                 this.effects.push({x: clickedBoat.x, y: clickedBoat.y, char: '📥', life: 30});
-                return;
+                return; // Солдаты получили приказ, выходим
             }
         } 
-        // 4. РУБКА ДЕРЕВА
-        else if (clickedTree) {
+        
+        // --- РУБКА ДЕРЕВА ---
+        if (clickedTree) {
             let builders = mobileUnits.filter(u => u.isBuilder || u.type === 'BUILDER');
             if (builders.length > 0) {
                 builders.forEach(u => { u.targetUnit = clickedTree; u.target = {x: clickedTree.x, y: clickedTree.y}; });
                 this.effects.push({x: clickedTree.x, y: clickedTree.y, char: '🪓', life: 30});
-                return;
+                return; // Строитель получил приказ, выходим
             }
         }
 
-        if (mobileUnits.length > 0) {
-            if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) {
-                // Если таймер еще идет, добавляем новую точку к существующему маршруту
-                this.waypointPath.push({x: m.x, y: m.y});
-            } else {
-                // Если таймер стоял, начинаем новый маршрут
-                this.waypointPath = [{x: m.x, y: m.y}];
-                this.waypointUnits = [...mobileUnits];
-            }
-            
-            // Сбрасываем таймер на 120 кадров (ровно 2 секунды)
-            this.waypointTimer = 120; 
-            
-            // Эффект клика (маркер)
-            this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
+        // --- ДВИЖЕНИЕ В ТОЧКУ (Система вейпоинтов) ---
+        if (this.waypointTimer > 0 && this.waypointPath && this.waypointPath.length > 0) {
+            // Если таймер еще идет, добавляем новую точку к существующему маршруту
+            this.waypointPath.push({x: m.x, y: m.y});
+        } else {
+            // Если таймер стоял, начинаем новый маршрут
+            this.waypointPath = [{x: m.x, y: m.y}];
+            this.waypointUnits = [...mobileUnits];
         }
+        
+        // Сбрасываем таймер на 120 кадров (ровно 2 секунды)
+        this.waypointTimer = 120; 
+        this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
          
-        if (this.isMultiplayer && idsToMove.length > 0 && CURRENT_ROOM) {
-            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
+        // --- МУЛЬТИПЛЕЕР (Отправка приказа на сервер) ---
+        if (this.isMultiplayer && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
+            // Собираем ID юнитов, которым отдали приказ
+            let idsToMove = mobileUnits.map(u => u.id).filter(id => id !== undefined);
+            if (idsToMove.length > 0) {
+                this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
+            }
         }
     },
 

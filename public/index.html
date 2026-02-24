@@ -1996,7 +1996,7 @@ setFilter(type) {
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
     patterns: {}, 
 
-    updateTerritoryCache() {;
+    updateTerritoryCache() {
         
         const margin = 100; 
         const w = canvas.width + margin * 2;
@@ -3598,29 +3598,7 @@ onDown(e) {
                 } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
-                // --------------------------------------------------------------
-
-                // Проверка территории для ОБЫЧНЫХ зданий (дорогу можно строить за пределами базы!)
-                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
-
-                const GAP = (bType === 'WALL') ? -15 : 30;
-                if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
-                    this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
-                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 
-                }
-
-                const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
-                if (!builder) { this.showError("НЕТ СТРОИТЕЛЯ!"); return; }
-                if (this.checkCost(bType)) {
-                    this.payCost(bType); this.updateUI([]); 
-                    const site = { id: Date.now() + Math.random(), type: bType, x: m.x, y: m.y, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
-                    this.constructions.push(site); builder.assignSite(site);
-                    this.pendingConstruction = null; document.body.style.cursor = 'default';
-                    this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
-                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id, builderId: builder.id });
-                } else this.showError("НЕТ ДЕНЕГ!");
-                return;
-            }
+              
 
             // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
@@ -4193,7 +4171,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
-                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");;
+                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");
                     }
                     else {
                         // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---

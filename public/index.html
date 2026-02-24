@@ -4319,7 +4319,7 @@ draw() {
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
 
-    // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
+    // --- ВСТАВЛЯТЬ СЮДА: ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
             MapUtils.roadGrid.forEach(key => {
                 let [cx, cy] = key.split(',').map(Number);
@@ -4327,12 +4327,11 @@ draw() {
                 let px = cx * 30; 
                 let py = cy * 30;
                 
-                // Рисуем только те куски тропинки, которые видит камера (чтобы не было лагов)
+                // Рисуем только те куски тропинки, которые видит камера
                 if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
                     py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
                     
                     // Рисуем нашу заготовленную кляксу грязи!
-                    // Сдвигаем на -15, потому что клякса размером 60x60, а игровая клетка 30x30
                     if (Game.roadTexture) {
                         ctx.drawImage(Game.roadTexture, px - 15, py - 15);
                     }
@@ -4530,6 +4529,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                 e.vy += 0.35; // Гравитация
                 e.life--;
             }
+                
 
 // --- ЯДЕРНЫЕ ЭФФЕКТЫ ---
             else if (e.type === 'nuke_flash') {

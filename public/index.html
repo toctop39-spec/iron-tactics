@@ -3442,6 +3442,27 @@ if (!this.isSpectator) {
         return { x: e.clientX - r.left + this.camera.x, y: e.clientY - r.top + this.camera.y, rawX: e.clientX, rawY: e.clientY };
     },
 
+    // --- НОВАЯ ФУНКЦИЯ: Попытка построить кусок дороги ---
+    tryBuildRoad(x, y) {
+        // Проверяем территорию и препятствия
+        if (this.getTerritoryOwner(x, y) !== this.myRole) return; 
+        if (MapUtils.checkWater(x, y) || MapUtils.checkMountain(x, y, 40)) return;
+        // Если тут уже есть дорога или здание, прерываем
+        if (MapUtils.checkRoad(x, y)) return;
+
+        // Пытаемся купить
+        if (this.checkCost('ROAD')) {
+            this.payCost('ROAD');
+            MapUtils.buildRoad(x, y); 
+            this.effects.push({x: x, y: y, char: '🟤', life: 20});
+            document.getElementById('money').innerText = Math.floor(this.money); 
+            
+            if (this.isMultiplayer && CURRENT_ROOM) {
+                this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: x, y: y });
+            }
+        }
+    },
+
 onDown(e) {
         if (e.button !== 0) return; // Только левый клик
         if (e.target && e.target.tagName !== 'CANVAS') return; // Игнорируем клики по кнопкам меню
@@ -3565,24 +3586,10 @@ onDown(e) {
                     this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
                 }
 
-                // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
+     // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ (ОБНОВЛЕННО) ---
                 if (bType === 'ROAD') {
-                    if (this.checkCost('ROAD')) {
-                        this.payCost('ROAD');
-                        MapUtils.buildRoad(m.x, m.y); 
-                        this.effects.push({x: m.x, y: m.y, char: '🟤', life: 20});
-                        document.getElementById('money').innerText = Math.floor(this.money); 
-                        
-                        if (this.isMultiplayer && CURRENT_ROOM) {
-                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: m.x, y: m.y });
-                        }
-                    } else {
-                        this.showError("НЕТ ДЕНЕГ!");
-                        this.pendingConstruction = null; 
-                        document.body.style.cursor = 'default';
-                        this.updateUI([]); 
-                    }
-                    return; // Выходим, чтобы строитель не бежал ставить фундамент
+                    this.tryBuildRoad(m.x, m.y);
+                    return; // Выходим, чтобы не ставился обычный фундамент
                 }
 
                 // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
@@ -4036,6 +4043,10 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
     onMove(e) { 
         if (this.isDrawingPath) {
             const m = this.getMouse(e);
+            if (e.buttons === 1 && this.pendingConstruction === 'ROAD') {
+            this.tryBuildRoad(m.x, m.y);
+            return; // Прерываем функцию, чтобы не рисовалась зеленая рамка выделения!
+        }
             const last = this.drawPath[this.drawPath.length - 1];
             if (Math.hypot(m.x - last.x, m.y - last.y) > 30) {
                 this.drawPath.push({x: m.x, y: m.y});

@@ -3934,7 +3934,7 @@ onRight(e) {
         if (this.isMultiplayer && idsToMove.length > 0 && CURRENT_ROOM) {
             this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
         }
-    }
+    },
 
     _normalizeSelection() {
         const builders = this.selection.filter(s => s.isBuilder);

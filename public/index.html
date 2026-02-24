@@ -660,19 +660,21 @@ getWorldHeight(x, y) {
     },
 
 roadPaths: [], 
+    roadGrid: null, // Быстрая сетка для оптимизации (чтобы игра не лагала)
 
     generateRoads() {
         this.roadPaths = [];
+        this.roadGrid = new Set();
         if (this.spawnPoints.length < 2) return;
 
-        const step = 60; // Шаг сетки
+        const step = 80; // Больший шаг = алгоритм работает в разы быстрее
 
+        // ВАЖНО: Убрали запрет на воду! Теперь алгоритм может прокладывать броды/мосты
         const isWalkable = (cx, cy) => {
             const px = cx * step;
             const py = cy * step;
             if (px < 0 || px > MAP_W || py < 0 || py > MAP_H) return false;
-            if (this.getWorldHeight(px, py) < 0.48) return false; // Обходим воду
-            if (this.checkMountain(px, py, 40)) return false;     // Обходим горы
+            if (this.checkMountain(px, py, 40)) return false;     
             return true;
         };
 
@@ -691,8 +693,8 @@ roadPaths: [],
 
             let attempts = 0;
 
-            // УВЕЛИЧЕН ЛИМИТ: теперь алгоритм "доберется" до цели на больших картах
-            while (openSet.length > 0 && attempts < 5000) {
+            // Увеличили лимит до 8000, чтобы найти путь даже на гигантской карте
+            while (openSet.length > 0 && attempts < 8000) {
                 attempts++;
                 openSet.sort((a, b) => (fScore.get(hash(a)) || Infinity) - (fScore.get(hash(b)) || Infinity));
                 let current = openSet.shift();
@@ -712,7 +714,12 @@ roadPaths: [],
                     let neighbor = { x: current.x + d[0], y: current.y + d[1] };
                     if (!isWalkable(neighbor.x, neighbor.y)) continue;
 
-                    let tentative_gScore = (gScore.get(hash(current)) || Infinity) + Math.hypot(d[0], d[1]);
+                    // УМНАЯ ЛОГИКА: Вода стоит в 6 раз "дороже" для прокладки пути. 
+                    // Алгоритм будет обходить озера по суше, но если выхода нет - построит мост через океан!
+                    let isWater = this.getWorldHeight(neighbor.x * step, neighbor.y * step) < 0.48;
+                    let cost = isWater ? 6 : 1; 
+
+                    let tentative_gScore = (gScore.get(hash(current)) || Infinity) + Math.hypot(d[0], d[1]) * cost;
                     if (tentative_gScore < (gScore.get(hash(neighbor)) || Infinity)) {
                         cameFrom.set(hash(neighbor), current);
                         gScore.set(hash(neighbor), tentative_gScore);
@@ -723,49 +730,59 @@ roadPaths: [],
                     }
                 }
             }
-            return [];
+            return []; 
         };
 
-        let centerPoint = { x: MAP_W/2, y: MAP_H/2 };
-
+        // Соединяем базы соседей по кругу
         for (let i = 0; i < this.spawnPoints.length; i++) {
-            // 1. Дорога от базы в центр карты (создает крутой перекресток)
-            let pathToCenter = findPath(this.spawnPoints[i], centerPoint);
-            if (pathToCenter.length > 0) this.roadPaths.push(pathToCenter);
-
-            // 2. Дорога к соседу по кругу
             let p2 = this.spawnPoints[(i + 1) % this.spawnPoints.length];
-            let pathToNeighbor = findPath(this.spawnPoints[i], p2);
-            if (pathToNeighbor.length > 0) this.roadPaths.push(pathToNeighbor);
+            let path = findPath(this.spawnPoints[i], p2);
+            if (path.length > 0) this.roadPaths.push(path);
+        }
+
+        // ОПТИМИЗАЦИЯ: Записываем координаты дороги в сетку, чтобы игра не лагала при генерации
+        for (let path of this.roadPaths) {
+            for (let pt of path) {
+                let cx = Math.floor(pt.x / 30);
+                let cy = Math.floor(pt.y / 30);
+                this.roadGrid.add(cx + "," + cy);
+            }
         }
     },
 
-    // Математика расстояния до отрезка (для проверки, стоим ли мы на дороге)
-    distToSegment(px, py, x1, y1, x2, y2) {
-        let l2 = (x1 - x2) ** 2 + (y1 - y2) ** 2;
-        if (l2 === 0) return Math.hypot(px - x1, py - y1);
-        let t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2));
-        return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    // Моментальная проверка (без нагрузки на процессор)
+    checkRoad(x, y) {
+        if (!this.roadGrid) return false;
+        let cx = Math.floor(x / 30);
+        let cy = Math.floor(y / 30);
+        // Проверяем квадрат 3х3, чтобы дорога была широкой
+        for(let dx = -1; dx <= 1; dx++){
+            for(let dy = -1; dy <= 1; dy++){
+                if (this.roadGrid.has((cx+dx) + "," + (cy+dy))) return true;
+            }
+        }
+        return false;
     },
 
     getGroundType(x, y) {
+        if (this.checkRoad(x, y)) return 'ROAD'; // Дороги в приоритете (даже над водой)
         if (Game.isIslandMode && this.getWorldHeight(x, y) < 0.48) return 'WATER';
 
-        // Проверяем, стоим ли мы на проложенной тропинке (радиус 25 пикселей)
-        if (this.roadPaths) {
-            for (let path of this.roadPaths) {
-                for (let pt of path) {
-                    if (Math.hypot(x - pt.x, y - pt.y) < 25) return 'ROAD';
-                }
-            }
-        }
-
-        // Шум для полей и грязи
         let biomeNoise = SimplexNoise.noise(x * 0.0015, y * 0.0015);
         if (biomeNoise > 0.5) return 'MUD';
         if (biomeNoise < -0.5) return 'FIELD';
 
         return 'NORMAL';
+    },
+
+    getTerrain(x, y) {
+        if (!Game.isIslandMode) return 'LAND';
+        if (this.checkRoad(x, y)) return 'LAND'; // МОСТ НАД ВОДОЙ считается сушей!
+        
+        const h = this.getWorldHeight(x, y);
+        if (h >= 0.48) return 'LAND';
+        if (h >= 0.42) return 'SHALLOW'; 
+        return 'DEEP';
     },
     
     checkMountain(x, y, radius) {
@@ -2634,9 +2651,9 @@ loadLevel(lvlId) {
         document.getElementById('player-stats').style.visibility = 'visible';
         document.getElementById('spectator-hud').style.display = 'none';
         
-// --- ГЕНЕРАЦИЯ ГУСТЫХ ЛЕСОВ И ЛАНДШАФТА ---
+// --- ГЕНЕРАЦИЯ РЕДКИХ ЛЕСОВ И ЛАНДШАФТА ---
         const treeNoiseScale = 0.005; 
-        const gridSize = 45; // Шаг сетки больше = деревья растут реже
+        const gridSize = 65; // ШАГ СЕТКИ БОЛЬШЕ = ДЕРЕВЬЯ РЕЖЕ
         const cols = Math.ceil(MAP_W / gridSize);
         const rows = Math.ceil(MAP_H / gridSize);
         
@@ -2652,8 +2669,8 @@ loadLevel(lvlId) {
                     if (!MapUtils.checkMountain(dx, dy, 30)) {
                         let forestVal = SimplexNoise.noise(dx * treeNoiseScale, dy * treeNoiseScale);
                         
-                        // Порог 0.65 (было 0.4). Теперь лес генерируется только аккуратными рощами
-                        if (forestVal > 0.65) { 
+                        // ПОРОГ ВЫШЕ = ЛЕСА МЕНЬШЕ И РАСТУТ ТОЛЬКО РОЩАМИ
+                        if (forestVal > 0.7) { 
                             let tree = new Unit('TREE', dx, dy, 'neutral');
                             this.units.push(tree); 
                         } 

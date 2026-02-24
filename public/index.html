@@ -3468,6 +3468,7 @@ onDown(e) {
         if (e.target && e.target.tagName !== 'CANVAS') return; // Игнорируем клики по кнопкам меню
         
         const m = this.getMouse(e);
+    
         
         // Сброс спец-режимов (если мы целились ракетой или строили)
         if (this.buildType || this.pendingConstruction || this.artyMode || Game.launchMode) {
@@ -3479,6 +3480,12 @@ onDown(e) {
         }
         
         this.isDragging = false;
+
+         // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ (ОБНОВЛЕННО) ---
+                if (bType === 'ROAD') {
+                    this.tryBuildRoad(m.x, m.y);
+                    return; // Выходим, чтобы не ставился обычный фундамент
+                }
 
     // --- ВОЗВРАЩАЕМ СПАВН ДЛЯ КАМПАНИИ ---
         if (this.state === 'PLACE' && this.buildType) {
@@ -3584,12 +3591,6 @@ onDown(e) {
                 // 3. НОВОЕ: ЗАПРЕТ ПОСТРОЙКИ ЗДАНИЙ НА ТРОПИНКАХ
                 if (bType !== 'ROAD' && MapUtils.checkRoad(m.x, m.y)) {
                     this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
-                }
-
-     // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ (ОБНОВЛЕННО) ---
-                if (bType === 'ROAD') {
-                    this.tryBuildRoad(m.x, m.y);
-                    return; // Выходим, чтобы не ставился обычный фундамент
                 }
 
                 // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---

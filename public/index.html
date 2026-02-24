@@ -547,10 +547,16 @@ roadGrid: new Set(), // Хранилище построенных плиток �
 
     // Добавляем плитку дороги 30x30
     buildRoad(x, y) {
+        // УМНАЯ ЗАЩИТА: Если хранилища нет, создаем его прямо сейчас
+        if (!this.roadGrid) {
+            this.roadGrid = new Set();
+        }
+        
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
         this.roadGrid.add(cx + "," + cy);
     },
+
 
     // Проверяем, есть ли тут дорога (для скорости танков)
     checkRoad(x, y) {

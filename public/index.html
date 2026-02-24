@@ -3868,22 +3868,21 @@ onRight(e) {
         // 2. Отправляем юнитов в точку (если кто-то выделен)
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
 
-    // --- ВЫСАДКА ДЕСАНТА С ЛОДКИ ---
+    // 1. ВЫСАДКА ДЕСАНТА (выделена лодка + клик по суше)
         const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
-        if (selectedBoats.length > 0 && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
+        if (selectedBoats.length > 0 && !clickedBoat && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
             selectedBoats.forEach(b => {
                 if (b.passengers && b.passengers.length > 0) {
                     b.passengers.forEach(p => {
-                        // Спавним бойцов обратно на берег
+                        // Создаем НОВОГО солдата на берегу
                         let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
                         newTroop.hp = p.hp; 
                         this.units.push(newTroop);
                     });
                     b.passengers = []; // Очищаем лодку
-                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); // Эффект высадки
+                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); 
                 }
             });
-            // Если высадили, отменяем обычное движение для лодки в эту точку
             if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
         }
         
@@ -4648,33 +4647,33 @@ attemptAutoProduction() {
             }
         }
 
-        // --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
-        if ((UNITS[this.type].isInfantry || this.isBuilder) && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
-            // Если подошли близко к лодке
-            if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 40) { 
+// --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
+        // 1. Безопасная проверка: пехота ли это (без риска ошибки скрипта)
+        let isPerson = ['INFANTRY', 'SNIPER', 'BUILDER', 'RPG'].includes(this.type) || this.isBuilder;
+
+        if (isPerson && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
+            let dist = Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y);
+            
+            if (dist < 45) { // Увеличили радиус захвата до 45 пикселей (с запасом!)
                 if (!this.targetUnit.passengers) this.targetUnit.passengers = [];
+                
                 if (this.targetUnit.passengers.length < 6) {
-                    this.targetUnit.passengers.push(this);
-                    this.hp = 0; // Солдат садится в лодку (исчезает с карты)
-                    Game.selection = Game.selection.filter(u => u !== this); 
-                    return;
+                    // Спасаем данные юнита в лодку
+                    this.targetUnit.passengers.push({ type: this.type, hp: this.hp });
+                    
+                    // ГАРАНТИРОВАННОЕ УДАЛЕНИЕ ЮНИТА С КАРТЫ
+                    this.dead = true; 
+                    this.hp = 0;
+                    Game.selection = Game.selection.filter(u => u !== this);
+                    
+                    return; // Прерываем апдейт, так как юнита больше нет на земле
+                } else {
+                    this.targetUnit = null; // Лодка полная — отменяем приказ
                 }
             } else {
-                // Если лодка уплывает — догоняем её!
-                this.target = {x: this.targetUnit.x, y: this.targetUnit.y}; 
-            }
-        }
-
-        // --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
-        if ((UNITS[this.type].isInfantry || this.isBuilder) && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
-            if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 30) {
-                if (!this.targetUnit.passengers) this.targetUnit.passengers = [];
-                if (this.targetUnit.passengers.length < 6) {
-                    this.targetUnit.passengers.push(this); // Садимся в массив лодки
-                    this.hp = 0; // Удаляем оригинал с земли
-                    Game.selection = Game.selection.filter(u => u !== this); 
-                    return;
-                }
+                // Если лодка чуть сдвинулась — догоняем её
+                this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                if (typeof busy !== 'undefined') busy = false; // Снимаем паузу
             }
         }
 

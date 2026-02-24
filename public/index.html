@@ -3866,6 +3866,25 @@ onRight(e) {
 
         // 2. Отправляем юнитов в точку (если кто-то выделен)
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
+
+    // --- ВЫСАДКА ДЕСАНТА С ЛОДКИ ---
+        const selectedBoats = this.selection.filter(u => u.type === 'BOAT' && u.side === this.myRole);
+        if (selectedBoats.length > 0 && MapUtils.getTerrain(m.x, m.y) !== 'DEEP') {
+            selectedBoats.forEach(b => {
+                if (b.passengers && b.passengers.length > 0) {
+                    b.passengers.forEach(p => {
+                        // Спавним бойцов обратно на берег
+                        let newTroop = new Unit(p.type, m.x + (Math.random()-0.5)*40, m.y + (Math.random()-0.5)*40, this.myRole);
+                        newTroop.hp = p.hp; 
+                        this.units.push(newTroop);
+                    });
+                    b.passengers = []; // Очищаем лодку
+                    this.effects.push({x: m.x, y: m.y, char: '🪂', life: 40}); // Эффект высадки
+                }
+            });
+            // Если высадили, отменяем обычное движение для лодки в эту точку
+            if (selectedBoats.some(b => b.passengers && b.passengers.length === 0)) return; 
+        }
         
      // --- ЗАХВАТ АРМИИ И ЗАПУСК ТАЙМЕРА (2 секунды) ---
         const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
@@ -4580,6 +4599,40 @@ attemptAutoProduction() {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
         this.checkPower();
 
+       // --- ЛОГИКА РУБКИ ЛЕСА ---
+        if (this.isBuilder || this.type === 'BUILDER') {
+            if (this.target && !this.targetUnit) {
+               let tree = Game.units.find(u => u.type === 'TREE' && Math.hypot(u.x - this.target.x, u.y - this.target.y) < 15);
+               if (tree) this.targetUnit = tree;
+            }
+            if (this.targetUnit && this.targetUnit.type === 'TREE' && this.targetUnit.hp > 0) {
+                if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 25) { 
+                    this.constructing = true; this.target = null; // Включаем анимацию молотка
+                    if (Game.frameCount % 30 === 0) {
+                        this.targetUnit.hp -= 20; 
+                        for(let i=0; i<3; i++) Game.effects.push({type: 'dirt', x: this.targetUnit.x, y: this.targetUnit.y, vx: (Math.random()-0.5)*5, vy: -Math.random()*5, size: 2, life: 20, color: '#d2b48c'});
+                        if (this.targetUnit.hp <= 0) {
+                            this.targetUnit.hp = 0; this.targetUnit = null; this.constructing = false;
+                        }
+                    }
+                    return; 
+                } else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+            } else if (!this.assignedSite) this.constructing = false;
+        }
+
+        // --- ЛОГИКА ПОСАДКИ В ЛОДКУ ---
+        if ((UNITS[this.type].isInfantry || this.isBuilder) && this.targetUnit && this.targetUnit.type === 'BOAT' && this.targetUnit.side === this.side) {
+            if (Math.hypot(this.x - this.targetUnit.x, this.y - this.targetUnit.y) < 30) {
+                if (!this.targetUnit.passengers) this.targetUnit.passengers = [];
+                if (this.targetUnit.passengers.length < 6) {
+                    this.targetUnit.passengers.push(this); // Садимся в массив лодки
+                    this.hp = 0; // Удаляем оригинал с земли
+                    Game.selection = Game.selection.filter(u => u !== this); 
+                    return;
+                }
+            }
+        }
+
        // --- ЛОГИКА ТАНКА (Отдача и поворот башни) ---
         if (this.type === 'TANK') {
             // === ФИЗИКА СНОСА ДЕРЕВЬЕВ ===
@@ -5256,23 +5309,6 @@ if (dist < 15) {
                 }
             }
 
-// --- ПЕРЕВОЗКА ПАССАЖИРОВ НА ЛОДКЕ ---
-        if (this.type === 'BOAT' && (this.x !== prevX || this.y !== prevY)) {
-            let dxMove = this.x - prevX;
-            let dyMove = this.y - prevY;
-            
-            Game.units.forEach(u => {
-                // ПРОВЕРКА: Юнит НЕ должен быть зданием
-                const isBuilding = u.isProducer || ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type);
-
-                if (u.side === this.side && u !== this && !u.isFlying && u.type !== 'BOAT' && !isBuilding) {
-                    if (Math.hypot(u.x - prevX, u.y - prevY) < this.radius + 10) {
-                                u.x += dxMove;
-                                u.y += dyMove;
-                            }
-                        }
-                    });
-                }
             }
         }
 
@@ -5369,6 +5405,18 @@ if (dist < 15) {
         if (this.type === 'TREE') {
             ctx.save();
             ctx.translate(this.x, this.y);
+
+            // === ПОДСВЕТКА ДЛЯ СТРОИТЕЛЕЙ ===
+            let isHovered = window.mousePos && Math.hypot(window.mousePos.x - this.x, window.mousePos.y - this.y) < 15;
+            let hasBuilderSelected = Game.selection.some(u => u.isBuilder || u.type === 'BUILDER');
+            
+            if (isHovered && hasBuilderSelected) {
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.stroke();
+                document.body.style.cursor = 'crosshair'; 
+            }
+            // ================================
             // Тень
             ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(4, 4, this.radius*1.4, this.radius*1.1, 0, 0, Math.PI*2); ctx.fill();
             // Ствол
@@ -5595,6 +5643,26 @@ if (dist < 15) {
             ctx.moveTo(cabinX, -cabinH*0.2); ctx.lineTo(cabinX, cabinH*0.2);
             ctx.moveTo(cabinX-3, 0); ctx.lineTo(cabinX+3, 0);
             ctx.stroke();
+            // === ПАССАЖИРЫ НА СВОИХ МЕСТАХ ===
+            if (this.passengers && this.passengers.length > 0) {
+                this.passengers.forEach((p, i) => {
+                    ctx.save();
+                    let px = 0, py = 0;
+                    if (i === 0) { px = cabinX; py = 0; } // Водитель в рубке
+                    else if (i === 1) { px = turretX - 5; py = 0; } // Стрелок у башни
+                    else { // Остальные сидят по бортам
+                        let row = Math.floor((i - 2) / 2);
+                        let side = (i % 2 === 0) ? 1 : -1;
+                        px = cabinX - 12 - row * 10; 
+                        py = side * boatWid * 0.6; 
+                    }
+                    ctx.translate(px, py);
+                    // Рисуем каску (снайпер - темная, остальные - зеленые/желтые)
+                    ctx.fillStyle = (p.type === 'SNIPER') ? '#1b2e11' : (p.type === 'BUILDER' ? '#ffcc00' : '#2d4c1e');
+                    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.restore();
+                });
+            }
 
             // Передняя орудийная башня (круглая)
             ctx.fillStyle = '#4a5b69';

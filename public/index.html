@@ -3944,14 +3944,15 @@ onRight(e) {
         this.waypointTimer = 120; 
         this.effects.push({x: m.x, y: m.y, char: '📍', life: 20});
          
-        // --- МУЛЬТИПЛЕЕР (Отправка приказа на сервер) ---
+// --- МУЛЬТИПЛЕЕР (Отправка приказа на сервер) ---
         if (this.isMultiplayer && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
             // Собираем ID юнитов, которым отдали приказ
             let idsToMove = mobileUnits.map(u => u.id).filter(id => id !== undefined);
             if (idsToMove.length > 0) {
                 this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'move', side: this.myRole, ids: idsToMove, tx: m.x, ty: m.y });
             }
-        },
+        } // <-- ЗАКРЫВАЕТ БЛОК IF
+    }, // <-- ЗАКРЫВАЕТ ФУНКЦИЮ onRight И СТАВИТ ЗАПЯТУЮ
 
     _normalizeSelection() {
         const builders = this.selection.filter(s => s.isBuilder);

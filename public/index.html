@@ -3827,8 +3827,6 @@ let target = this.units.slice().reverse().find(u => u.type !== 'TREE' && Math.hy
 
 onRight(e) {
         if (this.state !== 'BATTLE' || this.isSpectator) return;
-        const m = this.getMouse(e);
-
     // --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ---
         if (this.state === 'PLACE') {
             // Ищем нашего юнита под курсором

@@ -3826,15 +3826,11 @@ let target = this.units.slice().reverse().find(u => u.type !== 'TREE' && Math.hy
     },
 
 onRight(e) {
-        // 1. БАЗОВЫЕ ПРОВЕРКИ
-        if (!this.running || this.isSpectator) return;
+// 1. БАЗОВЫЕ ПРОВЕРКИ
+        if (this.isSpectator) return;
 
-        // 2. ВЫЧИСЛЯЕМ КООРДИНАТЫ МЫШИ (Делаем это сразу!)
-        const rect = this.canvas.getBoundingClientRect();
-        const m = {
-            x: (e.clientX - rect.left) / this.scale + this.camera.x,
-            y: (e.clientY - rect.top) / this.scale + this.camera.y
-        };
+        // 2. ВЫЧИСЛЯЕМ КООРДИНАТЫ МЫШИ (Используем твою встроенную функцию!)
+        const m = this.getMouse(e);
 
         // 3. --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ('PLACE') ---
         if (this.state === 'PLACE') {

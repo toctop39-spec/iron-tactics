@@ -5734,13 +5734,21 @@ if (dist < 15) {
             ctx.fillStyle = '#112233';
             ctx.fillRect(cabinX + cabinW*0.3, -cabinH*0.3, 3, cabinH*0.6);
 
-            // Радар/Мачта (маленький крестик на рубке)
+        // Радар/Мачта (маленький крестик на рубке)
             ctx.strokeStyle = '#334455'; ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(cabinX, -cabinH*0.2); ctx.lineTo(cabinX, cabinH*0.2);
             ctx.moveTo(cabinX-3, 0); ctx.lineTo(cabinX+3, 0);
             ctx.stroke();
-            // === ПАССАЖИРЫ НА СВОИХ МЕСТАХ ===
+
+            // === СНАЧАЛА РИСУЕМ БАШНЮ (ЧТОБЫ ПУЛЕМЕТЧИКУ БЫЛО КУДА СЕСТЬ) ===
+            ctx.fillStyle = '#4a5b69';
+            let turretX = boatLen * 0.3; // <--- ПЕРЕМЕННАЯ СОЗДАЕТСЯ ЗДЕСЬ
+            ctx.beginPath(); ctx.arc(turretX, 0, boatWid * 0.3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#334455';
+            ctx.fillRect(turretX, -2.5, boatLen * 0.3, 5);
+
+            // === А ТЕПЕРЬ САЖАЕМ ПАССАЖИРОВ ===
             if (this.passengers && this.passengers.length > 0) {
                 this.passengers.forEach((p, i) => {
                     ctx.save();
@@ -5761,10 +5769,8 @@ if (dist < 15) {
                 });
             }
 
-            // Передняя орудийная башня (круглая)
-            ctx.fillStyle = '#4a5b69';
-            let turretX = boatLen * 0.3;
-            ctx.beginPath(); ctx.arc(turretX, 0, boatWid * 0.3, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            // Цветной маркер фракции на корме
+            ctx.fillStyle = this.color;
             // Ствол орудия
             ctx.fillStyle = '#334455';
             ctx.fillRect(turretX, -2.5, boatLen * 0.3, 5);

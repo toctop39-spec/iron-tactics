@@ -416,8 +416,8 @@ FPV: {
     
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 4, buildTime: 5, isBuilder: true },
     
-    POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 50 },
-NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 500 },
+    POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 1600, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 150 },
+NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 800 },
 SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5 },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER'] },
@@ -474,7 +474,7 @@ const HOUSE_UPGRADES = [
     { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 4000, energy: 25, income: 40, maxSpawn: 15 },
     { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 15000, energy: 35, income: 80, maxSpawn: 25 },
     { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 25000, energy: 40, income: 150, maxSpawn: 40 },
-    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 100000, energy: 50, income: 600, maxSpawn: 80 }
+    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 100000, energy: 50, income: 600, maxSpawn: 20 }
 ];
     
 const SILO_AMMO = {
@@ -2649,8 +2649,8 @@ loadPvpLevel(settings) {
         this.state = 'BATTLE';
         this.money = 4000;
         
-        MAP_W = 5000;
-        MAP_H = 5000;
+        MAP_W = 6000;
+        MAP_H = 4000;
         MapUtils.init();
         
         this.resetGameData(); 

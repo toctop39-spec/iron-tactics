@@ -7236,11 +7236,11 @@ const InitialLoader = {
     // Этапы: текст, процент заполнения полосы, время задержки (в мс)
     messages: [
         { t: "Загрузка ресурсов...", p: 15, time: 800 },
-        { t: "Загрузка изображений...", p: 30, time: 700 },
-        { t: "Соединение с сервером...", p: 45, time: 900 },
-        { t: "Строим заводы... 🏭", p: 60, time: 1000 },
-        { t: "Находим строителей... 👷", p: 70, time: 1000 },
-        { t: "Ищем сильных противников... ⚔️", p: 80, time: 1200 }
+        { t: "Загрузка изображений...", p: 20, time: 700 },
+        { t: "Соединение с сервером...", p: 25, time: 900 },
+        { t: "Строим заводы... 🏭", p: 30, time: 1000 },
+        { t: "Находим строителей... 👷", p: 40, time: 1000 },
+        { t: "Ищем сильных противников... ⚔️", p: 50, time: 1200 }
     ],
     init() {
         this.step = 0;
@@ -7263,11 +7263,11 @@ const InitialLoader = {
     },
     fakeDownload(textEl, barEl) {
         let downloadedMB = 0;
-        const totalMB = 8192; // 8 ГБ
+        const totalMB = 1024; // 1 ГБ
         
         // Скачиваем примерно по 50-80 МБ каждые 30 миллисекунд
         const dlInterval = setInterval(() => {
-            downloadedMB += 40 + Math.random() * 40; 
+            downloadedMB += 12 + Math.random() * 40; 
             
             if (downloadedMB >= totalMB) {
                 downloadedMB = totalMB;

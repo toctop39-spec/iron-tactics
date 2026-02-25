@@ -178,6 +178,88 @@ canvas { display: block; cursor: crosshair; }
 #menu-screen .spec-settings {
     text-align: left;
 }
+        /* --- РЕДАКТОР СТРАНЫ (HOI4 STYLE) --- */
+.hoi4-window {
+    background: #1e1e1e;
+    border: 2px solid #5a5a5a;
+    box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.5);
+    width: 700px;
+    max-width: 95%;
+    font-family: 'Exo 2', sans-serif;
+    color: #dcdcdc;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+}
+.hoi4-header {
+    background: linear-gradient(to bottom, #4a4a4a, #2a2a2a);
+    border-bottom: 2px solid #111;
+    padding: 12px;
+    text-align: center;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #e0e0e0;
+    text-shadow: 1px 1px 2px #000;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.hoi4-content {
+    display: flex;
+    padding: 20px;
+    gap: 25px;
+    background: repeating-linear-gradient(45deg, #1f1f1f, #1f1f1f 10px, #1a1a1a 10px, #1a1a1a 20px);
+}
+.hoi4-portrait-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 170px;
+}
+#ce-portrait-img {
+    width: 156px;
+    height: 210px;
+    border: 3px solid #333;
+    outline: 1px solid #777;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.7);
+    object-fit: cover;
+    background: #000;
+}
+.hoi4-info-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.hoi4-info-section label {
+    font-size: 0.85em;
+    color: #999;
+    margin-bottom: -4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hoi4-input {
+    background: #111;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 8px 10px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 1em;
+    box-shadow: inset 1px 1px 5px rgba(0,0,0,0.8);
+    transition: 0.2s;
+}
+.hoi4-input:focus {
+    border-color: #00aaff;
+    background: #1a1a1a;
+    outline: none;
+}
+.hoi4-footer {
+    padding: 15px;
+    border-top: 1px solid #3a3a3a;
+    background: #151515;
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
            </style>
 </head>
 <body>
@@ -211,6 +293,8 @@ canvas { display: block; cursor: crosshair; }
         </div>
         <div onclick="Game.selection=[]; Game.updateUI([]);" style="position:absolute; bottom:180px; right:20px; width:60px; height:60px; background:rgba(255,0,0,0.3); border:2px solid #f00; border-radius:50%; color:#fff; display:flex; justify-content:center; align-items:center; font-size:30px; pointer-events:auto;">✖</div>
     </div>
+
+    
 
     <div id="spectator-hud"></div>
     <div id="tutorial-overlay">
@@ -269,6 +353,71 @@ canvas { display: block; cursor: crosshair; }
     </div>
 </div>
 
+<div id="country-editor-screen" class="screen hidden" style="background: rgba(5, 5, 8, 0.9); z-index: 200;">
+    <div class="hoi4-window">
+        <div class="hoi4-header">УПРАВЛЕНИЕ ГОСУДАРСТВОМ</div>
+        <div class="hoi4-content">
+            <div class="hoi4-portrait-section">
+                <img id="ce-portrait-img" src="https://via.placeholder.com/156x210/222222/555555?text=ПОРТРЕТ" alt="Leader" onerror="this.src='https://via.placeholder.com/156x210/222222/555555?text=ОШИБКА'">
+                <input type="text" id="ce-photo-url" class="hoi4-input" style="width: 100%; font-size: 0.8em;" placeholder="URL фото лидера..." oninput="CountryEditor.updatePortrait()">
+            </div>
+            <div class="hoi4-info-section">
+                <label>Название государства:</label>
+                <input type="text" id="ce-country-name" class="hoi4-input" style="font-weight: bold; font-size: 1.2em;" value="СИНИЕ">
+
+                <label>Имя лидера:</label>
+                <input type="text" id="ce-leader-name" class="hoi4-input" placeholder="Введите имя...">
+
+            <div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
+    <div class="hoi4-window" style="width: 550px; border-color: #777;" onclick="event.stopPropagation()">
+        <div class="hoi4-header" id="ci-name" style="font-size: 1.5em; color: #fff;">НАЗВАНИЕ СТРАНЫ</div>
+        <div class="hoi4-content" style="align-items: flex-start;">
+            <div class="hoi4-portrait-section" style="width: 140px;">
+                <img id="ci-portrait" src="" style="width: 130px; height: 175px; border: 2px solid #444; object-fit: cover;">
+                <div id="ci-leader" style="font-weight: bold; font-size: 1.1em; color: #e0e0e0; text-align: center; margin-top: 5px;">ИМЯ ЛИДЕРА</div>
+            </div>
+            <div class="hoi4-info-section" style="gap: 15px;">
+                <div>
+                    <label>ФОРМА ПРАВЛЕНИЯ:</label>
+                    <div id="ci-gov" style="font-size: 1.2em; font-weight: bold; color: #00aaff; text-shadow: 0 0 5px rgba(0, 170, 255, 0.5);">Демократия</div>
+                </div>
+                <div>
+                    <label>НАЦИОНАЛЬНЫЙ ДУХ / ОПИСАНИЕ:</label>
+                    <div id="ci-desc" style="font-size: 0.95em; color: #bbb; white-space: pre-wrap; background: rgba(0,0,0,0.3); padding: 10px; border: 1px solid #333; border-radius: 3px; min-height: 80px;">Тут будет описание идеологии...</div>
+                </div>
+            </div>
+        </div>
+        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
+            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
+        </div>
+    </div>
+</div>
+
+<div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
+    <div class="hoi4-window" style="width: 550px; border-color: #777;" onclick="event.stopPropagation()">
+        <div class="hoi4-header" id="ci-name" style="font-size: 1.5em; color: #fff;">НАЗВАНИЕ СТРАНЫ</div>
+        <div class="hoi4-content" style="align-items: flex-start;">
+            <div class="hoi4-portrait-section" style="width: 140px;">
+                <img id="ci-portrait" src="" style="width: 130px; height: 175px; border: 2px solid #444; object-fit: cover;">
+                <div id="ci-leader" style="font-weight: bold; font-size: 1.1em; color: #e0e0e0; text-align: center; margin-top: 5px;">ИМЯ ЛИДЕРА</div>
+            </div>
+            <div class="hoi4-info-section" style="gap: 15px;">
+                <div>
+                    <label>ФОРМА ПРАВЛЕНИЯ:</label>
+                    <div id="ci-gov" style="font-size: 1.2em; font-weight: bold; color: #00aaff; text-shadow: 0 0 5px rgba(0, 170, 255, 0.5);">Демократия</div>
+                </div>
+                <div>
+                    <label>НАЦИОНАЛЬНЫЙ ДУХ / ОПИСАНИЕ:</label>
+                    <div id="ci-desc" style="font-size: 0.95em; color: #bbb; white-space: pre-wrap; background: rgba(0,0,0,0.3); padding: 10px; border: 1px solid #333; border-radius: 3px; min-height: 80px;">Тут будет описание идеологии...</div>
+                </div>
+            </div>
+        </div>
+        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
+            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
+        </div>
+    </div>
+</div>
+                
 <div id="menu-screen" class="screen clickable">
     <h1 style="color:#4f4; text-shadow: 0 0 30px #0f0; font-size: 4em; letter-spacing: 5px; margin-bottom: 0;">IRON TACTICS</h1>
     <h3 style="color:#aaa; margin-top: 5px; font-weight: normal; letter-spacing: 2px;">v25.2.26</h3>
@@ -279,6 +428,7 @@ canvas { display: block; cursor: crosshair; }
             <button class="menu-btn" style="border-color: #00ffcc; color: #00ffcc; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);" onclick="Game.transitToSandbox()">🧪 ПЕСОЧНИЦА (ТЕСТ)</button>
             <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.transitToAdvanced()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
             <button class="menu-btn" style="background:rgba(0, 68, 136, 0.4); border-color:#0af;" onclick="Lobby.initTransition()">🌐МУЛЬТИПЛЕЕР</button>
+            <button class="menu-btn" style="border-color: #ffaa00; color: #ffaa00; box-shadow: 0 0 15px rgba(255, 170, 0, 0.2);" onclick="CountryEditor.open()">📜 РЕДАКТОР СТРАНЫ</button>
         </div>
         
         <div class="spec-settings">
@@ -500,21 +650,116 @@ const LEVELS = [
 { id:10,  budget:45000, unlock:['SOLDIER','SNIPER','TANK','HELICOPTER','GRAD'], enemies:{ TANK:10, SOLDIER:20, HELICOPTER:3 }, note:'Первый танк — шок' },
 { id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
 ];
-const FACTIONS = {
-    'player': { color: '#44aaff', name: 'СИНИЕ' },     // Игрок 1 (Хост)
-    'enemy':  { color: '#e53935', name: 'КРАСНЫЕ' },   // Игрок 2
+// --- ЛОГИКА РЕДАКТОРА СТРАНЫ ---
+const CountryEditor = {
+    data: {
+        name: 'СИНИЕ',
+        leaderName: '',
+        leaderPhoto: '',
+        govType: 'democracy',
+        description: ''
+    },
     
-    // ИСПРАВЛЕНИЕ: Теперь bot1 - ЖЕЛТЫЙ, а не красный
-    'bot1':   { color: '#ffd700', name: 'ЖЕЛТЫЕ' },    // Игрок 3
+    init() {
+        // Загружаем данные из памяти браузера при входе в игру
+        const saved = localStorage.getItem('iron_tactics_country');
+        if (saved) {
+            this.data = { ...this.data, ...JSON.parse(saved) };
+            FACTIONS['player'].name = this.data.name; // Сразу применяем к фракции игрока
+        }
+    },
+
+    open() {
+        // Заполняем поля текущими данными
+        document.getElementById('ce-country-name').value = this.data.name;
+        document.getElementById('ce-leader-name').value = this.data.leaderName;
+        document.getElementById('ce-photo-url').value = this.data.leaderPhoto;
+        document.getElementById('ce-gov-type').value = this.data.govType;
+        document.getElementById('ce-description').value = this.data.description;
+        this.updatePortrait();
+
+        document.getElementById('country-editor-screen').classList.remove('hidden');
+    },
+
+    close() {
+        document.getElementById('country-editor-screen').classList.add('hidden');
+    },
+
+    updatePortrait() {
+        const url = document.getElementById('ce-photo-url').value;
+        const img = document.getElementById('ce-portrait-img');
+        if (url) {
+            img.src = url;
+        } else {
+            img.src = 'https://via.placeholder.com/156x210/222222/555555?text=ПОРТРЕТ';
+        }
+    },
+
+    saveAndClose() {
+        // Сохраняем данные из полей ввода
+        const newName = document.getElementById('ce-country-name').value.trim();
+        this.data.name = newName || 'СИНИЕ'; // Защита от пустого имени
+        this.data.leaderName = document.getElementById('ce-leader-name').value;
+        this.data.leaderPhoto = document.getElementById('ce-photo-url').value;
+        this.data.govType = document.getElementById('ce-gov-type').value;
+        this.data.description = document.getElementById('ce-description').value;
+
+        // Сохраняем в кэш браузера
+        localStorage.setItem('iron_tactics_country', JSON.stringify(this.data));
+
+        // ВАЖНО: Записываем новое имя в объект FACTIONS,
+        // чтобы функция updateTerritoryCache() выводила его на карту!
+        FACTIONS['player'].name = this.data.name;
+
+// Отправляем новые данные всем игрокам в комнате (если мы в сети)
+        if (typeof Game !== 'undefined' && Game.isMultiplayer && CURRENT_ROOM) {
+            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_country', side: Game.myRole, data: this.data });
+        }
+        
+        this.close();
+        if (Game.showError) Game.showError("ДАННЫЕ СТРАНЫ СОХРАНЕНЫ");
+    }
+
+    , // Запятая после saveAndClose() обязательна!
     
-    'bot2':   { color: '#00cc00', name: 'ЗЕЛЕНЫЕ' },   // Игрок 4
-    'bot3':   { color: '#ff8800', name: 'ОРАНЖЕВЫЕ' }, // Игрок 5
-    'bot4':   { color: '#aa00ff', name: 'ФИОЛЕТОВЫЕ' },// Игрок 6
-    'bot5':   { color: '#00ffff', name: 'БИРЮЗОВЫЕ' }, // Игрок 7
-    'bot6':   { color: '#ff00ff', name: 'РОЗОВЫЕ' },   // Игрок 8
-    'bot7':   { color: '#ffffff', name: 'БЕЛЫЕ' },
-    'bot8':   { color: '#555555', name: 'ЧЕРНЫЕ' }
+    showInfo(side) {
+        // Достаем данные: либо свои, либо сохраненные из сети (чужие)
+        let cData = (side === Game.myRole) ? this.data : (Game.countryData && Game.countryData[side]);
+        
+        // Если игрок/бот еще не прислал данные, показываем заглушку
+        if (!cData) {
+            cData = {
+                name: FACTIONS[side] ? FACTIONS[side].name : side,
+                leaderName: 'Неизвестный лидер',
+                leaderPhoto: 'https://via.placeholder.com/156x210/222222/555555?text=?',
+                govType: 'non-aligned',
+                description: 'Сведения об этом государстве засекречены или отсутствуют...'
+            };
+        }
+
+        document.getElementById('ci-name').innerText = cData.name.toUpperCase();
+        document.getElementById('ci-leader').innerText = cData.leaderName || 'Неизвестно';
+        document.getElementById('ci-portrait').src = cData.leaderPhoto || 'https://via.placeholder.com/156x210/222222/555555?text=?';
+        
+        const govMap = {
+            'democracy': 'Демократия 🕊️',
+            'communism': 'Коммунизм ☭',
+            'fascism': 'Фашизм 🦅',
+            'non-aligned': 'Нейтралитет ⚖️'
+        };
+        document.getElementById('ci-gov').innerText = govMap[cData.govType] || cData.govType;
+        document.getElementById('ci-desc').innerText = cData.description || 'Нет описания.';
+
+        // Меняем цвет идеологии
+        const govColor = { 'democracy': '#00aaff', 'communism': '#ff4444', 'fascism': '#888888', 'non-aligned': '#cccccc' };
+        document.getElementById('ci-gov').style.color = govColor[cData.govType] || '#fff';
+
+        document.getElementById('country-info-screen').classList.remove('hidden');
+    }
 };
+
+// Инициализируем при загрузке
+window.addEventListener('load', () => CountryEditor.init());
 const ARTY_COST = 200;
 const RELOAD_COST = 1000;
 let MAP_W = 3500;
@@ -2635,10 +2880,12 @@ loadPvpLevel(settings) {
             // Когда мы зашли, ждем 1.5 секунды (пока все прогрузится) 
             // и просим остальных игроков прислать нам всё, что они построили.
             setTimeout(() => {
+         // ВАЖНО: Отправляем свои политические настройки всем остальным при входе
                 this.socket.emit('gameCommand', { 
                     roomName: CURRENT_ROOM, 
-                    type: 'request_sync', 
-                    side: this.myRole 
+                    type: 'sync_country', 
+                    side: this.myRole, 
+                    data: CountryEditor.data 
                 });
             }, 1500); 
         }
@@ -2919,6 +3166,15 @@ else if (cmd.type === 'move') {
                 unitsToMove.forEach(u => {
                     u.moveCmd(u.x + cmd.dx, u.y + cmd.dy);
                 });
+            }
+        }
+
+            else if (cmd.type === 'sync_country') {
+            if (!this.countryData) this.countryData = {};
+            this.countryData[cmd.side] = cmd.data;
+            // Сразу обновляем имя в глобальном списке фракций, чтобы карта перерисовалась
+            if (FACTIONS[cmd.side]) {
+                FACTIONS[cmd.side].name = cmd.data.name;
             }
         }
             
@@ -3487,6 +3743,17 @@ onDown(e) {
         if (e.target && e.target.tagName !== 'CANVAS') return; // Игнорируем клики по кнопкам меню
         
         const m = this.getMouse(e);
+
+    // --- ПЕРЕХВАТ КЛИКА В ПОЛИТИЧЕСКОМ РЕЖИМЕ ---
+        if (this.territoryMode === 3) {
+            // Ищем, кому принадлежит территория, по которой кликнули
+            let owner = this.getTerritoryOwner(m.x, m.y);
+            if (owner) {
+                CountryEditor.showInfo(owner);
+                SoundManager.play('steps', 0, 0.5); // Легкий звук клика
+            }
+            return; // Выходим из onDown, чтобы не выделять юнитов рамкой
+        }
         
         // Сброс спец-режимов (если мы целились ракетой или строили)
         if (this.buildType || this.pendingConstruction || this.artyMode || Game.launchMode) {

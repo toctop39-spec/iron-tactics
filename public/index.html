@@ -203,11 +203,6 @@ canvas { display: block; cursor: crosshair; }
 <div id="connection-warning">Ожидание...</div>
 
 <div id="ui-layer">
-
-    <div id="chat-container" style="position:absolute; left:10px; bottom:120px; width:300px; height:200px; display:none; flex-direction:column; pointer-events:auto;">
-    <div id="chat-messages" style="flex:1; overflow-y:auto; color:white; font-size:14px; text-shadow:1px 1px 2px #000; background:rgba(0,0,0,0.5); padding:5px; margin-bottom:5px;"></div>
-    <input type="text" id="chat-input" placeholder="Сообщение..." style="background:rgba(0,0,0,0.7); color:white; border:1px solid #0af; padding:5px; outline:none;">
-</div>
     <button id="mobile-toggle-btn" class="clickable" onclick="MobileControls.toggle()" style="position:absolute; top:70px; right:10px; z-index:999; padding:5px; background:#333; color:#fff; border:1px solid #fff; opacity:0.7;">📱</button>
     
     <div id="mobile-controls" style="display:none; pointer-events:none;">
@@ -464,8 +459,6 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
     WH_DEPOSIT: { type: 'action', name: 'ПОЛОЖИТЬ ВСЕ', emoji: '📥', cost: 0 },
     WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 },
-
-    TOGGLE_STANCE: { type: 'action', name: 'АТАКА', emoji: '⚔️', cost: 0 },
 
     // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ И ЛОДОК ---
     DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 },
@@ -1527,20 +1520,6 @@ const Lobby = {
 
 setupEvents() {
         const s = Game.socket;
-
-    s.on('chat_msg', (data) => {
-    const msgBox = document.getElementById('chat-messages');
-    msgBox.innerHTML += `<div><b style="color:${FACTIONS[data.side].color}">${data.side}:</b> ${data.text}</div>`;
-    msgBox.scrollTop = msgBox.scrollHeight;
-});
-
-// Отправка по Enter
-document.getElementById('chat-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && e.target.value.trim() !== '') {
-        Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'chat_msg', side: Game.myRole, text: e.target.value });
-        e.target.value = '';
-    }
-});
         
         // 1. Обновление онлайна
         s.on('update_online', (count) => {
@@ -1869,29 +1848,26 @@ const SoundManager = {
         let factor = 1 - (minDist / maxDist);
         return Math.max(0, Math.min(maxVol, maxVol * factor * factor));
     },
-    
-play(name, throttleMs = 0, volume = 1.0) {
-    if (volume <= 0.01) return; 
-    
-    if (this.sounds[name]) {
-        const baseSnd = this.sounds[name];
 
-        // Для взрывов и выстрелов танков клонируем звук, чтобы они накладывались!
-        if (name === 'explosion' || name === 'tankFire' || name === 'shoot') {
-            let clone = baseSnd.cloneNode();
-            clone.volume = volume;
-            clone.play().catch(e => {});
-            return;
+    play(name, throttleMs = 0, volume = 1.0) {
+        if (volume <= 0.01) return; // Не играем звуки, если их всё равно не слышно
+        
+        if (this.sounds[name]) {
+            const baseSnd = this.sounds[name];
+
+            // === НОВАЯ ЛОГИКА ОЧЕРЕДИ ЗВУКОВ ===
+            // Проверяем: если этот конкретный звук СЕЙЧАС ИГРАЕТ 
+            // (он не на паузе, не закончился и время > 0)
+            if (!baseSnd.paused && !baseSnd.ended && baseSnd.currentTime > 0) {
+                return; // Просто выходим! Ждем, пока он доиграет до конца.
+            }
+
+            // Если звук свободен (доиграл), выставляем громкость и запускаем заново
+            baseSnd.volume = volume;
+            baseSnd.currentTime = 0; // Обязательно сбрасываем на начало
+            baseSnd.play().catch(e => {});
         }
-
-        // Для остальных (шаги, интерфейс) оставляем старую логику с ожиданием
-        if (!baseSnd.paused && !baseSnd.ended && baseSnd.currentTime > 0) return;
-
-        baseSnd.volume = volume;
-        baseSnd.currentTime = 0; 
-        baseSnd.play().catch(e => {});
     }
-}
 };
 // Инициализируем звуки сразу
 SoundManager.init();
@@ -2987,22 +2963,6 @@ else if (cmd.type === 'build_start') {
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
         }
 
-            else if (cmd.type === 'chat_msg') {
-            const msgBox = document.getElementById('chat-messages');
-            if (msgBox) {
-                // Получаем красивый цвет фракции написавшего игрока
-                const color = FACTIONS[cmd.side] ? FACTIONS[cmd.side].color : '#ffffff';
-                // Берем название фракции (например, "СИНИЕ" или "КРАСНЫЕ")
-                const senderName = FACTIONS[cmd.side] ? FACTIONS[cmd.side].name : cmd.side;
-                
-                // Добавляем само сообщение
-                msgBox.innerHTML += `<div style="margin-bottom: 3px;"><b style="color:${color}">${senderName}:</b> ${cmd.text}</div>`;
-                
-                // Автоматически прокручиваем ползунок чата в самый низ
-                msgBox.scrollTop = msgBox.scrollHeight;
-            }
-        }
-
             // --- СИНХРОНИЗАЦИЯ ДОРОГ ---
         else if (cmd.type === 'build_road') {
             MapUtils.buildRoad(cmd.x, cmd.y);
@@ -3783,35 +3743,6 @@ menuAction(type) {
             return;
         }
 
-    // --- ПЕРЕКЛЮЧЕНИЕ РЕЖИМА "БЕЛЫЙ ФЛАГ" ---
-        if (type === 'TOGGLE_STANCE') {
-            let currentStance = this.selection[0]?.stance || 'AGGRESSIVE';
-            let newStance = (currentStance === 'AGGRESSIVE') ? 'DEFENSIVE' : 'AGGRESSIVE';
-            
-            this.selection.forEach(u => {
-                if (!u.isProducer && !u.isBuilder) {
-                    u.stance = newStance;
-                    if (newStance === 'DEFENSIVE') u.targetUnit = null; // Перестаем стрелять
-                }
-            });
-            
-            if (newStance === 'DEFENSIVE') {
-                this.showError("РЕЖИМ: БЕЛЫЙ ФЛАГ 🏳️ (Только защита)");
-                UNITS.TOGGLE_STANCE.emoji = '🏳️';
-                UNITS.TOGGLE_STANCE.name = 'ЗАЩИТА';
-            } else {
-                this.showError("РЕЖИМ: АГРЕССИЯ ⚔️ (Огонь на поражение)");
-                UNITS.TOGGLE_STANCE.emoji = '⚔️';
-                UNITS.TOGGLE_STANCE.name = 'АТАКА';
-            }
-            
-            // Обновляем меню, чтобы иконка поменялась
-            let list = ['TOGGLE_STANCE'];
-            if (this.selectionFilter === 'ARMY') list.push('DISBAND_ARMY');
-            this.updateUI(list, true, `ВЫБРАНО: ${this.selection.length}`);
-            return;
-        }
-
 // --- РАСПУСК АРМИИ ---
         if (type === 'DISBAND_ARMY') {
             let count = 0;
@@ -4305,9 +4236,9 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
                         this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");;
                     }
-else {
-                        // Кнопка режима поведения доступна всегда, когда выбрана армия
-                        let list = ['TOGGLE_STANCE'];
+                    else {
+                        // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---
+                        let list = [];
                         if (this.selectionFilter === 'ARMY') {
                             list.push('DISBAND_ARMY');
                         }
@@ -5002,8 +4933,6 @@ class Unit {
         this.turretAngle = 0; // Куда смотрит башня
         this.recoil = 0;      // Отдача дула
         this.trackOffset = 0; // Анимация гусениц
-        this.stance = 'AGGRESSIVE'; // По умолчанию атакуют
-        this.lastAttacker = null;   // Запоминаем, кто ударил
 
         // --- ИНИЦИАЛИЗАЦИЯ СКЛАДА ---
         if (this.type === 'WAREHOUSE') {
@@ -5653,141 +5582,133 @@ if (this.type === 'AA_DEFENSE') {
             let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
 
     if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
-        // НОВАЯ ЛОГИКА БЕЛОГО ФЛАГА
-        if (this.stance === 'DEFENSIVE') {
-            if (this.lastAttacker && this.lastAttacker.hp > 0 && Math.hypot(this.lastAttacker.x - this.x, this.lastAttacker.y - this.y) < this.range) {
-                this.targetUnit = this.lastAttacker;
-            } else {
-                this.targetUnit = null; 
-            }
-        } else {
-            this.targetUnit = null;
-            let min = this.range + 50;
-            let near = null;
-
-            Game.units.forEach(u => {
-                if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
-                    if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
-                        let distToU = Math.hypot(u.x - this.x, u.y - this.y);
-                        if (distToU < min) { min = distToU; near = u; }
-                    }
-                }
-            });
-            this.targetUnit = near;
-        }
-    } // <--- ВОТ ЭТА СКОБКА БЫЛА ПОТЕРЯНА! ТЕПЕРЬ ОНА НА МЕСТЕ.
-
-    let busy = false;
-            
-    // Если цель есть - действуем
-    if (this.targetUnit) {
-        let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
-        
-        // Камикадзе (FPV)
-        if (this.isKamikaze) {
-            if (d <= 30) { 
-                this.hp = 0; 
-                let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
-                explosion.hit(); 
-                return; // Юнит уничтожен
-            } else {
-                this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
-            }
-        } 
-        // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
-        else if (d <= this.range) {
-            busy = true;
-            let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
-            this.angle = targetAngle; // Поворачиваемся к цели
-
-            // Если орудие заряжено
-            if (this.reload <= 0) {
-                this.reload = this.reloadMax;
-                let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
-
-                // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
-                let spawnX = this.x;
-                let spawnY = this.y;
+                this.targetUnit = null;                
+                let min = this.range + 50; 
+                let near = null;
                 
-                if (this.type === 'TANK') {
-                    spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
-                    spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
-                } else if (this.type === 'HELICOPTER') {
-                    spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
-                    spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
-                } else {
-                    spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
-                    spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
-                }
+                // --- ОПТИМИЗАЦИЯ ПОИСКА ЦЕЛИ (Манхэттенское отсечение) ---
+               Game.units.forEach(u => {
+    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+                        // Очень быстро отсекаем всех, кто явно дальше радиуса, без тяжелой математики с корнями
+                        if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
+                            let d = Math.hypot(u.x - this.x, u.y - this.y);
+                            if (d < min) { min = d; near = u; }
+                        }
+                    }
+                });
+                this.targetUnit = near;
+            }
 
-                // ВЕРТОЛЕТЫ
-                if (this.type === 'HELICOPTER') {
-                    SoundManager.play('shoot', 100, vol);
-                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                    // Второй выстрел
-                    setTimeout(() => {
-                        if (this.hp > 0 && Game.state !== 'MENU') {
+            let busy = false;
+            
+          // Если цель есть - действуем
+            if (this.targetUnit) {
+                let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
+                
+                // Камикадзе (FPV)
+                if (this.isKamikaze) {
+                    if (d <= 30) { 
+                        this.hp = 0; 
+                        let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
+                        explosion.hit(); 
+                        return; // Юнит уничтожен
+                    } else {
+                        this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                    }
+                } 
+                // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
+                else if (d <= this.range) {
+                    busy = true;
+                    let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
+                    this.angle = targetAngle; // Поворачиваемся к цели
+
+                    // Если орудие заряжено
+                    if (this.reload <= 0) {
+                        this.reload = this.reloadMax;
+                        let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
+
+                        // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
+                        let spawnX = this.x;
+                        let spawnY = this.y;
+                        
+                        if (this.type === 'TANK') {
+                            spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
+                            spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
+                        } else if (this.type === 'HELICOPTER') {
+                            spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
+                            spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
+                        } else {
+                            spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
+                            spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
+                        }
+
+                        // ВЕРТОЛЕТЫ
+                        if (this.type === 'HELICOPTER') {
                             SoundManager.play('shoot', 100, vol);
                             Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
+                            // Второй выстрел
+                            setTimeout(() => {
+                                if (this.hp > 0 && Game.state !== 'MENU') {
+                                    SoundManager.play('shoot', 100, vol);
+                                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
+                                }
+                            }, 150);
+                        } 
+                        // ОСТАЛЬНЫЕ (Танки, Пехота)
+                        else {
+                            if (this.type === 'TANK') {
+                                SoundManager.play('tankFire', 100, vol);
+                                this.recoil = 12; // Отдача
+                            } else {
+                                SoundManager.play('shoot', 100, vol); 
+                            }
+                            let splashR = (this.type === 'TANK') ? 60 : 0;
+                            Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
-                    }, 150);
-                } 
-                // ОСТАЛЬНЫЕ (Танки, Пехота)
-                else {
-                    if (this.type === 'TANK') {
-                        SoundManager.play('tankFire', 100, vol);
-                        this.recoil = 12; // Отдача
-                    } else {
-                        SoundManager.play('shoot', 100, vol); 
                     }
-                    let splashR = (this.type === 'TANK') ? 60 : 0;
-                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
+                } 
+                // Преследование (только для ботов или если не мультиплеер)
+                else if (!Game.isMultiplayer && this.side !== 'player') {
+                    if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
+                    else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                }
+            }
+            
+     // Физика движения к цели
+            if (this.target) {
+                if (this.isFlying) {
+                     // Вертолет летит только если закончил прогрев и поднялся (flyState === 2)
+                     if (this.flyState === 2) {
+                         let d = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+                         if (d < 10) { 
+                             if (this.pathQueue && this.pathQueue.length > 0) {
+                                 const next = this.pathQueue.shift();
+                                 this.target = {x: next.x, y: next.y};
+                             } else {
+                                 this.flyState = 3; this.target = null; // Прилетели - садимся
+                             }
+                         } else {
+                             this._movePhysics();
+                         }
+                     }
+                } else if (!busy) {
+                     this._movePhysics(); // Наземная техника едет сразу
                 }
             }
         } 
-        // Преследование (только для ботов или если не мультиплеер)
-        else if (!Game.isMultiplayer && this.side !== 'player') {
-            if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
-            else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
-        }
-
-        // Физика движения к цели
-        if (this.target) {
-            if (this.isFlying) {
-                 // Вертолет летит только если закончил прогрев
-                 if (this.flyState === 2) {
-                     let distToTargetPoint = Math.hypot(this.target.x - this.x, this.target.y - this.y); // <-- ОШИБКА ИСПРАВЛЕНА
-                     if (distToTargetPoint < 10) { 
-                         if (this.pathQueue && this.pathQueue.length > 0) {
-                             const next = this.pathQueue.shift();
-                             this.target = {x: next.x, y: next.y};
-                         } else {
-                             this.flyState = 3; 
-                             this.target = null; // Прилетели - садимся
-                         }
-                     } else {
-                         this._movePhysics();
-                     }
-                 }
-            } else if (!busy) {
-                 this._movePhysics(); // Наземная техника едет сразу
+        // Просто движение
+        else { 
+            if (this.target) {
+                if (this.isFlying) {
+                    if (this.flyState === 2) this._movePhysics();
+                } else {
+                    this._movePhysics(); 
+                }
             }
         }
-    } 
-    // Просто движение (срабатывает, если нет targetUnit)
-    else { 
-        if (this.target) {
-            if (this.isFlying) {
-                if (this.flyState === 2) this._movePhysics();
-            } else {
-                this._movePhysics(); 
-            }
-        }
+        
+        this.resolveCollision();
     }
-} // <--- ЗАКРЫВАЕМ if (canFight)
-
-this.resolveCollision();
-} // <--- ЗАКРЫВАЕМ update()
 
 _movePhysics() {
         let currentSpeed = this.speed;
@@ -6982,7 +6903,6 @@ hit() {
             for (let i = 0; i < 50; i++) {
                 Game.effects.push({ type: 'ash', x: this.x + (Math.random() - 0.5) * 500, y: this.y + (Math.random() - 0.5) * 500, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, life: 100 + Math.random() * 150 });
             }
-
             
             // --- НОВОЕ: АПОКАЛИПСИС (СОТНИ КУСКОВ ЗЕМЛИ) ---
             if (!isWaterHit) {
@@ -7011,7 +6931,6 @@ hit() {
                     // --- НОВОЕ: ВЫБРОС ЗЕМЛИ ОТ ТАНКОВ И РАКЕТ ---
                     let isRocket = this.splashRadius > 80; // Отличаем ракету от пушки танка
                     let dirtCount = isRocket ? 45 : 20; // Ракета выбивает больше комьев
-                    if (Game.lowGraphics) dirtCount = Math.floor(dirtCount / 4);
 
                     // ЕСЛИ ЭФФЕКТОВ УЖЕ БОЛЬШЕ 300, РЕЖЕМ КОЛИЧЕСТВО НОВОЙ ГРЯЗИ В 5 РАЗ!
                     if (Game.effects.length > 300) {
@@ -7073,14 +6992,9 @@ hit() {
                         damage = Math.ceil(this.dmg * 0.1); if (damage < 1) damage = 1; 
                     }
                     
-                  if (CAPTURABLE_BUILDINGS.includes(u.type)) {
-    // Проверяем, является ли стрелок пехотой
-    let isInfantry = this.owner && UNITS[this.owner.type] && UNITS[this.owner.type].isInfantry;
-    
-    // Техника и взрывы наносят урон. Пехота — захватывает.
-    if (this.isExplosive || !isInfantry) { 
-        u.hp -= damage; 
-    } else {
+                    if (CAPTURABLE_BUILDINGS.includes(u.type)) {
+                        if (this.isExplosive) { u.hp -= damage; } 
+                        else {
                              u.loyalty -= damage;
                             if (u.loyalty <= 0) {
                                 u.side = this.side; u.loyalty = u.maxLoyalty * 0.5; u.hp = u.maxHp; u.target = null; u.spawnCooldown = u.spawnMax;
@@ -7090,15 +7004,7 @@ hit() {
                                 if (!Game.isMultiplayer) { const oldBot = Game.bots.find(b => b.side === u.side); if(oldBot) oldBot.checkPanic(); }
                             }
                         }
-              }
                     } else { u.hp -= damage; }
-                    
-                    // --- ЮНИТ ЗАПОМИНАЕТ ОБИДЧИКА ДЛЯ ОТВЕТНОГО ОГНЯ ---
-                    if (this.owner && this.owner.hp > 0) {
-                        u.lastAttacker = this.owner;
-                    }
-                    
-                    if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) {
                     
                     if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) { 
                         u.aggro = true; Game.effects.push({x: u.x, y: u.y - 30, char: '😡', life: 40}); u.target = {x: this.owner.x, y: this.owner.y}; 

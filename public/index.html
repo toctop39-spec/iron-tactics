@@ -642,6 +642,22 @@ const LEVELS = [
 { id:10,  budget:45000, unlock:['SOLDIER','SNIPER','TANK','HELICOPTER','GRAD'], enemies:{ TANK:10, SOLDIER:20, HELICOPTER:3 }, note:'Первый танк — шок' },
 { id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
 ];
+
+    // --- ФРАКЦИИ И ЦВЕТА ---
+const FACTIONS = {
+    'player': { name: 'СИНИЕ', color: '#44aaff' },
+    'enemy':  { name: 'КРАСНЫЕ', color: '#e53935' },
+    'bot1':   { name: 'ОРАНЖЕВЫЕ', color: '#ffaa00' },
+    'bot2':   { name: 'ФИОЛЕТОВЫЕ', color: '#aa00ff' },
+    'bot3':   { name: 'БИРЮЗОВЫЕ', color: '#00ccaa' },
+    'bot4':   { name: 'ЖЕЛТЫЕ', color: '#ffff00' },
+    'bot5':   { name: 'РОЗОВЫЕ', color: '#ff00ff' },
+    'bot6':   { name: 'ЗЕЛЕНЫЕ', color: '#00ff00' },
+    'bot7':   { name: 'СВЕТЛО-СИНИЕ', color: '#00aaff' },
+    'bot8':   { name: 'ТЕМНО-КРАСНЫЕ', color: '#880000' },
+    'neutral':{ name: 'НЕЙТРАЛ', color: '#aaaaaa' }
+};
+    
 // --- ЛОГИКА РЕДАКТОРА СТРАНЫ ---
 const CountryEditor = {
     data: {

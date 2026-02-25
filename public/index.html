@@ -367,56 +367,6 @@ canvas { display: block; cursor: crosshair; }
 
                 <label>Имя лидера:</label>
                 <input type="text" id="ce-leader-name" class="hoi4-input" placeholder="Введите имя...">
-
-            <div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
-    <div class="hoi4-window" style="width: 550px; border-color: #777;" onclick="event.stopPropagation()">
-        <div class="hoi4-header" id="ci-name" style="font-size: 1.5em; color: #fff;">НАЗВАНИЕ СТРАНЫ</div>
-        <div class="hoi4-content" style="align-items: flex-start;">
-            <div class="hoi4-portrait-section" style="width: 140px;">
-                <img id="ci-portrait" src="" style="width: 130px; height: 175px; border: 2px solid #444; object-fit: cover;">
-                <div id="ci-leader" style="font-weight: bold; font-size: 1.1em; color: #e0e0e0; text-align: center; margin-top: 5px;">ИМЯ ЛИДЕРА</div>
-            </div>
-            <div class="hoi4-info-section" style="gap: 15px;">
-                <div>
-                    <label>ФОРМА ПРАВЛЕНИЯ:</label>
-                    <div id="ci-gov" style="font-size: 1.2em; font-weight: bold; color: #00aaff; text-shadow: 0 0 5px rgba(0, 170, 255, 0.5);">Демократия</div>
-                </div>
-                <div>
-                    <label>НАЦИОНАЛЬНЫЙ ДУХ / ОПИСАНИЕ:</label>
-                    <div id="ci-desc" style="font-size: 0.95em; color: #bbb; white-space: pre-wrap; background: rgba(0,0,0,0.3); padding: 10px; border: 1px solid #333; border-radius: 3px; min-height: 80px;">Тут будет описание идеологии...</div>
-                </div>
-            </div>
-        </div>
-        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
-            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
-        </div>
-    </div>
-</div>
-
-<div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
-    <div class="hoi4-window" style="width: 550px; border-color: #777;" onclick="event.stopPropagation()">
-        <div class="hoi4-header" id="ci-name" style="font-size: 1.5em; color: #fff;">НАЗВАНИЕ СТРАНЫ</div>
-        <div class="hoi4-content" style="align-items: flex-start;">
-            <div class="hoi4-portrait-section" style="width: 140px;">
-                <img id="ci-portrait" src="" style="width: 130px; height: 175px; border: 2px solid #444; object-fit: cover;">
-                <div id="ci-leader" style="font-weight: bold; font-size: 1.1em; color: #e0e0e0; text-align: center; margin-top: 5px;">ИМЯ ЛИДЕРА</div>
-            </div>
-            <div class="hoi4-info-section" style="gap: 15px;">
-                <div>
-                    <label>ФОРМА ПРАВЛЕНИЯ:</label>
-                    <div id="ci-gov" style="font-size: 1.2em; font-weight: bold; color: #00aaff; text-shadow: 0 0 5px rgba(0, 170, 255, 0.5);">Демократия</div>
-                </div>
-                <div>
-                    <label>НАЦИОНАЛЬНЫЙ ДУХ / ОПИСАНИЕ:</label>
-                    <div id="ci-desc" style="font-size: 0.95em; color: #bbb; white-space: pre-wrap; background: rgba(0,0,0,0.3); padding: 10px; border: 1px solid #333; border-radius: 3px; min-height: 80px;">Тут будет описание идеологии...</div>
-                </div>
-            </div>
-        </div>
-        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
-            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
-        </div>
-    </div>
-</div>
                 
 <div id="menu-screen" class="screen clickable">
     <h1 style="color:#4f4; text-shadow: 0 0 30px #0f0; font-size: 4em; letter-spacing: 5px; margin-bottom: 0;">IRON TACTICS</h1>
@@ -493,6 +443,65 @@ canvas { display: block; cursor: crosshair; }
 <div id="end-screen" class="screen hidden clickable">
     <h1 id="end-title" style="font-size: 5em; text-shadow: 0 0 50px currentColor;">ПОБЕДА</h1>
     <button id="end-btn" class="menu-btn">ДАЛЕЕ</button>
+</div>
+
+<div id="country-editor-screen" class="screen hidden" style="background: rgba(5, 5, 8, 0.9); z-index: 200;">
+    <div class="hoi4-window">
+        <div class="hoi4-header">УПРАВЛЕНИЕ ГОСУДАРСТВОМ</div>
+        <div class="hoi4-content">
+            <div class="hoi4-portrait-section">
+                <img id="ce-portrait-img" src="https://via.placeholder.com/156x210/222222/555555?text=ПОРТРЕТ" alt="Leader" onerror="this.src='https://via.placeholder.com/156x210/222222/555555?text=ОШИБКА'">
+                <input type="text" id="ce-photo-url" class="hoi4-input" style="width: 100%; font-size: 0.8em;" placeholder="URL фото лидера..." oninput="CountryEditor.updatePortrait()">
+            </div>
+            <div class="hoi4-info-section">
+                <label>Название государства:</label>
+                <input type="text" id="ce-country-name" class="hoi4-input" style="font-weight: bold; font-size: 1.2em;" value="СИНИЕ">
+
+                <label>Имя лидера:</label>
+                <input type="text" id="ce-leader-name" class="hoi4-input" placeholder="Введите имя...">
+
+                <label>Форма правления:</label>
+                <select id="ce-gov-type" class="hoi4-input">
+                    <option value="democracy">Демократия</option>
+                    <option value="communism">Коммунизм</option>
+                    <option value="fascism">Фашизм</option>
+                    <option value="non-aligned">Нейтралитет</option>
+                </select>
+
+                <label>Национальный дух / Описание:</label>
+                <textarea id="ce-description" class="hoi4-input" style="height: 70px; resize: none;" placeholder="Опишите идеологию и цели вашей страны..."></textarea>
+            </div>
+        </div>
+        <div class="hoi4-footer">
+            <button class="menu-btn" style="min-width: 150px; padding: 10px; font-size: 1em; background: #004400; border-color: #0f0;" onclick="CountryEditor.saveAndClose()">СОХРАНИТЬ</button>
+            <button class="menu-btn" style="min-width: 150px; padding: 10px; font-size: 1em; border-color: #ff4444; color: #ff4444;" onclick="CountryEditor.close()">ОТМЕНА</button>
+        </div>
+    </div>
+</div>
+
+<div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
+    <div class="hoi4-window" style="width: 550px; border-color: #777;" onclick="event.stopPropagation()">
+        <div class="hoi4-header" id="ci-name" style="font-size: 1.5em; color: #fff;">НАЗВАНИЕ СТРАНЫ</div>
+        <div class="hoi4-content" style="align-items: flex-start;">
+            <div class="hoi4-portrait-section" style="width: 140px;">
+                <img id="ci-portrait" src="" style="width: 130px; height: 175px; border: 2px solid #444; object-fit: cover;">
+                <div id="ci-leader" style="font-weight: bold; font-size: 1.1em; color: #e0e0e0; text-align: center; margin-top: 5px;">ИМЯ ЛИДЕРА</div>
+            </div>
+            <div class="hoi4-info-section" style="gap: 15px;">
+                <div>
+                    <label>ФОРМА ПРАВЛЕНИЯ:</label>
+                    <div id="ci-gov" style="font-size: 1.2em; font-weight: bold; color: #00aaff; text-shadow: 0 0 5px rgba(0, 170, 255, 0.5);">Демократия</div>
+                </div>
+                <div>
+                    <label>НАЦИОНАЛЬНЫЙ ДУХ / ОПИСАНИЕ:</label>
+                    <div id="ci-desc" style="font-size: 0.95em; color: #bbb; white-space: pre-wrap; background: rgba(0,0,0,0.3); padding: 10px; border: 1px solid #333; border-radius: 3px; min-height: 80px;">Тут будет описание идеологии...</div>
+                </div>
+            </div>
+        </div>
+        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
+            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
+        </div>
+    </div>
 </div>
 <script>
 const CAPTURABLE_BUILDINGS = ['HOUSE', 'FACTORY', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'HOSPITAL', 'WAREHOUSE'];

@@ -1617,16 +1617,16 @@ setupEvents() {
         const mode = document.querySelector('input[name="gameMode"]:checked').value;
         
   // СТАЛО: (добавляем seed)
-        let settings = { mapSize: 4000, isIsland: false, maxPlayers: 4, seed: Math.floor(Math.random() * 1000000) };
+        let settings = { mapSize: 3000, isIsland: false, maxPlayers: 2, seed: Math.floor(Math.random() * 1000000) };
 
         if (mode === 'island') {
-            settings.mapSize = 3000;
+            settings.mapSize = 5000;
             settings.isIsland = true;
-            settings.maxPlayers = 5;
+            settings.maxPlayers = 4;
         } else if (mode === 'giant') {
             settings.mapSize = 7000;
             settings.isIsland = false;
-            settings.maxPlayers = 8;
+            settings.maxPlayers = 6;
         }
 
         Game.socket.emit('create_room', { name, password: pass, settings });

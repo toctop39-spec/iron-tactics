@@ -416,21 +416,29 @@ FPV: {
     
     BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 4, buildTime: 5, isBuilder: true },
     
-POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 50, gridW: 2, gridH: 2 },
-    NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 500, gridW: 3, gridH: 3 },
-    SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5, gridW: 2, gridH: 2 },
-    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true, gridW: 3, gridH: 3 },
-    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER'], gridW: 3, gridH: 2 }, // 6 клеток
+    POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 400, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 50 },
+NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 500 },
+SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5 },
+    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
+   HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER'] },
     
-    FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
-               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
-               constructTime: 40, energyUse: 15, gridW: 4, gridH: 2 }, // 8 клеток
+FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
+             
+// Замените строчку spawnList у FACTORY на эту:
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
+               constructTime: 40, energyUse: 15 },
                
-    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 15, gridW: 2, gridH: 2 },
-    HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 5, gridW: 3, gridH: 3 },
+    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 15 },
+    HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 5 },
     
-    WAREHOUSE: { type: 'bldg', name: 'Склад', emoji: '🏚️', cost: 2000, resCost: { iron: 25 }, hp: 800, radius: 45, constructTime: 15, energyUse: 5, color: '#8d6e63', gridW: 3, gridH: 2 },
-    WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555', gridW: 1, gridH: 1 },
+    // --- НОВОЕ ЗДАНИЕ: СКЛАД ---
+    WAREHOUSE: { 
+        type: 'bldg', name: 'Склад', emoji: '🏚️', 
+        cost: 2000, resCost: { iron: 25 }, 
+        hp: 800, radius: 45, constructTime: 15, energyUse: 5, color: '#8d6e63' 
+    },
+
+    WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
     ROAD: { type: 'bldg', name: 'Дорога', emoji: '🛣️', cost: 150, hp: 100, radius: 15, constructTime: 1, color: '#555' },
 
     TREE: { type: 'bldg', name: 'Дерево', hp: 80, radius: 12, color: '#2d4c1e', isInvulnerable: false },
@@ -564,22 +572,63 @@ const MapUtils = {
 
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
-    // === 1. СУПЕР-БЫСТРЫЙ КЭШ ЛАНДШАФТА ===
-    heightCache: null,
-    cacheStep: 15, // Шаг сетки (чем меньше, тем точнее, но 15 - идеально)
+// Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
+buildRoad(x, y) {
+        // Умная защита: создаем хранилище, если его нет
+        if (!this.roadGrid) { this.roadGrid = new Set(); }
+        
+        let cx = Math.floor(x / 30);
+        let cy = Math.floor(y / 30);
+        const gridKey = cx + "," + cy;
 
-    generateHeightCache() {
-        if (!Game.isIslandMode) return;
-        const cols = Math.ceil(MAP_W / this.cacheStep);
-        const rows = Math.ceil(MAP_H / this.cacheStep);
-        this.heightCache = new Float32Array(cols * rows); // Float32Array работает в 10 раз быстрее обычных массивов
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                this.heightCache[y * cols + x] = this.calcWorldHeight(x * this.cacheStep, y * this.cacheStep);
+        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз
+        if (this.roadGrid.has(gridKey)) return;
+
+        this.roadGrid.add(gridKey);
+
+        // --- МАГИЯ ТЕКСТУРЫ (ИСПРАВЛЕНО МАСШТАБИРОВАНИЕ) ---
+        if (this.bgCanvas) {
+            const ctx = this.bgCanvas.getContext('2d');
+            
+            // ВАЖНО: bgCanvas отрендерен в масштабе 0.5, 
+            // поэтому все координаты и размеры для него нужно умножать на scale!
+            const scale = 0.5; 
+            
+            const rx = (x + (Math.random() - 0.5) * 15) * scale;
+            const ry = (y + (Math.random() - 0.5) * 15) * scale;
+            const radius = (35 + Math.random() * 10) * scale; 
+
+            const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
+            gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
+            gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
+            gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Камешки тоже уменьшаем
+            for(let i=0; i<3; i++) {
+                ctx.fillStyle = 'rgba(50, 40, 30, 0.6)';
+                const px = rx + (Math.random() - 0.5) * 30 * scale;
+                const py = ry + (Math.random() - 0.5) * 30 * scale;
+                ctx.beginPath();
+                ctx.arc(px, py, (2 + Math.random()*3) * scale, 0, Math.PI*2);
+                ctx.fill();
             }
         }
     },
 
+    // Проверяем, есть ли тут дорога (для скорости танков)
+    checkRoad(x, y) {
+        let cx = Math.floor(x / 30);
+        let cy = Math.floor(y / 30);
+        return this.roadGrid.has(cx + "," + cy);
+    },
+
+    // В функции init() нужно просто очищать сетку при старте:
     init(forcedSeed) {
         this.seed = forcedSeed !== undefined ? forcedSeed : Math.floor(Math.random() * 1000000);
         this.currentSeed = this.seed; 
@@ -588,24 +637,25 @@ roadGrid: new Set(), // Хранилище построенных плиток �
         this.lakes = [];
         this.mountains = [];
         this.spawnPoints = [];
-        this.roadGrid = new Set(); 
-
-        this.generateHeightCache(); // <--- Генерируем ландшафт ОДИН РАЗ при загрузке
+        this.roadGrid = new Set(); // <--- Очищаем дороги новой игры
 
         if (Game.isIslandMode) this.calculateSpawns();
         this.generateMountains();
         this.renderBackground();
     },
 
-    // Реальная математика (вызывается только при загрузке)
-    calcWorldHeight(x, y) {
+getWorldHeight(x, y) {
+        if (!Game.isIslandMode) return 0.6; 
+        
         const wx = x - MAP_W / 2;
         const wy = y - MAP_H / 2;
         const mapSize = Math.max(MAP_W, MAP_H);
 
+        // 1. Мягкий ограничитель краев (просто чтобы суша не обрывалась об экран)
         const dist = Math.sqrt(wx*wx + wy*wy) / (mapSize * 0.48); 
         const edgeMask = Math.max(0, 1.0 - Math.pow(dist, 4.0)); 
 
+        // 2. Генерируем шум. freq = 1/1000 даст нам несколько крупных пятен (островов)
         let noiseVal = 0, amp = 1, freq = 1 / 1000; 
         let maxAmp = 0;
         
@@ -615,23 +665,16 @@ roadGrid: new Set(), // Хранилище построенных плиток �
             amp *= 0.5; freq *= 2.0;
         }
         
+        // Нормализуем значение шума (чтобы оно было примерно от 0 до 1)
         noiseVal = (noiseVal / maxAmp + 1) / 2;
-        noiseVal = Math.pow(noiseVal, 0.7); 
-        return Math.max(0, Math.min(1, noiseVal * edgeMask));
-    },
 
-    // Моментальная функция для юнитов (берет готовое число из памяти)
-    getWorldHeight(x, y) {
-        if (!Game.isIslandMode) return 0.6; 
-        if (this.heightCache) {
-            let cx = Math.floor(x / this.cacheStep);
-            let cy = Math.floor(y / this.cacheStep);
-            let cols = Math.ceil(MAP_W / this.cacheStep);
-            if (cx >= 0 && cx < cols && cy >= 0 && cy < Math.ceil(MAP_H / this.cacheStep)) {
-                return this.heightCache[cy * cols + cx];
-            }
-        }
-        return this.calcWorldHeight(x, y);
+        // 3. Немного "топим" карту, чтобы острова визуально отделились друг от друга проливами
+        noiseVal = Math.pow(noiseVal, 0.7); 
+
+        // 4. Накладываем краевую маску
+        let h = noiseVal * edgeMask;
+
+        return Math.max(0, Math.min(1, h));
     },
 
     getTerrain(x, y) {
@@ -3538,53 +3581,45 @@ onDown(e) {
             if (this.isSpectator) return;
 
 // 3. СТРОЙКА (Постановка фундамента)
-         // 3. СТРОЙКА (Постановка фундамента)
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
+                const inWater = MapUtils.checkWater(m.x, m.y);
+                const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
+                if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 
-                // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ (оставляем старую логику протяжки) ---
+                // 1. ЕДИНАЯ ПРОВЕРКА ТЕРРИТОРИИ (Теперь дорогу нельзя строить за пределами своей базы)
+                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+
+                // 2. ЕДИНАЯ ПРОВЕРКА НАЛОЖЕНИЯ (Нельзя строить прямо поверх танков и зданий)
+                const GAP = (bType === 'WALL') ? -15 : 30;
+                if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
+                    this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
+                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 
+                }
+
+                // 3. НОВОЕ: ЗАПРЕТ ПОСТРОЙКИ ЗДАНИЙ НА ТРОПИНКАХ
+                if (bType !== 'ROAD' && MapUtils.checkRoad(m.x, m.y)) {
+                    this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
+                }
+
+   // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
                 if (bType === 'ROAD') {
-                    if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+                    // НАЧИНАЕМ ПРОТЯЖКУ ДОРОГИ
                     this.roadDragStart = { x: m.x, y: m.y };
-                    return; 
+                    return; // Выходим, ждем onUp
                 }
 
-                // --- НОВАЯ СЕТОЧНАЯ ПОСТРОЙКА ЗДАНИЙ ---
-                if (!this.currentBuildSnap) return; // Защита, если мышка ушла с экрана
-                
-                if (!this.currentBuildSnap.canBuild) {
-                    this.showError("НЕЛЬЗЯ СТРОИТЬ ЗДЕСЬ (Занято / Вне базы / Вода)!"); 
-                    return;
-                }
-
+                // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
                 const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (!builder) { this.showError("НЕТ СТРОИТЕЛЯ!"); return; }
-                
                 if (this.checkCost(bType)) {
-                    this.payCost(bType); 
-                    this.updateUI([]); 
-                    
-                    // БЕРЕМ КООРДИНАТЫ ИЗ СЕТКИ, А НЕ ОТ МЫШИ!
-                    let bx = this.currentBuildSnap.x;
-                    let by = this.currentBuildSnap.y;
-                    
-                    const site = { id: Date.now() + Math.random(), type: bType, x: bx, y: by, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
-                    this.constructions.push(site); 
-                    builder.assignSite(site);
-                    
-                    // Сбрасываем режимы
-                    this.pendingConstruction = null; 
-                    this.currentBuildSnap = null; 
-                    document.body.style.cursor = 'default';
-                    this.effects.push({x: bx, y: by, char: '📍', life: 30});
-                    
-                    // Отправляем мультиплеер с новыми ровными координатами
-                    if (this.isMultiplayer && CURRENT_ROOM) {
-                        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: bx, y: by, side: this.myRole, id: site.id, builderId: builder.id });
-                    }
-                } else {
-                    this.showError("НЕТ ДЕНЕГ ИЛИ РЕСУРСОВ!");
-                }
+                    this.payCost(bType); this.updateUI([]); 
+                    const site = { id: Date.now() + Math.random(), type: bType, x: m.x, y: m.y, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
+                    this.constructions.push(site); builder.assignSite(site);
+                    this.pendingConstruction = null; document.body.style.cursor = 'default';
+                    this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
+                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id, builderId: builder.id });
+                } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
               
@@ -4690,73 +4725,48 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.restore();
         }
     
-if (this.pendingConstruction && window.mousePos) {
+    if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos;
             let bType = this.pendingConstruction;
-            let uData = UNITS[bType];
-            let cellSize = 30; // Базовый размер клетки (как у дорог)
+            let bRad = UNITS[bType].radius;
             
-            // Если это не здание (например, дорога), или нет сетки - ставим 1x1
-            let gw = uData.gridW || 1;
-            let gh = uData.gridH || 1;
-
-            // Находим координаты левого верхнего угла нашей сетки, привязываясь к шагу 30px
-            let snapX = Math.floor(m.x / cellSize) * cellSize;
-            let snapY = Math.floor(m.y / cellSize) * cellSize;
-
-            // Будущий центр здания для спавна
-            let centerX = snapX + (gw * cellSize) / 2;
-            let centerY = snapY + (gh * cellSize) / 2;
-
-            let canBuildHere = true;
+            // Проверяем все те же правила, что и при клике строительства
+            let inWater = MapUtils.checkWater(m.x, m.y);
+            let onMountain = MapUtils.checkMountain(m.x, m.y, 40);
+            let owner = this.getTerritoryOwner(m.x, m.y);
+            let GAP = (bType === 'WALL') ? -15 : 30;
+            
+            // Проверяем, не пересекаемся ли мы с другими юнитами или стройками
+            let busy = this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + bRad + GAP) ||
+                       this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP);
+            
+            // Итоговый вердикт: можно тут строить или нет?
+            let isValid = !inWater && !onMountain && (owner === this.myRole) && !busy;
 
             ctx.save();
-            // Рисуем квадратики сетки под зданием
-            for (let ix = 0; ix < gw; ix++) {
-                for (let iy = 0; iy < gh; iy++) {
-                    let cellCX = snapX + ix * cellSize + 15;
-                    let cellCY = snapY + iy * cellSize + 15;
-
-                    // Проверяем каждую конкретную клетку
-                    let inWater = MapUtils.checkWater(cellCX, cellCY);
-                    let onMountain = MapUtils.checkMountain(cellCX, cellCY, 10);
-                    let owner = this.getTerritoryOwner(cellCX, cellCY);
-                    let onRoad = bType !== 'ROAD' && MapUtils.checkRoad(cellCX, cellCY);
-                    
-                    // Проверка на пересечение с юнитами и другими стройками для этой клетки
-                    let GAP = (bType === 'WALL') ? -10 : 20;
-                    let busy = this.units.some(u => Math.hypot(u.x - cellCX, u.y - cellCY) < u.radius + GAP) ||
-                               this.constructions.some(c => Math.hypot(c.x - cellCX, c.y - cellCY) < UNITS[c.type].radius + GAP);
-
-                    let cellValid = !inWater && !onMountain && (owner === this.myRole) && !busy && !onRoad;
-                    if (!cellValid) canBuildHere = false;
-
-                    // Рисуем саму клеточку (зеленая или красная)
-                    ctx.fillStyle = cellValid ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)';
-                    ctx.fillRect(snapX + ix * cellSize, snapY + iy * cellSize, cellSize, cellSize);
-                    ctx.strokeStyle = cellValid ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 0, 0, 0.8)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(snapX + ix * cellSize, snapY + iy * cellSize, cellSize, cellSize);
-                }
-            }
-
-            // Рисуем радиусы действия (ПВО, СЭС) от НОВОГО центра
-            if (uData.range || uData.energyGen) {
-                let range = uData.range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, bRad, 0, Math.PI*2);
+            
+            // Если можно - заливаем зеленым, если нельзя - красным
+            ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
+            ctx.fill();
+            ctx.strokeStyle = isValid ? '#0f0' : '#f00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // БОНУС: Если строим ПВО или СЭС, сразу рисуем пунктиром их радиус действия!
+            if (UNITS[bType].range || UNITS[bType].energyGen) {
+                let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, range, 0, Math.PI*2);
+                ctx.arc(m.x, m.y, range, 0, Math.PI*2);
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
             }
             ctx.restore();
-
-            // Сохраняем данные, чтобы функция клика знала, куда именно ставить здание
-            this.currentBuildSnap = { x: centerX, y: centerY, canBuild: canBuildHere };
-        } else {
-            this.currentBuildSnap = null;
         }
-},
+         ctx.restore();
+    },
 
     renderLoop() { if (!document.hidden) { this.draw(); } requestAnimationFrame(() => this.renderLoop()); },
 
@@ -4941,8 +4951,6 @@ class Unit {
 
 checkPower() {
         if (!UNITS[this.type].energyUse && this.type !== 'HOUSE') { this.isPowered = true; return; }
-
-    if (this.isPowered !== undefined && Game.frameCount % 30 !== 0) return;
         
         // --- ОПТИМИЗАЦИЯ ПИТАНИЯ (Ищем только электростанции) ---
         // Исключаем лишние математические проверки тысяч солдат
@@ -7298,6 +7306,8 @@ InitialLoader.init();
 </script>
 </body>
 </html>
+
+
 
 
 

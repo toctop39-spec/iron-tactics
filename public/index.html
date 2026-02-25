@@ -564,63 +564,22 @@ const MapUtils = {
 
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
-// Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
-buildRoad(x, y) {
-        // Умная защита: создаем хранилище, если его нет
-        if (!this.roadGrid) { this.roadGrid = new Set(); }
-        
-        let cx = Math.floor(x / 30);
-        let cy = Math.floor(y / 30);
-        const gridKey = cx + "," + cy;
+    // === 1. СУПЕР-БЫСТРЫЙ КЭШ ЛАНДШАФТА ===
+    heightCache: null,
+    cacheStep: 15, // Шаг сетки (чем меньше, тем точнее, но 15 - идеально)
 
-        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз
-        if (this.roadGrid.has(gridKey)) return;
-
-        this.roadGrid.add(gridKey);
-
-        // --- МАГИЯ ТЕКСТУРЫ (ИСПРАВЛЕНО МАСШТАБИРОВАНИЕ) ---
-        if (this.bgCanvas) {
-            const ctx = this.bgCanvas.getContext('2d');
-            
-            // ВАЖНО: bgCanvas отрендерен в масштабе 0.5, 
-            // поэтому все координаты и размеры для него нужно умножать на scale!
-            const scale = 0.5; 
-            
-            const rx = (x + (Math.random() - 0.5) * 15) * scale;
-            const ry = (y + (Math.random() - 0.5) * 15) * scale;
-            const radius = (35 + Math.random() * 10) * scale; 
-
-            const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
-            gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
-            gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
-            gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
-
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Камешки тоже уменьшаем
-            for(let i=0; i<3; i++) {
-                ctx.fillStyle = 'rgba(50, 40, 30, 0.6)';
-                const px = rx + (Math.random() - 0.5) * 30 * scale;
-                const py = ry + (Math.random() - 0.5) * 30 * scale;
-                ctx.beginPath();
-                ctx.arc(px, py, (2 + Math.random()*3) * scale, 0, Math.PI*2);
-                ctx.fill();
+    generateHeightCache() {
+        if (!Game.isIslandMode) return;
+        const cols = Math.ceil(MAP_W / this.cacheStep);
+        const rows = Math.ceil(MAP_H / this.cacheStep);
+        this.heightCache = new Float32Array(cols * rows); // Float32Array работает в 10 раз быстрее обычных массивов
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                this.heightCache[y * cols + x] = this.calcWorldHeight(x * this.cacheStep, y * this.cacheStep);
             }
         }
     },
 
-    // Проверяем, есть ли тут дорога (для скорости танков)
-    checkRoad(x, y) {
-        let cx = Math.floor(x / 30);
-        let cy = Math.floor(y / 30);
-        return this.roadGrid.has(cx + "," + cy);
-    },
-
-    // В функции init() нужно просто очищать сетку при старте:
     init(forcedSeed) {
         this.seed = forcedSeed !== undefined ? forcedSeed : Math.floor(Math.random() * 1000000);
         this.currentSeed = this.seed; 
@@ -629,25 +588,24 @@ buildRoad(x, y) {
         this.lakes = [];
         this.mountains = [];
         this.spawnPoints = [];
-        this.roadGrid = new Set(); // <--- Очищаем дороги новой игры
+        this.roadGrid = new Set(); 
+
+        this.generateHeightCache(); // <--- Генерируем ландшафт ОДИН РАЗ при загрузке
 
         if (Game.isIslandMode) this.calculateSpawns();
         this.generateMountains();
         this.renderBackground();
     },
 
-getWorldHeight(x, y) {
-        if (!Game.isIslandMode) return 0.6; 
-        
+    // Реальная математика (вызывается только при загрузке)
+    calcWorldHeight(x, y) {
         const wx = x - MAP_W / 2;
         const wy = y - MAP_H / 2;
         const mapSize = Math.max(MAP_W, MAP_H);
 
-        // 1. Мягкий ограничитель краев (просто чтобы суша не обрывалась об экран)
         const dist = Math.sqrt(wx*wx + wy*wy) / (mapSize * 0.48); 
         const edgeMask = Math.max(0, 1.0 - Math.pow(dist, 4.0)); 
 
-        // 2. Генерируем шум. freq = 1/1000 даст нам несколько крупных пятен (островов)
         let noiseVal = 0, amp = 1, freq = 1 / 1000; 
         let maxAmp = 0;
         
@@ -657,16 +615,23 @@ getWorldHeight(x, y) {
             amp *= 0.5; freq *= 2.0;
         }
         
-        // Нормализуем значение шума (чтобы оно было примерно от 0 до 1)
         noiseVal = (noiseVal / maxAmp + 1) / 2;
-
-        // 3. Немного "топим" карту, чтобы острова визуально отделились друг от друга проливами
         noiseVal = Math.pow(noiseVal, 0.7); 
+        return Math.max(0, Math.min(1, noiseVal * edgeMask));
+    },
 
-        // 4. Накладываем краевую маску
-        let h = noiseVal * edgeMask;
-
-        return Math.max(0, Math.min(1, h));
+    // Моментальная функция для юнитов (берет готовое число из памяти)
+    getWorldHeight(x, y) {
+        if (!Game.isIslandMode) return 0.6; 
+        if (this.heightCache) {
+            let cx = Math.floor(x / this.cacheStep);
+            let cy = Math.floor(y / this.cacheStep);
+            let cols = Math.ceil(MAP_W / this.cacheStep);
+            if (cx >= 0 && cx < cols && cy >= 0 && cy < Math.ceil(MAP_H / this.cacheStep)) {
+                return this.heightCache[cy * cols + cx];
+            }
+        }
+        return this.calcWorldHeight(x, y);
     },
 
     getTerrain(x, y) {
@@ -4976,6 +4941,8 @@ class Unit {
 
 checkPower() {
         if (!UNITS[this.type].energyUse && this.type !== 'HOUSE') { this.isPowered = true; return; }
+
+    if (this.isPowered !== undefined && Game.frameCount % 30 !== 0) return;
         
         // --- ОПТИМИЗАЦИЯ ПИТАНИЯ (Ищем только электростанции) ---
         // Исключаем лишние математические проверки тысяч солдат

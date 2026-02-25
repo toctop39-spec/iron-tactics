@@ -5623,27 +5623,45 @@ if (this.type === 'AA_DEFENSE') {
 
     if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
         // НОВАЯ ЛОГИКА БЕЛОГО ФЛАГА
-    if (this.stance === 'DEFENSIVE') {
-        if (this.lastAttacker && this.lastAttacker.hp > 0 && Math.hypot(this.lastAttacker.x - this.x, this.lastAttacker.y - this.y) < this.range) {
-            this.targetUnit = this.lastAttacker; // Бьем только в ответ
-        }
+   if (this.stance === 'DEFENSIVE') {
+
+    if (
+        this.lastAttacker &&
+        this.lastAttacker.hp > 0 &&
+        Math.hypot(
+            this.lastAttacker.x - this.x,
+            this.lastAttacker.y - this.y
+        ) < this.range
+    ) {
+        this.targetUnit = this.lastAttacker;
     } else {
-                this.targetUnit = null;                
-                let min = this.range + 50; 
-                let near = null;
-                
-                // --- ОПТИМИЗАЦИЯ ПОИСКА ЦЕЛИ (Манхэттенское отсечение) ---
-               Game.units.forEach(u => {
-    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
-                        // Очень быстро отсекаем всех, кто явно дальше радиуса, без тяжелой математики с корнями
-                        if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
-                            let d = Math.hypot(u.x - this.x, u.y - this.y);
-                            if (d < min) { min = d; near = u; }
-                        }
-                    }
-                });
-                this.targetUnit = near;
+        this.targetUnit = null; // ← ВАЖНО
+    }
+
+} else {
+
+    this.targetUnit = null;
+    let min = this.range + 50;
+    let near = null;
+
+    Game.units.forEach(u => {
+        if (u.side !== this.side && u.hp > 0 &&
+            u.type !== 'MINE' && u.type !== 'TREE') {
+
+            if (Math.abs(u.x - this.x) < min &&
+                Math.abs(u.y - this.y) < min) {
+
+                let d = Math.hypot(u.x - this.x, u.y - this.y);
+                if (d < min) {
+                    min = d;
+                    near = u;
+                }
             }
+        }
+    });
+
+    this.targetUnit = near;
+}
 
             let busy = false;
             
@@ -5719,11 +5737,10 @@ if (this.type === 'AA_DEFENSE') {
                     else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
                 }
             }
-            
-     // Физика движения к цели
+  // Физика движения к цели
             if (this.target) {
                 if (this.isFlying) {
-                     // Вертолет летит только если закончил прогрев и поднялся (flyState === 2)
+                     // Вертолет летит только если закончил прогрев
                      if (this.flyState === 2) {
                          let d = Math.hypot(this.target.x - this.x, this.target.y - this.y);
                          if (d < 10) { 
@@ -5731,7 +5748,8 @@ if (this.type === 'AA_DEFENSE') {
                                  const next = this.pathQueue.shift();
                                  this.target = {x: next.x, y: next.y};
                              } else {
-                                 this.flyState = 3; this.target = null; // Прилетели - садимся
+                                 this.flyState = 3; 
+                                 this.target = null; // Прилетели - садимся
                              }
                          } else {
                              this._movePhysics();
@@ -5742,7 +5760,7 @@ if (this.type === 'AA_DEFENSE') {
                 }
             }
         } 
-        // Просто движение
+        // Просто движение (срабатывает, если нет targetUnit)
         else { 
             if (this.target) {
                 if (this.isFlying) {
@@ -5755,9 +5773,8 @@ if (this.type === 'AA_DEFENSE') {
         
         this.resolveCollision();
     }
-   },
 
-_movePhysics() {
+    _movePhysics() {
         let currentSpeed = this.speed;
         let onWater = false;
         

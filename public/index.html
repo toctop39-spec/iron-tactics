@@ -5623,158 +5623,142 @@ if (this.type === 'AA_DEFENSE') {
 
     if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
         // НОВАЯ ЛОГИКА БЕЛОГО ФЛАГА
-   if (this.stance === 'DEFENSIVE') {
-
-    if (
-        this.lastAttacker &&
-        this.lastAttacker.hp > 0 &&
-        Math.hypot(
-            this.lastAttacker.x - this.x,
-            this.lastAttacker.y - this.y
-        ) < this.range
-    ) {
-        this.targetUnit = this.lastAttacker;
-    } else {
-        this.targetUnit = null; // ← ВАЖНО
-    }
-
-} else {
-
-    this.targetUnit = null;
-    let min = this.range + 50;
-    let near = null;
-
-    Game.units.forEach(u => {
-        if (u.side !== this.side && u.hp > 0 &&
-            u.type !== 'MINE' && u.type !== 'TREE') {
-
-            if (Math.abs(u.x - this.x) < min &&
-                Math.abs(u.y - this.y) < min) {
-
-                let d = Math.hypot(u.x - this.x, u.y - this.y);
-                if (d < min) {
-                    min = d;
-                    near = u;
-                }
+        if (this.stance === 'DEFENSIVE') {
+            if (this.lastAttacker && this.lastAttacker.hp > 0 && Math.hypot(this.lastAttacker.x - this.x, this.lastAttacker.y - this.y) < this.range) {
+                this.targetUnit = this.lastAttacker;
+            } else {
+                this.targetUnit = null; 
             }
-        }
-    });
+        } else {
+            this.targetUnit = null;
+            let min = this.range + 50;
+            let near = null;
 
-    this.targetUnit = near;
-}
-
-            let busy = false;
-            
-          // Если цель есть - действуем
-            if (this.targetUnit) {
-                let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
-                
-                // Камикадзе (FPV)
-                if (this.isKamikaze) {
-                    if (d <= 30) { 
-                        this.hp = 0; 
-                        let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
-                        explosion.hit(); 
-                        return; // Юнит уничтожен
-                    } else {
-                        this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+            Game.units.forEach(u => {
+                if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+                    if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
+                        let distToU = Math.hypot(u.x - this.x, u.y - this.y);
+                        if (distToU < min) { min = distToU; near = u; }
                     }
-                } 
-                // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
-                else if (d <= this.range) {
-                    busy = true;
-                    let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
-                    this.angle = targetAngle; // Поворачиваемся к цели
+                }
+            });
+            this.targetUnit = near;
+        }
+    } // <--- ВОТ ЭТА СКОБКА БЫЛА ПОТЕРЯНА! ТЕПЕРЬ ОНА НА МЕСТЕ.
 
-                    // Если орудие заряжено
-                    if (this.reload <= 0) {
-                        this.reload = this.reloadMax;
-                        let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
+    let busy = false;
+            
+    // Если цель есть - действуем
+    if (this.targetUnit) {
+        let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
+        
+        // Камикадзе (FPV)
+        if (this.isKamikaze) {
+            if (d <= 30) { 
+                this.hp = 0; 
+                let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
+                explosion.hit(); 
+                return; // Юнит уничтожен
+            } else {
+                this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+            }
+        } 
+        // --- СТАНДАРТНАЯ СТРЕЛЬБА ---
+        else if (d <= this.range) {
+            busy = true;
+            let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
+            this.angle = targetAngle; // Поворачиваемся к цели
 
-                        // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
-                        let spawnX = this.x;
-                        let spawnY = this.y;
-                        
-                        if (this.type === 'TANK') {
-                            spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
-                            spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
-                        } else if (this.type === 'HELICOPTER') {
-                            spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
-                            spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
-                        } else {
-                            spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
-                            spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
-                        }
+            // Если орудие заряжено
+            if (this.reload <= 0) {
+                this.reload = this.reloadMax;
+                let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
 
-                        // ВЕРТОЛЕТЫ
-                        if (this.type === 'HELICOPTER') {
+                // --- ВЫЧИСЛЯЕМ ТОЧКУ ВЫЛЕТА ПУЛИ ---
+                let spawnX = this.x;
+                let spawnY = this.y;
+                
+                if (this.type === 'TANK') {
+                    spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
+                    spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
+                } else if (this.type === 'HELICOPTER') {
+                    spawnX = this.x + Math.cos(this.angle) * this.radius * 1.2;
+                    spawnY = this.y + Math.sin(this.angle) * this.radius * 1.2;
+                } else {
+                    spawnX = this.x + Math.cos(this.angle) * this.radius * 0.8;
+                    spawnY = this.y + Math.sin(this.angle) * this.radius * 0.8;
+                }
+
+                // ВЕРТОЛЕТЫ
+                if (this.type === 'HELICOPTER') {
+                    SoundManager.play('shoot', 100, vol);
+                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
+                    // Второй выстрел
+                    setTimeout(() => {
+                        if (this.hp > 0 && Game.state !== 'MENU') {
                             SoundManager.play('shoot', 100, vol);
                             Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                            // Второй выстрел
-                            setTimeout(() => {
-                                if (this.hp > 0 && Game.state !== 'MENU') {
-                                    SoundManager.play('shoot', 100, vol);
-                                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this));
-                                }
-                            }, 150);
-                        } 
-                        // ОСТАЛЬНЫЕ (Танки, Пехота)
-                        else {
-                            if (this.type === 'TANK') {
-                                SoundManager.play('tankFire', 100, vol);
-                                this.recoil = 12; // Отдача
-                            } else {
-                                SoundManager.play('shoot', 100, vol); 
-                            }
-                            let splashR = (this.type === 'TANK') ? 60 : 0;
-                            Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
-                    }
+                    }, 150);
                 } 
-                // Преследование (только для ботов или если не мультиплеер)
-                else if (!Game.isMultiplayer && this.side !== 'player') {
-                    if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
-                    else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
-                }
-            }
-  // Физика движения к цели
-            if (this.target) {
-                if (this.isFlying) {
-                     // Вертолет летит только если закончил прогрев
-                     if (this.flyState === 2) {
-                         let d = Math.hypot(this.target.x - this.x, this.target.y - this.y);
-                         if (d < 10) { 
-                             if (this.pathQueue && this.pathQueue.length > 0) {
-                                 const next = this.pathQueue.shift();
-                                 this.target = {x: next.x, y: next.y};
-                             } else {
-                                 this.flyState = 3; 
-                                 this.target = null; // Прилетели - садимся
-                             }
-                         } else {
-                             this._movePhysics();
-                         }
-                     }
-                } else if (!busy) {
-                     this._movePhysics(); // Наземная техника едет сразу
+                // ОСТАЛЬНЫЕ (Танки, Пехота)
+                else {
+                    if (this.type === 'TANK') {
+                        SoundManager.play('tankFire', 100, vol);
+                        this.recoil = 12; // Отдача
+                    } else {
+                        SoundManager.play('shoot', 100, vol); 
+                    }
+                    let splashR = (this.type === 'TANK') ? 60 : 0;
+                    Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                 }
             }
         } 
-        // Просто движение (срабатывает, если нет targetUnit)
-        else { 
-            if (this.target) {
-                if (this.isFlying) {
-                    if (this.flyState === 2) this._movePhysics();
-                } else {
-                    this._movePhysics(); 
-                }
+        // Преследование (только для ботов или если не мультиплеер)
+        else if (!Game.isMultiplayer && this.side !== 'player') {
+            if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
+            else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+        }
+
+        // Физика движения к цели
+        if (this.target) {
+            if (this.isFlying) {
+                 // Вертолет летит только если закончил прогрев
+                 if (this.flyState === 2) {
+                     let distToTargetPoint = Math.hypot(this.target.x - this.x, this.target.y - this.y); // <-- ОШИБКА ИСПРАВЛЕНА
+                     if (distToTargetPoint < 10) { 
+                         if (this.pathQueue && this.pathQueue.length > 0) {
+                             const next = this.pathQueue.shift();
+                             this.target = {x: next.x, y: next.y};
+                         } else {
+                             this.flyState = 3; 
+                             this.target = null; // Прилетели - садимся
+                         }
+                     } else {
+                         this._movePhysics();
+                     }
+                 }
+            } else if (!busy) {
+                 this._movePhysics(); // Наземная техника едет сразу
             }
         }
-        
-        this.resolveCollision();
+    } 
+    // Просто движение (срабатывает, если нет targetUnit)
+    else { 
+        if (this.target) {
+            if (this.isFlying) {
+                if (this.flyState === 2) this._movePhysics();
+            } else {
+                this._movePhysics(); 
+            }
+        }
     }
+} // <--- ЗАКРЫВАЕМ if (canFight)
 
-    _movePhysics() {
+this.resolveCollision();
+} // <--- ЗАКРЫВАЕМ update()
+
+_movePhysics() {
         let currentSpeed = this.speed;
         let onWater = false;
         

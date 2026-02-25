@@ -465,6 +465,8 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     WH_DEPOSIT: { type: 'action', name: 'ПОЛОЖИТЬ ВСЕ', emoji: '📥', cost: 0 },
     WH_WITHDRAW: { type: 'action', name: 'ЗАБРАТЬ ВСЕ', emoji: '📤', cost: 0 },
 
+    TOGGLE_STANCE: { type: 'action', name: 'АТАКА', emoji: '⚔️', cost: 0 },
+
     // --- НОВОЕ: КНОПКА РАСПУСКА АРМИИ И ЛОДОК ---
     DISBAND_ARMY: { type: 'action', name: 'ПРОДАТЬ (+100$)', emoji: '❌', cost: 0 },
     BOAT_LOAD: { type: 'action', name: 'ПОСАДИТЬ', emoji: '📥', cost: 0 },
@@ -3781,6 +3783,35 @@ menuAction(type) {
             return;
         }
 
+    // --- ПЕРЕКЛЮЧЕНИЕ РЕЖИМА "БЕЛЫЙ ФЛАГ" ---
+        if (type === 'TOGGLE_STANCE') {
+            let currentStance = this.selection[0]?.stance || 'AGGRESSIVE';
+            let newStance = (currentStance === 'AGGRESSIVE') ? 'DEFENSIVE' : 'AGGRESSIVE';
+            
+            this.selection.forEach(u => {
+                if (!u.isProducer && !u.isBuilder) {
+                    u.stance = newStance;
+                    if (newStance === 'DEFENSIVE') u.targetUnit = null; // Перестаем стрелять
+                }
+            });
+            
+            if (newStance === 'DEFENSIVE') {
+                this.showError("РЕЖИМ: БЕЛЫЙ ФЛАГ 🏳️ (Только защита)");
+                UNITS.TOGGLE_STANCE.emoji = '🏳️';
+                UNITS.TOGGLE_STANCE.name = 'ЗАЩИТА';
+            } else {
+                this.showError("РЕЖИМ: АГРЕССИЯ ⚔️ (Огонь на поражение)");
+                UNITS.TOGGLE_STANCE.emoji = '⚔️';
+                UNITS.TOGGLE_STANCE.name = 'АТАКА';
+            }
+            
+            // Обновляем меню, чтобы иконка поменялась
+            let list = ['TOGGLE_STANCE'];
+            if (this.selectionFilter === 'ARMY') list.push('DISBAND_ARMY');
+            this.updateUI(list, true, `ВЫБРАНО: ${this.selection.length}`);
+            return;
+        }
+
 // --- РАСПУСК АРМИИ ---
         if (type === 'DISBAND_ARMY') {
             let count = 0;
@@ -4274,9 +4305,9 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
                         this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");;
                     }
-                    else {
-                        // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---
-                        let list = [];
+else {
+                        // Кнопка режима поведения доступна всегда, когда выбрана армия
+                        let list = ['TOGGLE_STANCE'];
                         if (this.selectionFilter === 'ARMY') {
                             list.push('DISBAND_ARMY');
                         }
@@ -7059,7 +7090,15 @@ hit() {
                                 if (!Game.isMultiplayer) { const oldBot = Game.bots.find(b => b.side === u.side); if(oldBot) oldBot.checkPanic(); }
                             }
                         }
+              }
                     } else { u.hp -= damage; }
+                    
+                    // --- ЮНИТ ЗАПОМИНАЕТ ОБИДЧИКА ДЛЯ ОТВЕТНОГО ОГНЯ ---
+                    if (this.owner && this.owner.hp > 0) {
+                        u.lastAttacker = this.owner;
+                    }
+                    
+                    if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) {
                     
                     if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) { 
                         u.aggro = true; Game.effects.push({x: u.x, y: u.y - 30, char: '😡', life: 40}); u.target = {x: this.owner.x, y: this.owner.y}; 

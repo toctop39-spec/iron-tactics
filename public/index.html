@@ -286,13 +286,14 @@ canvas { display: block; cursor: crosshair; }
 
 <div id="ui-layer">
     <button id="mobile-toggle-btn" class="clickable" onclick="MobileControls.toggle()" style="position:absolute; top:70px; right:10px; z-index:999; padding:5px; background:#333; color:#fff; border:1px solid #fff; opacity:0.7;">📱</button>
+    <button class="menu-btn" style="position:absolute; left:15px; bottom:15px; min-width: 45px; height: 45px; padding: 0; pointer-events: auto; z-index: 999999;" onclick="ChatManager.isOpen ? ChatManager.closeChat() : ChatManager.openChat()">💬</button>
 
     <div style="position: absolute; right: 15px; top: 130px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto;">
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(0.4)">+</button>
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(-0.4)">-</button>
     </div>
 
-   <div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 9999;">
+   <div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 999999;">
         <div id="chat-messages" style="overflow-y: auto; color: white; text-shadow: 1px 1px 2px black; font-size: 15px; margin-bottom: 5px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto; padding-right: 5px; max-height: 200px;">
         </div>
         <input type="text" id="chat-input" placeholder="Нажмите Enter для чата..." autocomplete="off" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.6); border: 1px solid #0af; color: #fff; pointer-events: auto; display: none; border-radius: 4px; font-family: 'Exo 2', sans-serif;">

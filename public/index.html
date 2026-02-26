@@ -2442,24 +2442,16 @@ const searchMargin = RADIUS_PX + 50;
                     tCtx.globalAlpha = 0.55; // Более плотная и насыщенная заливка
                     tCtx.fillRect(x, y, step + 1, step + 1);
                     
-else if (this.territoryMode === 4) {
+                // --- ДОБАВЬ ВОТ ЭТОТ БЛОК ---
+                else if (this.territoryMode === 4) {
                     // --- ТОЧНЫЙ РЕЖИМ (6px) ---
                     tCtx.fillStyle = color;
                     tCtx.globalAlpha = 0.4;
                     tCtx.fillRect(x, y, step + 1, step + 1);
-    
-                    // Тонкие черные границы каждой клетки для легкого эффекта "бумажной карты"
-                    tCtx.fillStyle = '#000';
-                    tCtx.globalAlpha = 0.5;
-                    const BORDER_W = 2;
-                    if (iy > 0 && getCellOwner((iy - 1) * cols + ix) !== owner) tCtx.fillRect(x, y, step, BORDER_W); 
-                    if (iy < rows - 1 && getCellOwner((iy + 1) * cols + ix) !== owner) tCtx.fillRect(x, y + step - BORDER_W, step, BORDER_W);
-                    if (ix > 0 && getCellOwner(iy * cols + (ix - 1)) !== owner) tCtx.fillRect(x, y, BORDER_W, step);
-                    if (ix < cols - 1 && getCellOwner(iy * cols + (ix + 1)) !== owner) tCtx.fillRect(x + step - BORDER_W, y, BORDER_W, step);
                 }
             }
         }
-
+                            
         // --- ОТРИСОВКА НАЗВАНИЙ ГОСУДАРСТВ ---
         if (this.territoryMode === 3) {
             for (let owner in factionsData) {

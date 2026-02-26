@@ -3754,45 +3754,51 @@ onDown(e) {
         
         const m = this.getMouse(e);
 
-    // --- ПЕРЕХВАТ КЛИКА В ПОЛИТИЧЕСКОМ РЕЖИМЕ ---
+        // --- ПЕРЕХВАТ КЛИКА В ПОЛИТИЧЕСКОМ РЕЖИМЕ ---
         if (this.territoryMode === 3) {
-            // Ищем, кому принадлежит территория, по которой кликнули
             let owner = this.getTerritoryOwner(m.x, m.y);
             if (owner) {
                 CountryEditor.showInfo(owner);
                 SoundManager.play('steps', 0, 0.5); // Легкий звук клика
             }
-            return; // Выходим из onDown, чтобы не выделять юнитов рамкой
+            return; // Выходим, чтобы не выделять рамкой
         }
         
-        // Сброс спец-режимов (если мы целились ракетой или строили)
+        // Сброс спец-режимов (если целились или строили)
         if (this.buildType || this.pendingConstruction || this.artyMode || Game.launchMode) {
-            this.dragStart = null; // Рамку не рисуем, это клик-действие!
+            this.dragStart = null; // Рамку не рисуем
         } else {
-            // Начинаем рисовать рамку (сохраняем точные координаты)
+            // Начинаем рисовать выделяющую рамку
             this.dragStart = { x: m.x, y: m.y, rx: m.rawX, ry: m.rawY };
             this.dragCurr = { x: m.rawX, y: m.rawY }; 
         }
         
         this.isDragging = false;
 
-    // --- ВОЗВРАЩАЕМ СПАВН ДЛЯ КАМПАНИИ ---
+        // --- ВОЗВРАЩАЕМ СПАВН ДЛЯ КАМПАНИИ (С ПРИМАГНИЧИВАНИЕМ) ---
         if (this.state === 'PLACE' && this.buildType) {
-            // В кампании зеленая линия находится на координате x=1000
             if (m.x > 1000) { 
                 this.showError("СТАВЬТЕ ЮНИТОВ СЛЕВА ОТ ЛИНИИ!"); 
                 return; 
             }
             
+            // Примагничиваем координаты, если это здание
+            let spawnX = m.x, spawnY = m.y;
+            if (UNITS[this.buildType].type === 'bldg') {
+                spawnX = Math.floor(m.x / 30) * 30 + 15;
+                spawnY = Math.floor(m.y / 30) * 30 + 15;
+            }
+
             if (this.checkCost(this.buildType)) {
                 this.payCost(this.buildType);
-                const u = new Unit(this.buildType, m.x, m.y, 'player');
+                const u = new Unit(this.buildType, spawnX, spawnY, 'player');
                 this.units.push(u);
-                this.effects.push({x: m.x, y: m.y, char: '✨', life: 30});
+                this.effects.push({x: spawnX, y: spawnY, char: '✨', life: 30});
                 
-                // Обновляем интерфейс, чтобы списались деньги на экране
-                const data = LEVELS.find(l => l.id === this.level);
-                if (data) this.updateUI(data.unlock);
+                if (typeof LEVELS !== 'undefined') {
+                    const data = LEVELS.find(l => l.id === this.level);
+                    if (data) this.updateUI(data.unlock);
+                }
             } else {
                 this.showError("НЕТ СРЕДСТВ ИЛИ РЕСУРСОВ!");
             }
@@ -3800,28 +3806,34 @@ onDown(e) {
         }
 
         if (this.state === 'BATTLE') {
-            // 1. СПАВН ПЕСОЧНИЦЫ
+            // 1. СПАВН ПЕСОЧНИЦЫ (С ПРИМАГНИЧИВАНИЕМ ЗДАНИЙ)
             if (this.isSandbox && this.buildType) {
-                // --- ИСПРАВЛЕНИЕ: ДОРОГА В ПЕСОЧНИЦЕ (КРАСИМ ЗЕМЛЮ) ---
-                if (this.buildType === 'ROAD') {
-                    MapUtils.buildRoad(m.x, m.y);
-                    Game.effects.push({x: m.x, y: m.y, char: '🛣️', life: 20});
+                
+                let spawnX = m.x, spawnY = m.y;
+                if (UNITS[this.buildType].type === 'bldg') {
+                    spawnX = Math.floor(m.x / 30) * 30 + 15;
+                    spawnY = Math.floor(m.y / 30) * 30 + 15;
+                }
+
+                if (this.buildType === 'ROAD' || this.buildType === 'ASPHALT') {
+                    MapUtils.buildRoad(spawnX, spawnY, this.buildType);
+                    Game.effects.push({x: spawnX, y: spawnY, char: this.buildType === 'ASPHALT' ? '⬛' : '🟤', life: 20});
                     return;
                 }
-                // --------------------------------------
 
-                const isWater = MapUtils.checkWater(m.x, m.y);
+                const isWater = MapUtils.checkWater(spawnX, spawnY);
                 const isBoat = this.buildType === 'BOAT';
                 if (isWater && !isBoat && !UNITS[this.buildType].isFlying) { this.showError("ЭТО ВОДА!"); return; }
-                const u = new Unit(this.buildType, m.x, m.y, this.sandboxSide);
+                
+                const u = new Unit(this.buildType, spawnX, spawnY, this.sandboxSide);
                 u.isPowered = true;
                 if (this.buildType === 'SILO') u.nukeTimer = 0; 
                 this.units.push(u);
-                this.effects.push({x: m.x, y: m.y, char: '✨', life: 30});
+                this.effects.push({x: spawnX, y: spawnY, char: '✨', life: 30});
                 return;
             }
 
-     // 2. ЗАПУСК ОРУЖИЯ ИЗ БУНКЕРА
+            // 2. ЗАПУСК ОРУЖИЯ ИЗ БУНКЕРА
             if (Game.launchMode) {
                  if (Game.launchSilo) {
                      const silo = Game.launchSilo;
@@ -3832,7 +3844,6 @@ onDown(e) {
                          return;
                      }
 
-                     // Для крылатой ракеты снимаем деньги и железо прямо сейчас
                      if (Game.launchMode === 'CRUISE') {
                          if (this.money >= ammo.cost && this.resources.iron >= ammo.resCostAmt) {
                              this.money -= ammo.cost;
@@ -3843,9 +3854,7 @@ onDown(e) {
                          } else {
                              this.showError(`НУЖНО ${ammo.cost}$ И 🔩${ammo.resCostAmt} ЖЕЛЕЗА!`);
                          }
-                     } 
-                     // Для остальных (готовые патроны со склада)
-                     else {
+                     } else {
                          if (this.resources[ammo.reqRes] >= 1) { 
                              this.resources[ammo.reqRes] -= 1; 
                              silo.startSiloLaunch(m.x, m.y, Game.launchMode);
@@ -3860,46 +3869,56 @@ onDown(e) {
 
             if (this.isSpectator) return;
 
-// 3. СТРОЙКА (Постановка фундамента)
+            // 3. СТРОЙКА (Постановка фундамента) - ИДЕАЛЬНОЕ ПРИМАГНИЧИВАНИЕ К СЕТКЕ
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
-                const inWater = MapUtils.checkWater(m.x, m.y);
-                const onMountain = MapUtils.checkMountain(m.x, m.y, 40);
-                if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 
-                // 1. ЕДИНАЯ ПРОВЕРКА ТЕРРИТОРИИ (Теперь дорогу нельзя строить за пределами своей базы)
-                if (this.getTerritoryOwner(m.x, m.y) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
-
-                // 2. ЕДИНАЯ ПРОВЕРКА НАЛОЖЕНИЯ (Нельзя строить прямо поверх танков и зданий)
-                const GAP = (bType === 'WALL') ? -15 : 30;
-                if (this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + UNITS[bType].radius + GAP) ||
-                    this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP)) { 
-                     this.showError("СЛИШКОМ БЛИЗКО К ДРУГИМ!"); return; 
-                }
-
-                // 3. НОВОЕ: ЗАПРЕТ ПОСТРОЙКИ ЗДАНИЙ НА ТРОПИНКАХ
-                if (bType !== 'ROAD' && MapUtils.checkRoad(m.x, m.y)) {
-                    this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
-                }
-
-   // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
-              // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ИЛИ АСФАЛЬТА ---
+                // Протяжка дороги и асфальта (использует сырые координаты мыши для плавности)
                 if (bType === 'ROAD' || bType === 'ASPHALT') {
-                    // НАЧИНАЕМ ПРОТЯЖКУ
                     this.roadDragStart = { x: m.x, y: m.y, type: bType };
                     return; 
                 }
 
-                // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
+                // === МАГНИТ К СЕТКЕ 30x30 ДЛЯ ЗДАНИЙ ===
+                let snapX = Math.floor(m.x / 30) * 30 + 15;
+                let snapY = Math.floor(m.y / 30) * 30 + 15;
+
+                // Используем snapX и snapY для всех проверок ландшафта
+                const inWater = MapUtils.checkWater(snapX, snapY);
+                const onMountain = MapUtils.checkMountain(snapX, snapY, 12);
+                if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
+                
+                if (this.getTerritoryOwner(snapX, snapY) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
+
+                if (MapUtils.checkRoad(snapX, snapY)) {
+                    this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
+                }
+
+                // Проверка пересечений с помощью быстрой сетки SpatialHash
+                let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: snapX, y: snapY}) : Game.units;
+                let isOccupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - snapX, u.y - snapY) < 20);
+                if (isOccupied) { 
+                     this.showError("МЕСТО ЗАНЯТО!"); return; 
+                }
+
                 const builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
                 if (!builder) { this.showError("НЕТ СТРОИТЕЛЯ!"); return; }
+                
                 if (this.checkCost(bType)) {
-                    this.payCost(bType); this.updateUI([]); 
-                    const site = { id: Date.now() + Math.random(), type: bType, x: m.x, y: m.y, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
-                    this.constructions.push(site); builder.assignSite(site);
+                    this.payCost(bType); 
+                    this.updateUI([]); 
+                    
+                    // Сохраняем фундамент уже с ПРИМАГНИЧЕННЫМИ координатами
+                    const site = { id: Date.now() + Math.random(), type: bType, x: snapX, y: snapY, total: UNITS[bType].constructTime * 60, remaining: UNITS[bType].constructTime * 60, owner: this.myRole, idleTime: 0 };
+                    this.constructions.push(site); 
+                    builder.assignSite(site);
+                    
                     this.pendingConstruction = null; document.body.style.cursor = 'default';
-                    this.effects.push({x: m.x, y: m.y, char: '📍', life: 30});
-                    if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: m.x, y: m.y, side: this.myRole, id: site.id, builderId: builder.id });
+                    this.effects.push({x: snapX, y: snapY, char: '📍', life: 30});
+                    
+                    if (this.isMultiplayer && CURRENT_ROOM) {
+                        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_start', bType: bType, x: snapX, y: snapY, side: this.myRole, id: site.id, builderId: builder.id });
+                    }
                 } else this.showError("НЕТ ДЕНЕГ!");
                 return;
             }
@@ -3907,7 +3926,7 @@ onDown(e) {
             // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
                 if (this.money >= ARTY_COST) {
-               const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
+                    const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
                         this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
@@ -3927,7 +3946,7 @@ onDown(e) {
                 if (builder) {
                     builder.assignSite(clickedSite); builder.moveTo(clickedSite.x, clickedSite.y);
                     this.effects.push({ x: clickedSite.x, y: clickedSite.y, char: '🔧', life: 30 });
-                    this.dragStart = null; // Отменяем рамку
+                    this.dragStart = null; 
                     if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'help_build', builderId: builder.id, siteId: clickedSite.id, side: this.myRole });
                     return; 
                 }
@@ -5061,36 +5080,40 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
 
-// --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
-        if (this.roadDragStart && window.mousePos) {
+// --- ПРЕВЬЮ КЛЕТКИ ПОД КУРСОРОМ (ДЛЯ ЛЮБОЙ ПОСТРОЙКИ) ---
+        // Работает, если выбран строитель, но мы не тянем дорогу прямо сейчас
+        if (this.selection && this.selection.some(u => u.isBuilder) && window.mousePos && !this.roadDragStart) {
             ctx.save();
-            let bType = this.roadDragStart.type;
             
-            // Вычисляем координаты начальной и конечной клетки
-            let startCx = Math.floor(this.roadDragStart.x / 30);
-            let startCy = Math.floor(this.roadDragStart.y / 30);
-            let endCx = Math.floor(window.mousePos.x / 30);
-            let endCy = Math.floor(window.mousePos.y / 30);
+            // Определяем клетку, над которой сейчас мышка
+            let cx = Math.floor(window.mousePos.x / 30);
+            let cy = Math.floor(window.mousePos.y / 30);
+            let px = cx * 30 + 15; // Идеальный центр клетки
+            let py = cy * 30 + 15;
             
-            let dx = endCx - startCx;
-            let dy = endCy - startCy;
+            let isValid = true;
             
-            // Вычисляем длину пути в клетках
-            let steps = Math.max(Math.abs(dx), Math.abs(dy));
-            let cellsToDraw = [];
-            
-            // Одиночный клик или протяжка
-            if (steps === 0) {
-                cellsToDraw.push({cx: startCx, cy: startCy});
-            } else {
-                for (let i = 0; i <= steps; i++) {
-                    cellsToDraw.push({
-                        cx: startCx + Math.round(dx * (i / steps)),
-                        cy: startCy + Math.round(dy * (i / steps))
-                    });
-                }
+            // Проверяем все правила постройки для этой клетки
+            if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
+            if (isValid && (MapUtils.checkWater(px, py) || MapUtils.checkMountain(px, py, 12))) isValid = false;
+            if (isValid && MapUtils.checkRoad(px, py)) isValid = false;
+            if (isValid) {
+                let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
+                let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 20);
+                if (occupied) isValid = false;
             }
 
+            // Рисуем яркий квадрат, примагниченный к сетке
+            ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
+            ctx.strokeStyle = isValid ? '#0f0' : '#f00';
+            ctx.lineWidth = 2;
+            
+            ctx.fillRect(cx * 30, cy * 30, 30, 30);
+            ctx.strokeRect(cx * 30, cy * 30, 30, 30);
+            
+            ctx.restore();
+        }
+    
             let cost = cellsToDraw.length * UNITS[bType].cost;
             let canAfford = this.money >= cost;
 

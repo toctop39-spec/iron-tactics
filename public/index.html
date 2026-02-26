@@ -3375,7 +3375,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
             this.bots.forEach(bot => bot.update());
 // --- ВСТАВИТЬ ЭТОТ БЛОК ---
            if (!this.spatialGrid) {
-                this.spatialGrid = new SpatialHash(150);
+                this.spatialGrid = new SpatialHash(250);
             }
             this.spatialGrid.cells.clear(); // Быстро очищаем старую сетку
             this.units.forEach(u => this.spatialGrid.add(u));
@@ -5861,16 +5861,29 @@ if (this.type === 'AA_DEFENSE') {
                 let min = this.range + 50; 
                 let near = null;
                 
-                // --- ОПТИМИЗАЦИЯ ПОИСКА ЦЕЛИ (Манхэттенское отсечение) ---
-               Game.units.forEach(u => {
-    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
-                        // Очень быстро отсекаем всех, кто явно дальше радиуса, без тяжелой математики с корнями
-                        if (Math.abs(u.x - this.x) < min && Math.abs(u.y - this.y) < min) {
-                            let d = Math.hypot(u.x - this.x, u.y - this.y);
-                            if (d < min) { min = d; near = u; }
+  // --- СУПЕР-ОПТИМИЗАЦИЯ: ПОИСК ПО ПРОСТРАНСТВЕННОЙ СЕТКЕ ---
+                let minSq = min * min; // Используем квадраты расстояний (работает быстрее корней)
+                
+                // Берем только соседей по квадратам сетки, а не перебираем всех на карте
+                let targetsToCheck = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+
+                // Используем классический цикл for (он работает быстрее, чем forEach)
+                for (let i = 0; i < targetsToCheck.length; i++) {
+                    let u = targetsToCheck[i];
+                    
+                    if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+                        let dx = u.x - this.x;
+                        let dy = u.y - this.y;
+                        
+                        // Быстрое вычисление дистанции: x*x + y*y работает в разы быстрее, чем Math.hypot
+                        let distSq = dx*dx + dy*dy;
+                        
+                        if (distSq < minSq) {
+                            minSq = distSq;
+                            near = u;
                         }
                     }
-                });
+                }
                 this.targetUnit = near;
             }
 

@@ -1089,19 +1089,6 @@ roadPaths: [],
             }
         }
     },
-
-checkRoad(x, y) {
-        if (!this.roadGrid) return false;
-        let cx = Math.floor(x / 30);
-        let cy = Math.floor(y / 30);
-        for(let dx = -1; dx <= 1; dx++){
-            for(let dy = -1; dy <= 1; dy++){
-                let type = this.roadGrid.get((cx+dx) + "," + (cy+dy));
-                if (type) return type; // Вернет 'ROAD' или 'ASPHALT'
-            }
-        }
-        return false;
-    },
     
     getGroundType(x, y) {
         if (this.checkRoad(x, y)) return 'ROAD'; // Дороги в приоритете (даже над водой)

@@ -2334,7 +2334,7 @@ this.lastTerritoryTime = this.frameCount;
         if (this.territoryMode === 1) step = 15;
         else if (this.territoryMode === 2) step = 8;
         else if (this.territoryMode === 3) step = 12;
-        else if (this.territoryMode === 4) step = 3; // СВЕРХТОЧНЫЙ РЕЖИМ
+        else if (this.territoryMode === 4) step = 6; // СВЕРХТОЧНЫЙ РЕЖИМ
         
         const cols = Math.ceil(w / step);
         const rows = Math.ceil(h / step);
@@ -4788,6 +4788,14 @@ onRight(e) {
     },
 
 draw() {
+    // 1. ЖЕСТКИЙ СБРОС МАСШТАБА перед новым кадром (лечит координаты)
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 2. Включаем зум и камеру ТОЛЬКО для игрового мира
+        let z = this.zoom || 1;
+        ctx.scale(z, z);
+        ctx.translate(-this.camera.x, -this.camera.y);
         // Очистка экрана и сохранение контекста (ОБЯЗАТЕЛЬНО)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();

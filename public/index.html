@@ -828,7 +828,6 @@ const MapUtils = {
 
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
-// Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
 buildRoad(x, y, type = 'ROAD') {
         if (!this.roadGrid) { this.roadGrid = new Map(); }
         
@@ -846,17 +845,8 @@ buildRoad(x, y, type = 'ROAD') {
             const ctx = this.bgCanvas.getContext('2d');
             const scale = 0.5; 
             
-            if (type === 'ROAD') {
-                const rx = (x + (Math.random() - 0.5) * 15) * scale;
-                const ry = (y + (Math.random() - 0.5) * 15) * scale;
-                const radius = (35 + Math.random() * 10) * scale; 
-
-                const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
-                gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
-                gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
-                gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
-
-       ctx.globalCompositeOperation = 'source-over';
+            ctx.globalCompositeOperation = 'source-over';
+            
             if (type === 'ROAD') {
                 ctx.fillStyle = 'rgba(90, 60, 40, 0.8)';
                 // Квадратная тропинка на фоне
@@ -866,9 +856,9 @@ buildRoad(x, y, type = 'ROAD') {
                 // Квадратный асфальт на фоне
                 ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
                 
-                // Статичная разметка для фона (фон не анимируется, чтобы не лагало)
-                let cx = Math.floor(x / 30), cy = Math.floor(y / 30);
-                if ((cx + cy) % 2 === 0) {
+                // Статичная разметка для фона
+                let tileX = Math.floor(x / 30), tileY = Math.floor(y / 30);
+                if ((tileX + tileY) % 2 === 0) {
                     ctx.fillStyle = '#fff';
                     ctx.fillRect((x - 2) * scale, (y - 8) * scale, 4 * scale, 16 * scale);
                 }

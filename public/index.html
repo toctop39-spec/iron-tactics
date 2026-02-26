@@ -4354,46 +4354,60 @@ onUp(e) {
         if (!this.dragStart && !this.roadDragStart) return; 
         const m = this.getMouse(e);
         
- if (this.roadDragStart) {
+if (this.roadDragStart) {
             const start = this.roadDragStart;
             this.roadDragStart = null; 
-            let bType = start.type; // 'ROAD' или 'ASPHALT'
+            let bType = start.type; 
 
-            let dx = m.x - start.x;
-            let dy = m.y - start.y;
-            let dist = Math.hypot(dx, dy);
+            // Считаем координаты по сетке
+            let startCx = Math.floor(start.x / 30);
+            let startCy = Math.floor(start.y / 30);
+            let endCx = Math.floor(m.x / 30);
+            let endCy = Math.floor(m.y / 30);
             
-            let stepsCount = Math.max(1, Math.floor(dist / 30)); 
-            let costTotal = stepsCount * UNITS[bType].cost;
+            let dx = endCx - startCx;
+            let dy = endCy - startCy;
+            let steps = Math.max(Math.abs(dx), Math.abs(dy));
+            
+            let cellsToBuild = [];
+            // Если мышку не сдвинули, строим 1 клетку (одиночный клик)
+            if (steps === 0) {
+                cellsToBuild.push({cx: startCx, cy: startCy});
+            } else {
+                // Идеально ровная линия по сетке (без пропущенных клеток)
+                for (let i = 0; i <= steps; i++) {
+                    cellsToBuild.push({
+                        cx: startCx + Math.round(dx * (i / steps)),
+                        cy: startCy + Math.round(dy * (i / steps))
+                    });
+                }
+            }
+
+            let costTotal = cellsToBuild.length * UNITS[bType].cost;
 
             if (this.money >= costTotal) {
-                for (let i = 0; i <= stepsCount; i++) {
-                    let px = start.x + (dx * (i / stepsCount));
-                    let py = start.y + (dy * (i / stepsCount));
+                for (let cell of cellsToBuild) {
+                    // Берем центр клетки для точной постройки
+                    let px = cell.cx * 30 + 15;
+                    let py = cell.cy * 30 + 15;
                     
-          let isValid = true;
-                    // Проверка территории (можно строить только на своей)
+                    let isValid = true;
+                    // Нельзя строить на чужой земле
                     if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
 
-                    // Убрали общую проверку на горы/деревья, чтобы сделать её уникальной для каждого типа дороги!
-                    let isWater = MapUtils.checkWater(px, py) || MapUtils.checkWater(px + 30, py) || MapUtils.checkWater(px - 30, py) || MapUtils.checkWater(px, py + 30) || MapUtils.checkWater(px, py - 30);
+                    // Уменьшенный радиус проверки воды (чтобы не блокировало слишком далеко)
+                    let isWater = MapUtils.checkWater(px, py) || MapUtils.checkWater(px + 15, py) || MapUtils.checkWater(px - 15, py) || MapUtils.checkWater(px, py + 15) || MapUtils.checkWater(px, py - 15);
 
-                    // --- ПРАВИЛА ТРОПИНКИ (ROAD) ---
+                    // --- ПРАВИЛА ТРОПИНКИ ---
                     if (bType === 'ROAD') {
-                        // 1. Нельзя на воде
                         if (isWater) isValid = false;
-                        // 2. Деревья ИГНОРИРУЮТСЯ (тропинка идет сквозь лес)
-                        // 3. Горы блокируют
                         if (MapUtils.checkMountain(px, py, 10)) isValid = false;
                     } 
-                    // --- ПРАВИЛА АСФАЛЬТА (ASPHALT) ---
+                    // --- ПРАВИЛА АСФАЛЬТА ---
                     else if (bType === 'ASPHALT') {
-                        // 1. На воде МОЖНО (асфальт работает как мост)
-                        // 2. Деревья БЛОКИРУЮТ (для шоссе нужно чистое поле)
                         let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
                         let nearTree = neighbors.some(u => u.type === 'TREE' && u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 30);
                         if (nearTree) isValid = false;
-                        // 3. Горы блокируют
                         if (MapUtils.checkMountain(px, py, 10)) isValid = false;
                     }
                     
@@ -4409,7 +4423,7 @@ onUp(e) {
                 this.money -= costTotal; 
                 document.getElementById('money').innerText = Math.floor(this.money); 
             } else {
-                this.showError(`НЕТ ДЕНЕГ! (Нужно: ${costTotal}$)`);
+                if (this.showError) this.showError(`НЕТ ДЕНЕГ! (Нужно: ${costTotal}$)`);
             }
             return;
         }
@@ -5047,21 +5061,52 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
 
-// --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ ---
+// --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
         if (this.roadDragStart && window.mousePos) {
             ctx.save();
             let bType = this.roadDragStart.type;
-            // Асфальт рисуем темно-серым, тропинку - желто-коричневой
-            ctx.strokeStyle = bType === 'ASPHALT' ? 'rgba(50, 50, 50, 0.9)' : 'rgba(255, 200, 0, 0.7)';
-            ctx.lineWidth = bType === 'ASPHALT' ? 22 : 15;
-            ctx.lineCap = 'round';
-            ctx.beginPath(); ctx.moveTo(this.roadDragStart.x, this.roadDragStart.y); ctx.lineTo(window.mousePos.x, window.mousePos.y); ctx.stroke();
             
-            // Подсчет стоимости на лету
-            let dist = Math.hypot(window.mousePos.x - this.roadDragStart.x, window.mousePos.y - this.roadDragStart.y);
-            let cost = Math.max(1, Math.floor(dist / 30)) * UNITS[bType].cost; 
+            // Вычисляем координаты начальной и конечной клетки
+            let startCx = Math.floor(this.roadDragStart.x / 30);
+            let startCy = Math.floor(this.roadDragStart.y / 30);
+            let endCx = Math.floor(window.mousePos.x / 30);
+            let endCy = Math.floor(window.mousePos.y / 30);
             
-            ctx.fillStyle = this.money >= cost ? '#0f0' : '#f00';
+            let dx = endCx - startCx;
+            let dy = endCy - startCy;
+            
+            // Вычисляем длину пути в клетках
+            let steps = Math.max(Math.abs(dx), Math.abs(dy));
+            let cellsToDraw = [];
+            
+            // Одиночный клик или протяжка
+            if (steps === 0) {
+                cellsToDraw.push({cx: startCx, cy: startCy});
+            } else {
+                for (let i = 0; i <= steps; i++) {
+                    cellsToDraw.push({
+                        cx: startCx + Math.round(dx * (i / steps)),
+                        cy: startCy + Math.round(dy * (i / steps))
+                    });
+                }
+            }
+
+            let cost = cellsToDraw.length * UNITS[bType].cost;
+            let canAfford = this.money >= cost;
+
+            // Настраиваем цвета превью
+            ctx.fillStyle = bType === 'ASPHALT' ? 'rgba(34, 34, 34, 0.8)' : 'rgba(92, 64, 51, 0.8)';
+            ctx.strokeStyle = canAfford ? '#0f0' : '#f00';
+            ctx.lineWidth = 2;
+
+            // Рисуем квадраты-превью строго по сетке
+            cellsToDraw.forEach(cell => {
+                ctx.fillRect(cell.cx * 30, cell.cy * 30, 30, 30);
+                ctx.strokeRect(cell.cx * 30, cell.cy * 30, 30, 30);
+            });
+
+            // Вывод стоимости
+            ctx.fillStyle = canAfford ? '#0f0' : '#f00';
             ctx.font = 'bold 20px Arial';
             ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
             ctx.fillText(`$${cost}`, window.mousePos.x + 20, window.mousePos.y - 20);

@@ -683,12 +683,16 @@ const CountryEditor = {
         description: ''
     },
     
-    init() {
+init() {
         // Загружаем данные из памяти браузера при входе в игру
         const saved = localStorage.getItem('iron_tactics_country');
         if (saved) {
             this.data = { ...this.data, ...JSON.parse(saved) };
-            FACTIONS['player'].name = this.data.name; // Сразу применяем к фракции игрока
+            FACTIONS['player'].name = this.data.name; 
+            // ФИКС: Применяем и для сетевой роли, если она уже задана
+            if (typeof Game !== 'undefined' && Game.myRole && FACTIONS[Game.myRole]) {
+                FACTIONS[Game.myRole].name = this.data.name;
+            }
         }
     },
 
@@ -729,6 +733,11 @@ const CountryEditor = {
 
         // Сохраняем в кэш браузера
         localStorage.setItem('iron_tactics_country', JSON.stringify(this.data));
+
+        let myCurrentRole = (typeof Game !== 'undefined' && Game.myRole) ? Game.myRole : 'player';
+        if (FACTIONS[myCurrentRole]) {
+            FACTIONS[myCurrentRole].name = this.data.name;
+        }
 
         // ВАЖНО: Записываем новое имя в объект FACTIONS,
         // чтобы функция updateTerritoryCache() выводила его на карту!
@@ -2939,6 +2948,11 @@ loadPvpLevel(settings) {
         this.startGameUI(this.isIslandMode ? "PVP: АРХИПЕЛАГ" : "PVP: БИТВА");
 // --- ДОБАВИТЬ ЭТОТ БЛОК ---
         if (this.isMultiplayer && CURRENT_ROOM) {
+
+            // ФИКС: Применяем наше кастомное имя к нашей сетевой роли локально!
+            if (FACTIONS[this.myRole]) {
+                FACTIONS[this.myRole].name = CountryEditor.data.name;
+            }
             // Когда мы зашли, ждем 1.5 секунды (пока все прогрузится) 
             // и просим остальных игроков прислать нам всё, что они построили.
             setTimeout(() => {

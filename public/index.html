@@ -292,12 +292,6 @@ canvas { display: block; cursor: crosshair; }
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(0.4)">+</button>
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(-0.4)">-</button>
     </div>
-
-   <div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 999999;">
-        <div id="chat-messages" style="overflow-y: auto; color: white; text-shadow: 1px 1px 2px black; font-size: 15px; margin-bottom: 5px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto; padding-right: 5px; max-height: 200px;">
-        </div>
-        <input type="text" id="chat-input" placeholder="Нажмите Enter для чата..." autocomplete="off" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.6); border: 1px solid #0af; color: #fff; pointer-events: auto; display: none; border-radius: 4px; font-family: 'Exo 2', sans-serif;">
-    </div>
     
     <div id="mobile-controls" style="display:none; pointer-events:none;">
         <div id="joystick-zone" style="position:absolute; bottom:50px; left:50px; width:150px; height:150px; background:rgba(255,255,255,0.1); border:2px solid rgba(255,255,255,0.3); border-radius:50%; pointer-events:auto; touch-action:none;">
@@ -497,6 +491,14 @@ canvas { display: block; cursor: crosshair; }
             <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
         </div>
     </div>
+</div>
+    <div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
+    </div>
+
+<div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 999999;">
+    <div id="chat-messages" style="overflow-y: auto; color: white; text-shadow: 1px 1px 2px black; font-size: 15px; margin-bottom: 5px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto; padding-right: 5px; max-height: 200px;">
+    </div>
+    <input type="text" id="chat-input" placeholder="Нажмите Enter для чата..." autocomplete="off" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.6); border: 1px solid #0af; color: #fff; pointer-events: auto; display: none; border-radius: 4px; font-family: 'Exo 2', sans-serif;">
 </div>
 <script>
 const CAPTURABLE_BUILDINGS = ['HOUSE', 'FACTORY', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'HOSPITAL', 'WAREHOUSE'];

@@ -5125,7 +5125,47 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
 
-// --- ПРЕВЬЮ ПОСТРОЙКИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
+
+
+// --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
+        if ((this.selection && this.selection.some(u => u.isBuilder)) || this.roadDragStart) {
+            ctx.save();
+            let startCx = Math.floor(this.camera.x / 30);
+            let endCx = Math.ceil((this.camera.x + canvas.width / (this.zoom || 1)) / 30);
+            let startCy = Math.floor(this.camera.y / 30);
+            let endCy = Math.ceil((this.camera.y + canvas.height / (this.zoom || 1)) / 30);
+
+            for (let cx = startCx; cx <= endCx; cx++) {
+                for (let cy = startCy; cy <= endCy; cy++) {
+                    let px = cx * 30 + 15; 
+                    let py = cy * 30 + 15;
+                    
+                    let isValid = true;
+                    if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
+                    if (isValid && (MapUtils.checkWater(px, py) || MapUtils.checkMountain(px, py, 12))) isValid = false;
+                    if (isValid && MapUtils.checkRoad(px, py)) isValid = false;
+                    if (isValid) {
+                        let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
+                        let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < u.radius + 15);
+                        if (occupied) isValid = false;
+                    }
+
+                    ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.15)';
+                    ctx.strokeStyle = isValid ? 'rgba(0, 255, 0, 0.25)' : 'rgba(255, 0, 0, 0.25)';
+                    ctx.fillRect(cx * 30 + 1, cy * 30 + 1, 28, 28);
+                    
+                    if (!isValid) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx * 30 + 5, cy * 30 + 5); ctx.lineTo(cx * 30 + 25, cy * 30 + 25);
+                        ctx.moveTo(cx * 30 + 25, cy * 30 + 5); ctx.lineTo(cx * 30 + 5, cy * 30 + 25);
+                        ctx.stroke();
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        // --- ПРЕВЬЮ ПОСТРОЙКИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
         if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos; 
             let bType = this.pendingConstruction;
@@ -5167,130 +5207,10 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             }
             ctx.restore();
         }
+        
+        ctx.restore(); // СБРОС ТРАНСФОРМАЦИИ МИРА (ЗУМА)
 
-        // =======================================================
-        // ВАЖНО: ВОТ ЗДЕСЬ ЗАКАНЧИВАЕТСЯ МИР И ОТКЛЮЧАЕТСЯ ЗУМ!
-        ctx.restore(); 
-        // =======================================================
-
-        // --- РАМКА ВЫДЕЛЕНИЯ (В экранных координатах, поверх зума) ---
-        if (this.dragStart && this.dragCurr) {
-            ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0); 
-            const w = this.dragCurr.x - this.dragStart.rx;
-            const h = this.dragCurr.y - this.dragStart.ry;
-            ctx.strokeStyle = '#0f0'; 
-            ctx.lineWidth = 1;
-            ctx.strokeRect(this.dragStart.rx, this.dragStart.ry, w, h);
-            ctx.restore();
-        }
-
-
-// --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
-        // Активируется, если выбран строитель или мы тянем дорогу
-        if ((this.selection && this.selection.some(u => u.isBuilder)) || this.roadDragStart) {
-            ctx.save();
-            
-            // Вычисляем только видимую часть экрана, чтобы не было лагов!
-            let startCx = Math.floor(this.camera.x / 30);
-            let endCx = Math.ceil((this.camera.x + canvas.width) / 30);
-            let startCy = Math.floor(this.camera.y / 30);
-            let endCy = Math.ceil((this.camera.y + canvas.height) / 30);
-
-            for (let cx = startCx; cx <= endCx; cx++) {
-                for (let cy = startCy; cy <= endCy; cy++) {
-                    let px = cx * 30 + 15; // Центр проверяемой клетки
-                    let py = cy * 30 + 15;
-                    
-                    let isValid = true;
-                    
-                    // 1. Твоя ли это территория?
-                    if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
-                    
-                    // 2. Мешают ли горы или вода?
-                    if (isValid && (MapUtils.checkWater(px, py) || MapUtils.checkMountain(px, py, 12))) isValid = false;
-                    
-                    // 3. Занята ли клетка дорогой?
-                    if (isValid && MapUtils.checkRoad(px, py)) isValid = false;
-                    
-                    // 4. Занята ли клетка юнитами, зданиями или деревьями?
-                    if (isValid) {
-                        let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
-                        // Проверяем всех живых в радиусе 20 пикселей от центра клетки
-                        let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < u.radius + 15);
-                        if (occupied) isValid = false;
-                    }
-
-                    // Отрисовка подложки клетки
-                    // Зеленый цвет для свободных, красный для занятых
-                    ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.15)';
-                    ctx.strokeStyle = isValid ? 'rgba(0, 255, 0, 0.25)' : 'rgba(255, 0, 0, 0.25)';
-                    
-                    // Рисуем саму клеточку чуть меньше (28x28 вместо 30x30), чтобы получился красивый зазор сетки
-                    ctx.fillRect(cx * 30 + 1, cy * 30 + 1, 28, 28);
-                    
-                    // Если клетка занята, рисуем в ней красный крестик (опционально для красоты)
-                    if (!isValid) {
-                        ctx.beginPath();
-                        ctx.moveTo(cx * 30 + 5, cy * 30 + 5);
-                        ctx.lineTo(cx * 30 + 25, cy * 30 + 25);
-                        ctx.moveTo(cx * 30 + 25, cy * 30 + 5);
-                        ctx.lineTo(cx * 30 + 5, cy * 30 + 25);
-                        ctx.stroke();
-                    }
-                }
-            }
-            ctx.restore();
-        }
-
-    if (this.pendingConstruction && window.mousePos) {
-            let m = window.mousePos;
-            let bType = this.pendingConstruction;
-            let bRad = UNITS[bType].radius;
-            let GAP = (bType === 'WALL') ? -10 : 15; // Точно такой же зазор, как при клике!
-            
-            // СИНХРОНИЗИРУЕМ ПРЕВЬЮ С ТОЧКОЙ ПРИМАГНИЧИВАНИЯ СЕТКИ
-            let snapX = Math.floor(m.x / 30) * 30 + 15;
-            let snapY = Math.floor(m.y / 30) * 30 + 15;
-            
-            // Проверяем все те же правила, что и при клике строительства
-            let inWater = MapUtils.checkWater(snapX, snapY);
-            let onMountain = MapUtils.checkMountain(snapX, snapY, bRad);
-            let owner = this.getTerritoryOwner(snapX, snapY);
-            let onRoad = MapUtils.checkRoad(snapX, snapY);
-            
-            // Проверяем, не пересекаемся ли мы с другими юнитами или стройками
-            let busy = this.units.some(u => u.hp > 0 && Math.hypot(u.x-snapX, u.y-snapY) < u.radius + bRad + GAP) ||
-                       this.constructions.some(c => Math.hypot(c.x-snapX, c.y-snapY) < UNITS[c.type].radius + bRad + GAP);
-            
-            // Итоговый вердикт
-            let isValid = !inWater && !onMountain && !onRoad && (owner === this.myRole) && !busy;
-
-            ctx.save();
-            ctx.beginPath();
-            // РИСУЕМ КРУГ ИМЕННО ТАМ, КУДА ЗДАНИЕ ВСТАНЕТ!
-            ctx.arc(snapX, snapY, bRad, 0, Math.PI*2);
-            
-            // Если можно - заливаем зеленым, если нельзя - красным
-            ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
-            ctx.fill();
-            ctx.strokeStyle = isValid ? '#0f0' : '#f00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // Радиус действия ПВО и СЭС
-            if (UNITS[bType].range || UNITS[bType].energyGen) {
-                let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
-                ctx.beginPath();
-                ctx.arc(snapX, snapY, range, 0, Math.PI*2);
-                ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
-         ctx.restore();
-    // --- РАМКА ВЫДЕЛЕНИЯ (В экранных координатах, ПОВЕРХ ЗУМА) ---
+        // --- РАМКА ВЫДЕЛЕНИЯ (В экранных координатах, ПОВЕРХ ЗУМА) ---
         if (this.dragStart && this.dragCurr) {
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0); // Игнорируем камеру
@@ -5301,7 +5221,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.strokeRect(this.dragStart.rx, this.dragStart.ry, w, h);
             ctx.restore();
         }
-    }, // <-- КОНЕЦ ФУНКЦИИ draw
+    }, // <-- КОНЕЦ ФУНКЦИИ draw()
 
     renderLoop() { if (!document.hidden) { this.draw(); } requestAnimationFrame(() => this.renderLoop()); },
 
@@ -5399,7 +5319,9 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
     }
 };
 window.addEventListener('mousemove', e => {
-    if (Game.camera) { const r = canvas.getBoundingClientRect(); window.mousePos = { x: e.clientX - r.left + Game.camera.x, y: e.clientY - r.top + Game.camera.y }; }
+    if (Game.camera && Game.getMouse) { 
+        window.mousePos = Game.getMouse(e); // Используем ту же функцию, что и для идеальных кликов!
+    }
 });
 
 class SpatialHash {

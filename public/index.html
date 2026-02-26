@@ -851,11 +851,30 @@ buildRoad(x, y, type = 'ROAD') {
                 ctx.fillStyle = 'rgba(90, 60, 40, 0.8)';
                 // Квадратная тропинка на фоне
                 ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
-            } else if (type === 'ASPHALT') {
+    } else if (type === 'ASPHALT') {
                 ctx.fillStyle = '#222';
-                // Квадратный асфальт на фоне
                 ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
                 
+                // Проверяем соседей для фоновой разметки
+                let t = this.roadGrid.get(`${cx},${cy-1}`) === 'ASPHALT';
+                let b = this.roadGrid.get(`${cx},${cy+1}`) === 'ASPHALT';
+                let l = this.roadGrid.get(`${cx-1},${cy}`) === 'ASPHALT';
+                let r = this.roadGrid.get(`${cx+1},${cy}`) === 'ASPHALT';
+                
+                let isHorizontal = (l || r) && !t && !b;
+                let isVertical = (t || b) && !l && !r;
+                let isIntersection = (l || r) && (t || b);
+                
+                ctx.fillStyle = '#fff';
+                if (isHorizontal && cx % 2 === 0) {
+                    ctx.fillRect((x - 8) * scale, (y - 2) * scale, 16 * scale, 4 * scale);
+                } else if (isVertical && cy % 2 === 0) {
+                    ctx.fillRect((x - 2) * scale, (y - 8) * scale, 4 * scale, 16 * scale);
+                } else if (isIntersection) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.fillRect((x - 3) * scale, (y - 3) * scale, 6 * scale, 6 * scale);
+                }
+            }
                 // Статичная разметка для фона
                 let tileX = Math.floor(x / 30), tileY = Math.floor(y / 30);
                 if ((tileX + tileY) % 2 === 0) {
@@ -914,7 +933,7 @@ getWorldHeight(x, y) {
         noiseVal = (noiseVal / maxAmp + 1) / 2;
 
         // 3. Немного "топим" карту, чтобы острова визуально отделились друг от друга проливами
-        noiseVal = Math.pow(noiseVal, 0.5); 
+        noiseVal = Math.pow(noiseVal, 0.8); 
 
         // 4. Накладываем краевую маску
         let h = noiseVal * edgeMask;
@@ -4724,16 +4743,35 @@ draw() {
                 if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
                     py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
                     
-                    if (type === 'ASPHALT') {
+                 if (type === 'ASPHALT') {
                         ctx.fillStyle = '#222';
-                        // Рисуем строгий КВАДРАТ 30x30 пикселей (по размеру сетки)
                         ctx.fillRect(px - 15, py - 15, 30, 30); 
                         
-                        // Анимированная дорожная разметка (зависит от координат и времени)
-                        if ((cx + cy + animPhase) % 2 === 0) {
-                            ctx.fillStyle = '#fff';
-                            // Вертикальная разметка
-                            ctx.fillRect(px - 2, py - 8, 4, 16); 
+                        // Смотрим, есть ли асфальт в соседних клетках
+                        let t = MapUtils.roadGrid.get(`${cx},${cy-1}`) === 'ASPHALT'; // Сверху
+                        let b = MapUtils.roadGrid.get(`${cx},${cy+1}`) === 'ASPHALT'; // Снизу
+                        let l = MapUtils.roadGrid.get(`${cx-1},${cy}`) === 'ASPHALT'; // Слева
+                        let r = MapUtils.roadGrid.get(`${cx+1},${cy}`) === 'ASPHALT'; // Справа
+
+                        // Определяем форму участка дороги
+                        let isHorizontal = (l || r) && !t && !b;
+                        let isVertical = (t || b) && !l && !r;
+                        let isIntersection = (l || r) && (t || b); // Перекресток или поворот
+
+                        // Анимированная дорожная разметка
+                        ctx.fillStyle = '#fff';
+                        if (isHorizontal) {
+                            if ((cx + animPhase) % 2 === 0) {
+                                ctx.fillRect(px - 8, py - 2, 16, 4); // Горизонтальная полоса
+                            }
+                        } else if (isVertical) {
+                            if ((cy + animPhase) % 2 === 0) {
+                                ctx.fillRect(px - 2, py - 8, 4, 16); // Вертикальная полоса
+                            }
+                        } else if (isIntersection) {
+                            // На перекрестках рисуем тусклый квадрат по центру (как стоп-линия/центр)
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                            ctx.fillRect(px - 3, py - 3, 6, 6);
                         }
                     } else if (type === 'ROAD') {
                         // Квадратная тропинка

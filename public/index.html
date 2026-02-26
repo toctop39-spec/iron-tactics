@@ -581,7 +581,8 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     },
 
     WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
-    ROAD: { type: 'bldg', name: 'Дорога', emoji: '🛣️', cost: 150, hp: 100, radius: 15, constructTime: 1, color: '#555' },
+    ROAD: { type: 'bldg', name: 'Тропинка', emoji: '🟤', cost: 200, hp: 100, radius: 15, constructTime: 1, color: '#555' },
+    ASPHALT: { type: 'bldg', name: 'Асфальт', emoji: '🛣️', cost: 600, hp: 500, radius: 20, constructTime: 1, color: '#222' },
 
     TREE: { type: 'bldg', name: 'Дерево', hp: 80, radius: 12, color: '#2d4c1e', isInvulnerable: false },
     
@@ -828,50 +829,47 @@ const MapUtils = {
 roadGrid: new Set(), // Хранилище построенных плиток дороги
 
 // Добавляем плитку дороги и ВЖИВЛЯЕМ её в текстуру фона
-buildRoad(x, y) {
-        // Умная защита: создаем хранилище, если его нет
-        if (!this.roadGrid) { this.roadGrid = new Set(); }
+buildRoad(x, y, type = 'ROAD') {
+        if (!this.roadGrid) { this.roadGrid = new Map(); }
         
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
         const gridKey = cx + "," + cy;
 
-        // Если в этой клетке уже есть дорога, не рисуем поверх еще раз
-        if (this.roadGrid.has(gridKey)) return;
+        // Если в этой клетке уже есть такая же дорога, выходим
+        if (this.roadGrid.has(gridKey) && this.roadGrid.get(gridKey) === type) return;
 
-        this.roadGrid.add(gridKey);
+        this.roadGrid.set(gridKey, type);
 
-        // --- МАГИЯ ТЕКСТУРЫ (ИСПРАВЛЕНО МАСШТАБИРОВАНИЕ) ---
+        // Рисуем на фоне (для режима островов)
         if (this.bgCanvas) {
             const ctx = this.bgCanvas.getContext('2d');
-            
-            // ВАЖНО: bgCanvas отрендерен в масштабе 0.5, 
-            // поэтому все координаты и размеры для него нужно умножать на scale!
             const scale = 0.5; 
             
-            const rx = (x + (Math.random() - 0.5) * 15) * scale;
-            const ry = (y + (Math.random() - 0.5) * 15) * scale;
-            const radius = (35 + Math.random() * 10) * scale; 
+            if (type === 'ROAD') {
+                const rx = (x + (Math.random() - 0.5) * 15) * scale;
+                const ry = (y + (Math.random() - 0.5) * 15) * scale;
+                const radius = (35 + Math.random() * 10) * scale; 
 
-            const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
-            gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
-            gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
-            gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
+                const gradient = ctx.createRadialGradient(rx, ry, 10 * scale, rx, ry, radius);
+                gradient.addColorStop(0, 'rgba(70, 50, 30, 0.85)');  
+                gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
+                gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
 
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Камешки тоже уменьшаем
-            for(let i=0; i<3; i++) {
-                ctx.fillStyle = 'rgba(50, 40, 30, 0.6)';
-                const px = rx + (Math.random() - 0.5) * 30 * scale;
-                const py = ry + (Math.random() - 0.5) * 30 * scale;
-                ctx.beginPath();
-                ctx.arc(px, py, (2 + Math.random()*3) * scale, 0, Math.PI*2);
-                ctx.fill();
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = gradient;
+                ctx.beginPath(); ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2); ctx.fill();
+            } else if (type === 'ASPHALT') {
+                const radius = 22 * scale;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = '#222';
+                ctx.beginPath(); ctx.arc(x * scale, y * scale, radius, 0, Math.PI * 2); ctx.fill();
+                
+                // Дорожная разметка
+                if (Math.random() > 0.5) {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect((x - 2) * scale, (y - 8) * scale, 4 * scale, 16 * scale);
+                }
             }
         }
     },
@@ -892,7 +890,7 @@ buildRoad(x, y) {
         this.lakes = [];
         this.mountains = [];
         this.spawnPoints = [];
-        this.roadGrid = new Set(); // <--- Очищаем дороги новой игры
+       this.roadGrid = new Map(); // <--- Очищаем дороги новой игры (теперь Map)
 
         if (Game.isIslandMode) this.calculateSpawns();
         this.generateMountains();
@@ -994,7 +992,7 @@ roadPaths: [],
 
     generateRoads() {
         this.roadPaths = [];
-        this.roadGrid = new Set();
+       this.roadGrid = new Map();
         if (this.spawnPoints.length < 2) return;
 
         const step = 80; // Больший шаг = алгоритм работает в разы быстрее
@@ -1075,25 +1073,24 @@ roadPaths: [],
             for (let pt of path) {
                 let cx = Math.floor(pt.x / 30);
                 let cy = Math.floor(pt.y / 30);
-                this.roadGrid.add(cx + "," + cy);
+                this.roadGrid.set(cx + "," + cy);
             }
         }
     },
 
-    // Моментальная проверка (без нагрузки на процессор)
-    checkRoad(x, y) {
+checkRoad(x, y) {
         if (!this.roadGrid) return false;
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
-        // Проверяем квадрат 3х3, чтобы дорога была широкой
         for(let dx = -1; dx <= 1; dx++){
             for(let dy = -1; dy <= 1; dy++){
-                if (this.roadGrid.has((cx+dx) + "," + (cy+dy))) return true;
+                let type = this.roadGrid.get((cx+dx) + "," + (cy+dy));
+                if (type) return type; // Вернет 'ROAD' или 'ASPHALT'
             }
         }
         return false;
     },
-
+    
     getGroundType(x, y) {
         if (this.checkRoad(x, y)) return 'ROAD'; // Дороги в приоритете (даже над водой)
         if (Game.isIslandMode && this.getWorldHeight(x, y) < 0.48) return 'WATER';
@@ -3227,10 +3224,10 @@ else if (cmd.type === 'build_start') {
             if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
         }
 
-            // --- СИНХРОНИЗАЦИЯ ДОРОГ ---
+// --- СИНХРОНИЗАЦИЯ ДОРОГ ---
         else if (cmd.type === 'build_road') {
-            MapUtils.buildRoad(cmd.x, cmd.y);
-            Game.effects.push({x: cmd.x, y: cmd.y, char: '🛣️', life: 20});
+            MapUtils.buildRoad(cmd.x, cmd.y, cmd.roadType || 'ROAD');
+            Game.effects.push({x: cmd.x, y: cmd.y, char: cmd.roadType === 'ASPHALT' ? '⬛' : '🟤', life: 20});
         }
 // === 1. НОВИЧОК ПРОСИТ ДАННЫЕ ===
         else if (cmd.type === 'request_sync') {
@@ -3881,10 +3878,11 @@ onDown(e) {
                 }
 
    // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ---
-                if (bType === 'ROAD') {
-                    // НАЧИНАЕМ ПРОТЯЖКУ ДОРОГИ
-                    this.roadDragStart = { x: m.x, y: m.y };
-                    return; // Выходим, ждем onUp
+              // --- МГНОВЕННАЯ ПОСТРОЙКА ДОРОГИ ИЛИ АСФАЛЬТА ---
+                if (bType === 'ROAD' || bType === 'ASPHALT') {
+                    // НАЧИНАЕМ ПРОТЯЖКУ
+                    this.roadDragStart = { x: m.x, y: m.y, type: bType };
+                    return; 
                 }
 
                 // --- ПОСТРОЙКА ОБЫЧНЫХ ЗДАНИЙ ---
@@ -4351,35 +4349,53 @@ onUp(e) {
         if (!this.dragStart && !this.roadDragStart) return; 
         const m = this.getMouse(e);
         
-        // === НОВОЕ: ПОСТРОЙКА ДОРОГИ ПРОТЯЖКОЙ ===
-        if (this.roadDragStart) {
+ if (this.roadDragStart) {
             const start = this.roadDragStart;
-            this.roadDragStart = null; // Сбрасываем
+            this.roadDragStart = null; 
+            let bType = start.type; // 'ROAD' или 'ASPHALT'
 
             let dx = m.x - start.x;
             let dy = m.y - start.y;
             let dist = Math.hypot(dx, dy);
             
-            // Ставим плитку дороги каждые 30 пикселей
             let stepsCount = Math.max(1, Math.floor(dist / 30)); 
-            let costTotal = stepsCount * UNITS.ROAD.cost;
+            let costTotal = stepsCount * UNITS[bType].cost;
 
             if (this.money >= costTotal) {
                 for (let i = 0; i <= stepsCount; i++) {
                     let px = start.x + (dx * (i / stepsCount));
                     let py = start.y + (dy * (i / stepsCount));
                     
-                    // Строим только на своей территории и не на воде/горах
-                    if (this.getTerritoryOwner(px, py) === this.myRole && !MapUtils.checkWater(px, py) && !MapUtils.checkMountain(px, py, 10)) {
-                        MapUtils.buildRoad(px, py); 
-                        this.effects.push({x: px, y: py, char: '🟤', life: 20});
+                    let isValid = true;
+                    // Нельзя строить на чужой земле и в горах
+                    if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
+                    if (MapUtils.checkMountain(px, py, 10)) isValid = false;
+
+                    // --- ПРАВИЛА ТРОПИНКИ ---
+                    if (bType === 'ROAD') {
+                        // Нельзя строить на воде и ближе 40px к воде
+                        if (MapUtils.checkWater(px, py) || MapUtils.checkWater(px + 40, py) || MapUtils.checkWater(px - 40, py) || MapUtils.checkWater(px, py + 40) || MapUtils.checkWater(px, py - 40)) {
+                            isValid = false;
+                        }
+                    } 
+                    // --- ПРАВИЛА АСФАЛЬТА ---
+                    else if (bType === 'ASPHALT') {
+                        // Нельзя строить в лесу (ближе 50px к дереву)
+                        let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
+                        let nearTree = neighbors.some(u => u.type === 'TREE' && u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 50);
+                        if (nearTree) isValid = false;
+                    }
+                    
+                    if (isValid) {
+                        MapUtils.buildRoad(px, py, bType); 
+                        this.effects.push({x: px, y: py, char: bType === 'ROAD' ? '🟤' : '⬛', life: 20});
                         
                         if (this.isMultiplayer && CURRENT_ROOM) {
-                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: px, y: py });
+                            this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_road', x: px, y: py, roadType: bType });
                         }
                     }
                 }
-                this.money -= costTotal; // Списываем деньги за весь кусок разом
+                this.money -= costTotal; 
                 document.getElementById('money').innerText = Math.floor(this.money); 
             } else {
                 this.showError(`НЕТ ДЕНЕГ! (Нужно: ${costTotal}$)`);
@@ -4509,7 +4525,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
-                        this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");;
+                       this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD', 'ASPHALT'], true, "ПОСТРОЙКИ");
                     }
                     else {
                         // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---
@@ -4695,19 +4711,25 @@ draw() {
             ctx.fillRect(this.camera.x, this.camera.y, canvas.width, canvas.height);
         }
 
-    // --- ОТРИСОВКА ПОСТРОЕННЫХ ТРОПИНОК (ИГРОКОМ) ---
+// --- ОТРИСОВКА ПОСТРОЕННЫХ ДОРОГ ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
-            MapUtils.roadGrid.forEach(key => {
+            MapUtils.roadGrid.forEach((type, key) => {
+                // Страховка на случай старых сохранений
+                if (typeof key !== 'string') { key = type; type = 'ROAD'; }
+
                 let [cx, cy] = key.split(',').map(Number);
-                
                 let px = cx * 30; 
                 let py = cy * 30;
                 
-                // Здесь this.camera.x сработает идеально, потому что мы внутри объекта Game!
                 if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
                     py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
                     
-                    if (Game.roadTexture) {
+                    if (type === 'ASPHALT') {
+                        ctx.fillStyle = '#222';
+                        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(px - 2, py - 4, 4, 8); // Разметка
+                    } else if (type === 'ROAD' && Game.roadTexture) {
                         ctx.drawImage(Game.roadTexture, px - 15, py - 15);
                     }
                 }
@@ -4981,24 +5003,23 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
 
-    // --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ ---
+// --- ПРЕВЬЮ ПРОТЯЖКИ ДОРОГИ ---
         if (this.roadDragStart && window.mousePos) {
             ctx.save();
-            ctx.strokeStyle = 'rgba(255, 200, 0, 0.7)';
-            ctx.lineWidth = 15;
+            let bType = this.roadDragStart.type;
+            // Асфальт рисуем темно-серым, тропинку - желто-коричневой
+            ctx.strokeStyle = bType === 'ASPHALT' ? 'rgba(50, 50, 50, 0.9)' : 'rgba(255, 200, 0, 0.7)';
+            ctx.lineWidth = bType === 'ASPHALT' ? 22 : 15;
             ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(this.roadDragStart.x, this.roadDragStart.y);
-            ctx.lineTo(window.mousePos.x, window.mousePos.y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(this.roadDragStart.x, this.roadDragStart.y); ctx.lineTo(window.mousePos.x, window.mousePos.y); ctx.stroke();
             
             // Подсчет стоимости на лету
             let dist = Math.hypot(window.mousePos.x - this.roadDragStart.x, window.mousePos.y - this.roadDragStart.y);
-            let cost = Math.max(1, Math.floor(dist / 30)) * UNITS.ROAD.cost; 
+            let cost = Math.max(1, Math.floor(dist / 30)) * UNITS[bType].cost; 
             
             ctx.fillStyle = this.money >= cost ? '#0f0' : '#f00';
             ctx.font = 'bold 20px Arial';
-            ctx.shadowColor = '#000'; ctx.shadowBlur = 4; // Тень для читаемости
+            ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
             ctx.fillText(`$${cost}`, window.mousePos.x + 20, window.mousePos.y - 20);
             ctx.restore();
         }
@@ -6028,6 +6049,8 @@ _movePhysics() {
                     
                     if (ground === 'ROAD') {
                         currentSpeed *= 1.5; // На дороге все быстрее на 50%
+                    } else if (ground === 'ASPHALT') {
+                        currentSpeed *= 2.2;
                     } else if (ground === 'MUD') {
                         // В грязи техника вязнет страшно, пехоте чуть легче
                         currentSpeed *= isVehicle ? 0.3 : 0.7; 

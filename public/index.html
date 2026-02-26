@@ -856,17 +856,19 @@ buildRoad(x, y, type = 'ROAD') {
                 gradient.addColorStop(0.5, 'rgba(90, 70, 40, 0.5)'); 
                 gradient.addColorStop(1, 'rgba(100, 80, 50, 0)');    
 
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.fillStyle = gradient;
-                ctx.beginPath(); ctx.ellipse(rx, ry, radius, radius * (0.8 + Math.random()*0.4), Math.random()*Math.PI, 0, Math.PI * 2); ctx.fill();
+       ctx.globalCompositeOperation = 'source-over';
+            if (type === 'ROAD') {
+                ctx.fillStyle = 'rgba(90, 60, 40, 0.8)';
+                // Квадратная тропинка на фоне
+                ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
             } else if (type === 'ASPHALT') {
-                const radius = 22 * scale;
-                ctx.globalCompositeOperation = 'source-over';
                 ctx.fillStyle = '#222';
-                ctx.beginPath(); ctx.arc(x * scale, y * scale, radius, 0, Math.PI * 2); ctx.fill();
+                // Квадратный асфальт на фоне
+                ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
                 
-                // Дорожная разметка
-                if (Math.random() > 0.5) {
+                // Статичная разметка для фона (фон не анимируется, чтобы не лагало)
+                let cx = Math.floor(x / 30), cy = Math.floor(y / 30);
+                if ((cx + cy) % 2 === 0) {
                     ctx.fillStyle = '#fff';
                     ctx.fillRect((x - 2) * scale, (y - 8) * scale, 4 * scale, 16 * scale);
                 }
@@ -4366,24 +4368,30 @@ onUp(e) {
                     let px = start.x + (dx * (i / stepsCount));
                     let py = start.y + (dy * (i / stepsCount));
                     
-                    let isValid = true;
-                    // Нельзя строить на чужой земле и в горах
+          let isValid = true;
+                    // Проверка территории (можно строить только на своей)
                     if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
-                    if (MapUtils.checkMountain(px, py, 10)) isValid = false;
 
-                    // --- ПРАВИЛА ТРОПИНКИ ---
+                    // Убрали общую проверку на горы/деревья, чтобы сделать её уникальной для каждого типа дороги!
+                    let isWater = MapUtils.checkWater(px, py) || MapUtils.checkWater(px + 30, py) || MapUtils.checkWater(px - 30, py) || MapUtils.checkWater(px, py + 30) || MapUtils.checkWater(px, py - 30);
+
+                    // --- ПРАВИЛА ТРОПИНКИ (ROAD) ---
                     if (bType === 'ROAD') {
-                        // Нельзя строить на воде и ближе 40px к воде
-                        if (MapUtils.checkWater(px, py) || MapUtils.checkWater(px + 40, py) || MapUtils.checkWater(px - 40, py) || MapUtils.checkWater(px, py + 40) || MapUtils.checkWater(px, py - 40)) {
-                            isValid = false;
-                        }
+                        // 1. Нельзя на воде
+                        if (isWater) isValid = false;
+                        // 2. Деревья ИГНОРИРУЮТСЯ (тропинка идет сквозь лес)
+                        // 3. Горы блокируют
+                        if (MapUtils.checkMountain(px, py, 10)) isValid = false;
                     } 
-                    // --- ПРАВИЛА АСФАЛЬТА ---
+                    // --- ПРАВИЛА АСФАЛЬТА (ASPHALT) ---
                     else if (bType === 'ASPHALT') {
-                        // Нельзя строить в лесу (ближе 50px к дереву)
+                        // 1. На воде МОЖНО (асфальт работает как мост)
+                        // 2. Деревья БЛОКИРУЮТ (для шоссе нужно чистое поле)
                         let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
-                        let nearTree = neighbors.some(u => u.type === 'TREE' && u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 50);
+                        let nearTree = neighbors.some(u => u.type === 'TREE' && u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 30);
                         if (nearTree) isValid = false;
+                        // 3. Горы блокируют
+                        if (MapUtils.checkMountain(px, py, 10)) isValid = false;
                     }
                     
                     if (isValid) {
@@ -4713,8 +4721,10 @@ draw() {
 
 // --- ОТРИСОВКА ПОСТРОЕННЫХ ДОРОГ ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
+            // Генерируем фазу анимации (меняется каждые 5000 мс = 5 сек)
+            let animPhase = Math.floor(Date.now() / 5000);
+
             MapUtils.roadGrid.forEach((type, key) => {
-                // Страховка на случай старых сохранений
                 if (typeof key !== 'string') { key = type; type = 'ROAD'; }
 
                 let [cx, cy] = key.split(',').map(Number);
@@ -4726,11 +4736,23 @@ draw() {
                     
                     if (type === 'ASPHALT') {
                         ctx.fillStyle = '#222';
-                        ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.fill();
-                        ctx.fillStyle = '#fff';
-                        ctx.fillRect(px - 2, py - 4, 4, 8); // Разметка
-                    } else if (type === 'ROAD' && Game.roadTexture) {
-                        ctx.drawImage(Game.roadTexture, px - 15, py - 15);
+                        // Рисуем строгий КВАДРАТ 30x30 пикселей (по размеру сетки)
+                        ctx.fillRect(px - 15, py - 15, 30, 30); 
+                        
+                        // Анимированная дорожная разметка (зависит от координат и времени)
+                        if ((cx + cy + animPhase) % 2 === 0) {
+                            ctx.fillStyle = '#fff';
+                            // Вертикальная разметка
+                            ctx.fillRect(px - 2, py - 8, 4, 16); 
+                        }
+                    } else if (type === 'ROAD') {
+                        // Квадратная тропинка
+                        if (Game.roadTexture) {
+                            ctx.drawImage(Game.roadTexture, px - 15, py - 15, 30, 30);
+                        } else {
+                            ctx.fillStyle = '#5c4033'; // Коричневый цвет тропинки
+                            ctx.fillRect(px - 15, py - 15, 30, 30);
+                        }
                     }
                 }
             });

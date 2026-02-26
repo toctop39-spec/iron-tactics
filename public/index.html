@@ -291,6 +291,12 @@ canvas { display: block; cursor: crosshair; }
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(0.4)">+</button>
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(-0.4)">-</button>
     </div>
+
+    <div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 100;">
+        <div id="chat-messages" style="overflow-y: auto; color: white; text-shadow: 1px 1px 2px black; font-size: 15px; margin-bottom: 5px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto; padding-right: 5px; max-height: 200px;">
+            </div>
+        <input type="text" id="chat-input" placeholder="Нажмите Enter для чата..." autocomplete="off" onkeydown="event.stopPropagation()" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.6); border: 1px solid #0af; color: #fff; pointer-events: auto; display: none; border-radius: 4px; font-family: 'Exo 2', sans-serif;">
+    </div>
     
     <div id="mobile-controls" style="display:none; pointer-events:none;">
         <div id="joystick-zone" style="position:absolute; bottom:50px; left:50px; width:150px; height:150px; background:rgba(255,255,255,0.1); border:2px solid rgba(255,255,255,0.3); border-radius:50%; pointer-events:auto; touch-action:none;">
@@ -7702,6 +7708,92 @@ setTimeout(() => MobileControls.init(), 1000);
 
 // Запускаем реальную инициализацию игры в фоне (пока игрок смотрит загрузку)
 Game.init();
+
+    // --- МЕНЕДЖЕР ЧАТА ---
+const ChatManager = {
+    init() {
+        this.messagesDiv = document.getElementById('chat-messages');
+        this.inputEl = document.getElementById('chat-input');
+        this.isOpen = false;
+
+        // Открытие, закрытие и отправка по Enter/Escape
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (this.isOpen) this.sendMessage();
+                else this.openChat();
+            }
+            if (e.key === 'Escape' && this.isOpen) {
+                this.closeChat();
+            }
+        });
+
+        // Пытаемся подключить слушатель сокета каждые 2 секунды, пока он не появится
+        let checkSocket = setInterval(() => {
+            if (Game && Game.socket) {
+                Game.socket.on('chat_message', (data) => {
+                    this.addMessage(data.sender, data.text, data.color);
+                });
+                clearInterval(checkSocket);
+            }
+        }, 2000);
+    },
+
+    openChat() {
+        if (!Game.isMultiplayer) return; // В кампании/песочнице чат не нужен
+        this.isOpen = true;
+        this.inputEl.style.display = 'block';
+        this.inputEl.focus();
+    },
+
+    closeChat() {
+        this.isOpen = false;
+        this.inputEl.style.display = 'none';
+        this.inputEl.value = '';
+        canvas.focus(); // Возвращаем фокус игре
+    },
+
+    sendMessage() {
+        const text = this.inputEl.value.trim();
+        if (text.length > 0 && Game.socket && CURRENT_ROOM) {
+            
+            // Выбираем цвет в зависимости от команды (Красный или Синий)
+            let myColor = Game.myRole === 'red' ? '#ff4444' : '#4488ff';
+            
+            // Отправляем на сервер
+            Game.socket.emit('chat_message', {
+                roomName: CURRENT_ROOM,
+                sender: Game.myRole === 'red' ? 'Красный' : 'Синий', // Имя
+                text: text,
+                color: myColor
+            });
+        }
+        this.closeChat();
+    },
+
+    addMessage(sender, text, color) {
+        const msg = document.createElement('div');
+        msg.style.background = 'rgba(0, 0, 0, 0.4)';
+        msg.style.padding = '3px 8px';
+        msg.style.borderRadius = '4px';
+        msg.style.marginBottom = '3px';
+        msg.style.wordWrap = 'break-word';
+        msg.style.maxWidth = '100%';
+        
+        msg.innerHTML = `<b style="color: ${color || '#fff'}">${sender}:</b> ${text}`;
+        this.messagesDiv.appendChild(msg);
+        
+        // Автоскролл в самый низ
+        this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight;
+
+        // Удаляем самые старые сообщения, чтобы не засорять память (оставляем 20)
+        if (this.messagesDiv.children.length > 20) {
+            this.messagesDiv.removeChild(this.messagesDiv.firstChild);
+        }
+    }
+};
+
+// Запускаем менеджер после загрузки страницы
+window.addEventListener('load', () => ChatManager.init());
 
 // --- ЛОГИКА ЗАГРУЗОЧНОГО ЭКРАНА ---
 const InitialLoader = {

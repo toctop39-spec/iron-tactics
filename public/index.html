@@ -879,11 +879,24 @@ buildRoad(x, y, type = 'ROAD') {
         }
     },
 
-    // Проверяем, есть ли тут дорога (для скорости танков)
-    checkRoad(x, y) {
+ checkRoad(x, y) {
+        if (!this.roadGrid) return false;
+        
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
-        return this.roadGrid.has(cx + "," + cy);
+        
+        // 1. Проверяем саму клетку (прямо на дороге строить нельзя)
+        let type = this.roadGrid.get(cx + "," + cy);
+        if (type) return type; 
+
+        // 2. Проверяем клетки наискось (по диагоналям строить нельзя)
+        if (this.roadGrid.has((cx - 1) + "," + (cy - 1))) return true; // Левый верх
+        if (this.roadGrid.has((cx + 1) + "," + (cy - 1))) return true; // Правый верх
+        if (this.roadGrid.has((cx - 1) + "," + (cy + 1))) return true; // Левый низ
+        if (this.roadGrid.has((cx + 1) + "," + (cy + 1))) return true; // Правый низ
+
+        // Во всех остальных случаях (сверху, снизу, слева и справа) дорога не мешает
+        return false;
     },
 
     // В функции init() нужно просто очищать сетку при старте:

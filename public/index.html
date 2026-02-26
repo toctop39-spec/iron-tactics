@@ -924,7 +924,7 @@ getWorldHeight(x, y) {
         noiseVal = (noiseVal / maxAmp + 1) / 2;
 
         // 3. Немного "топим" карту, чтобы острова визуально отделились друг от друга проливами
-        noiseVal = Math.pow(noiseVal, 0.7); 
+        noiseVal = Math.pow(noiseVal, 0.5); 
 
         // 4. Накладываем краевую маску
         let h = noiseVal * edgeMask;

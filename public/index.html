@@ -882,16 +882,17 @@ buildRoad(x, y, type = 'ROAD') {
 checkRoad(x, y) {
         if (!this.roadGrid) return false;
         
+        // Вычисляем конкретную клетку, над которой находится курсор (или центр здания)
         let cx = Math.floor(x / 30);
         let cy = Math.floor(y / 30);
         
-        // Проверяем ТОЛЬКО саму клетку, над которой находится курсор.
-        // Никаких проверок вокруг! Если тут нет дороги — строить можно.
+        // Проверяем ТОЛЬКО эту одну клетку. Никаких проверок наискось или рядом!
         let type = this.roadGrid.get(cx + "," + cy);
         
+        // Если тут есть дорога - возвращаем её, иначе возвращаем false (можно строить)
         return type ? type : false;
     },
-
+    
     // В функции init() нужно просто очищать сетку при старте:
     init(forcedSeed) {
         this.seed = forcedSeed !== undefined ? forcedSeed : Math.floor(Math.random() * 1000000);

@@ -2711,8 +2711,15 @@ waterOffset: 0,
         this.generateRoadTexture();
         this.resize();
         window.addEventListener('resize', () => this.resize());
-        window.addEventListener('keydown', e => this.keys[e.code] = true);
-        window.addEventListener('keyup', e => this.keys[e.code] = false);
+        // СТАЛО:
+window.addEventListener('keydown', e => {
+    if (document.activeElement === document.getElementById('chat-input')) return;
+    this.keys[e.code] = true;
+});
+window.addEventListener('keyup', e => {
+    if (document.activeElement === document.getElementById('chat-input')) return;
+    this.keys[e.code] = false;
+});
         canvas.addEventListener('mousedown', e => this.onDown(e));
         window.addEventListener('mousemove', e => this.onMove(e));
         window.addEventListener('mouseup', e => this.onUp(e));
@@ -7801,17 +7808,15 @@ const ChatManager = {
             }
         });
 
-        // Отправка и закрытие (вешаем прямо на поле ввода)
-        this.inputEl.addEventListener('keydown', (e) => {
-            // Останавливаем события, чтобы WASD не двигали камеру, пока мы пишем
-            e.stopPropagation(); 
-            
-            if (e.key === 'Enter') {
-                this.sendMessage();
-            } else if (e.key === 'Escape') {
-                this.closeChat();
-            }
-        });
+this.inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.stopPropagation(); // <--- Добавить это!
+        this.sendMessage();
+    } else if (e.key === 'Escape') {
+        e.stopPropagation(); // <--- Добавить это!
+        this.closeChat();
+    }
+});
 
         // Подключаемся к серверу
         let checkSocket = setInterval(() => {

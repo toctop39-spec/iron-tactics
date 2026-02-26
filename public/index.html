@@ -7709,37 +7709,43 @@ setTimeout(() => MobileControls.init(), 1000);
 // Запускаем реальную инициализацию игры в фоне (пока игрок смотрит загрузку)
 Game.init();
 
-    // --- МЕНЕДЖЕР ЧАТА ---
+// --- МЕНЕДЖЕР ЧАТА (ИСПРАВЛЕННЫЙ) ---
 const ChatManager = {
     init() {
         this.messagesDiv = document.getElementById('chat-messages');
         this.inputEl = document.getElementById('chat-input');
         this.isOpen = false;
 
-        // Открытие, закрытие и отправка по Enter/Escape
+        // 1. Глобальный слушатель для ОТКРЫТИЯ чата (работает везде)
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                if (this.isOpen) this.sendMessage();
-                else this.openChat();
+            if (e.key === 'Enter' && !this.isOpen) {
+                this.openChat();
             }
-            if (e.key === 'Escape' && this.isOpen) {
+        });
+
+        // 2. Слушатель на самом поле ввода для ОТПРАВКИ и ЗАКРЫТИЯ 
+        // (Это обходит баг с блокировкой кнопок)
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.sendMessage();
+            } else if (e.key === 'Escape') {
                 this.closeChat();
             }
         });
 
-        // Пытаемся подключить слушатель сокета каждые 2 секунды, пока он не появится
+        // 3. Подключение к серверу для получения сообщений
         let checkSocket = setInterval(() => {
-            if (Game && Game.socket) {
+            if (Game && Game.socket && !this.socketLinked) {
                 Game.socket.on('chat_message', (data) => {
                     this.addMessage(data.sender, data.text, data.color);
                 });
+                this.socketLinked = true;
                 clearInterval(checkSocket);
             }
         }, 2000);
     },
 
-openChat() {
-        // Убрали проверку на мультиплеер, теперь чат открывается ВСЕГДА!
+    openChat() {
         this.isOpen = true;
         this.inputEl.style.display = 'block';
         this.inputEl.focus();
@@ -7749,23 +7755,32 @@ openChat() {
         this.isOpen = false;
         this.inputEl.style.display = 'none';
         this.inputEl.value = '';
-        canvas.focus(); // Возвращаем фокус игре
+        canvas.focus(); // Возвращаем фокус игре, чтобы снова работало WASD
     },
 
     sendMessage() {
         const text = this.inputEl.value.trim();
-        if (text.length > 0 && Game.socket && CURRENT_ROOM) {
+        if (text.length > 0) {
             
-            // Выбираем цвет в зависимости от команды (Красный или Синий)
-            let myColor = Game.myRole === 'red' ? '#ff4444' : '#4488ff';
-            
-            // Отправляем на сервер
-            Game.socket.emit('chat_message', {
-                roomName: CURRENT_ROOM,
-                sender: Game.myRole === 'red' ? 'Красный' : 'Синий', // Имя
-                text: text,
-                color: myColor
-            });
+            // Если мы в сетевой игре или сидим в лобби с другом:
+            if (Game.socket && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
+                // Вычисляем цвет
+                let myColor = Game.myRole === 'enemy' ? '#ff4444' : '#4488ff';
+                
+                // Берем название страны из редактора, если есть
+                let senderName = (typeof FACTIONS !== 'undefined' && FACTIONS[Game.myRole]) ? FACTIONS[Game.myRole].name : Game.myRole;
+
+                Game.socket.emit('chat_message', {
+                    roomName: CURRENT_ROOM,
+                    sender: senderName.toUpperCase(),
+                    text: text,
+                    color: myColor
+                });
+            } 
+            // Если мы тестируем в одиночной песочнице (просто показываем сообщение локально)
+            else {
+                this.addMessage("Я (Оффлайн)", text, '#00ff00');
+            }
         }
         this.closeChat();
     },
@@ -7782,10 +7797,10 @@ openChat() {
         msg.innerHTML = `<b style="color: ${color || '#fff'}">${sender}:</b> ${text}`;
         this.messagesDiv.appendChild(msg);
         
-        // Автоскролл в самый низ
+        // Автоскролл вниз
         this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight;
 
-        // Удаляем самые старые сообщения, чтобы не засорять память (оставляем 20)
+        // Чистим старые сообщения
         if (this.messagesDiv.children.length > 20) {
             this.messagesDiv.removeChild(this.messagesDiv.firstChild);
         }

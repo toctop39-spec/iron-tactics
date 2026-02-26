@@ -851,11 +851,12 @@ buildRoad(x, y, type = 'ROAD') {
                 ctx.fillStyle = 'rgba(90, 60, 40, 0.8)';
                 // Квадратная тропинка на фоне
                 ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
-    } else if (type === 'ASPHALT') {
+                
+            } else if (type === 'ASPHALT') {
                 ctx.fillStyle = '#222';
                 ctx.fillRect((x - 15) * scale, (y - 15) * scale, 30 * scale, 30 * scale);
                 
-                // Проверяем соседей для фоновой разметки
+                // УМНАЯ РАЗМЕТКА: Проверяем соседей
                 let t = this.roadGrid.get(`${cx},${cy-1}`) === 'ASPHALT';
                 let b = this.roadGrid.get(`${cx},${cy+1}`) === 'ASPHALT';
                 let l = this.roadGrid.get(`${cx-1},${cy}`) === 'ASPHALT';
@@ -873,13 +874,6 @@ buildRoad(x, y, type = 'ROAD') {
                 } else if (isIntersection) {
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                     ctx.fillRect((x - 3) * scale, (y - 3) * scale, 6 * scale, 6 * scale);
-                }
-            }
-                // Статичная разметка для фона
-                let tileX = Math.floor(x / 30), tileY = Math.floor(y / 30);
-                if ((tileX + tileY) % 2 === 0) {
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect((x - 2) * scale, (y - 8) * scale, 4 * scale, 16 * scale);
                 }
             }
         }

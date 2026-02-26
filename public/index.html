@@ -5125,36 +5125,52 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.stroke(); ctx.setLineDash([]);
         }
 
-// --- ПРЕВЬЮ КЛЕТКИ ПОД КУРСОРОМ (ДЛЯ ЛЮБОЙ ПОСТРОЙКИ) ---
-        // Работает, если выбран строитель, но мы не тянем дорогу прямо сейчас
-        if (this.selection && this.selection.some(u => u.isBuilder) && window.mousePos && !this.roadDragStart) {
+// --- ПРЕВЬЮ ПОСТРОЙКИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
+        if (this.pendingConstruction && window.mousePos) {
+            let m = window.mousePos;
+            let bType = this.pendingConstruction;
+            let bRad = UNITS[bType].radius;
+            let GAP = (bType === 'WALL') ? -10 : 15; 
+            
+            // ВЫЧИСЛЯЕМ ЦЕНТР КЛЕТКИ ДЛЯ ПРЕВЬЮ (Синхронизация с кликом)
+            let snapX = Math.floor(m.x / 30) * 30 + 15;
+            let snapY = Math.floor(m.y / 30) * 30 + 15;
+            
+            // Проверки для подсветки (красный/зеленый)
+            let inWater = MapUtils.checkWater(snapX, snapY);
+            let onMountain = MapUtils.checkMountain(snapX, snapY, bRad);
+            let owner = this.getTerritoryOwner(snapX, snapY);
+            let onRoad = MapUtils.checkRoad(snapX, snapY);
+            
+            let busy = this.units.some(u => u.hp > 0 && Math.hypot(u.x-snapX, u.y-snapY) < u.radius + bRad + GAP) ||
+                       this.constructions.some(c => Math.hypot(c.x-snapX, c.y-snapY) < UNITS[c.type].radius + bRad + GAP);
+            
+            let isValid = !inWater && !onMountain && !onRoad && (owner === this.myRole) && !busy;
+
             ctx.save();
             
-            // Определяем клетку, над которой сейчас мышка
-            let cx = Math.floor(window.mousePos.x / 30);
-            let cy = Math.floor(window.mousePos.y / 30);
-            let px = cx * 30 + 15; // Идеальный центр клетки
-            let py = cy * 30 + 15;
-            
-            let isValid = true;
-            
-            // Проверяем все правила постройки для этой клетки
-            if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
-            if (isValid && (MapUtils.checkWater(px, py) || MapUtils.checkMountain(px, py, 12))) isValid = false;
-            if (isValid && MapUtils.checkRoad(px, py)) isValid = false;
-            if (isValid) {
-                let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
-                let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 20);
-                if (occupied) isValid = false;
-            }
+            // 1. Рисуем квадрат самой клетки (чтобы видеть, куда встанет фундамент)
+            ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.15)' : 'rgba(255, 0, 0, 0.15)';
+            ctx.fillRect(snapX - 15, snapY - 15, 30, 30);
 
-            // Рисуем яркий квадрат, примагниченный к сетке
+            // 2. Рисуем кружок здания (ТЕПЕРЬ ПО КООРДИНАТАМ СЕТКИ snapX, snapY)
+            ctx.beginPath();
+            ctx.arc(snapX, snapY, bRad, 0, Math.PI * 2);
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
+            ctx.fill();
             ctx.strokeStyle = isValid ? '#0f0' : '#f00';
             ctx.lineWidth = 2;
+            ctx.stroke();
             
-            ctx.fillRect(cx * 30, cy * 30, 30, 30);
-            ctx.strokeRect(cx * 30, cy * 30, 30, 30);
+            // 3. Радиус действия (для ПВО и станций)
+            if (UNITS[bType].range || UNITS[bType].energyGen) {
+                let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
+                ctx.beginPath();
+                ctx.arc(snapX, snapY, range, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+            }
             
             ctx.restore();
         }

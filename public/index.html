@@ -7738,8 +7738,8 @@ const ChatManager = {
         }, 2000);
     },
 
-    openChat() {
-        if (!Game.isMultiplayer) return; // В кампании/песочнице чат не нужен
+openChat() {
+        // Убрали проверку на мультиплеер, теперь чат открывается ВСЕГДА!
         this.isOpen = true;
         this.inputEl.style.display = 'block';
         this.inputEl.focus();

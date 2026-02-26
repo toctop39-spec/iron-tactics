@@ -5113,28 +5113,6 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             
             ctx.restore();
         }
-    
-            let cost = cellsToDraw.length * UNITS[bType].cost;
-            let canAfford = this.money >= cost;
-
-            // Настраиваем цвета превью
-            ctx.fillStyle = bType === 'ASPHALT' ? 'rgba(34, 34, 34, 0.8)' : 'rgba(92, 64, 51, 0.8)';
-            ctx.strokeStyle = canAfford ? '#0f0' : '#f00';
-            ctx.lineWidth = 2;
-
-            // Рисуем квадраты-превью строго по сетке
-            cellsToDraw.forEach(cell => {
-                ctx.fillRect(cell.cx * 30, cell.cy * 30, 30, 30);
-                ctx.strokeRect(cell.cx * 30, cell.cy * 30, 30, 30);
-            });
-
-            // Вывод стоимости
-            ctx.fillStyle = canAfford ? '#0f0' : '#f00';
-            ctx.font = 'bold 20px Arial';
-            ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
-            ctx.fillText(`$${cost}`, window.mousePos.x + 20, window.mousePos.y - 20);
-            ctx.restore();
-        }
 
 // --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
         // Активируется, если выбран строитель или мы тянем дорогу

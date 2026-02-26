@@ -5128,15 +5128,25 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
 // --- ПРЕВЬЮ ПОСТРОЙКИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
         if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos;
+            
+            // ВАЖНО: Достаем сырые экранные координаты мыши
+            let screenX = m.rawX !== undefined ? m.rawX : m.x;
+            let screenY = m.rawY !== undefined ? m.rawY : m.y;
+            
+            // Пересчитываем их в точные МИРОВЫЕ координаты (с учетом зума и камеры)
+            const r = canvas.getBoundingClientRect();
+            let z = this.zoom || 1;
+            let worldX = (screenX - r.left) / z + this.camera.x;
+            let worldY = (screenY - r.top) / z + this.camera.y;
+
             let bType = this.pendingConstruction;
             let bRad = UNITS[bType].radius;
             let GAP = (bType === 'WALL') ? -10 : 15; 
             
-            // ВЫЧИСЛЯЕМ ЦЕНТР КЛЕТКИ ДЛЯ ПРЕВЬЮ (Синхронизация с кликом)
-            let snapX = Math.floor(m.x / 30) * 30 + 15;
-            let snapY = Math.floor(m.y / 30) * 30 + 15;
+            // ВЫЧИСЛЯЕМ ЦЕНТР КЛЕТКИ ДЛЯ ПРЕВЬЮ (Теперь координаты совпадают с кликом на 100%!)
+            let snapX = Math.floor(worldX / 30) * 30 + 15;
+            let snapY = Math.floor(worldY / 30) * 30 + 15;
             
-            // Проверки для подсветки (красный/зеленый)
             let inWater = MapUtils.checkWater(snapX, snapY);
             let onMountain = MapUtils.checkMountain(snapX, snapY, bRad);
             let owner = this.getTerritoryOwner(snapX, snapY);
@@ -5149,11 +5159,11 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
 
             ctx.save();
             
-            // 1. Рисуем квадрат самой клетки (чтобы видеть, куда встанет фундамент)
+            // 1. Квадрат клетки
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.15)' : 'rgba(255, 0, 0, 0.15)';
             ctx.fillRect(snapX - 15, snapY - 15, 30, 30);
 
-            // 2. Рисуем кружок здания (ТЕПЕРЬ ПО КООРДИНАТАМ СЕТКИ snapX, snapY)
+            // 2. Кружок здания
             ctx.beginPath();
             ctx.arc(snapX, snapY, bRad, 0, Math.PI * 2);
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
@@ -5162,7 +5172,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // 3. Радиус действия (для ПВО и станций)
+            // 3. Радиус действия
             if (UNITS[bType].range || UNITS[bType].energyGen) {
                 let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
                 ctx.beginPath();

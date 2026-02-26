@@ -286,6 +286,11 @@ canvas { display: block; cursor: crosshair; }
 
 <div id="ui-layer">
     <button id="mobile-toggle-btn" class="clickable" onclick="MobileControls.toggle()" style="position:absolute; top:70px; right:10px; z-index:999; padding:5px; background:#333; color:#fff; border:1px solid #fff; opacity:0.7;">📱</button>
+
+    <div style="position: absolute; right: 15px; top: 130px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto;">
+        <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(0.4)">+</button>
+        <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(-0.4)">-</button>
+    </div>
     
     <div id="mobile-controls" style="display:none; pointer-events:none;">
         <div id="joystick-zone" style="position:absolute; bottom:50px; left:50px; width:150px; height:150px; background:rgba(255,255,255,0.1); border:2px solid rgba(255,255,255,0.3); border-radius:50%; pointer-events:auto; touch-action:none;">
@@ -2183,11 +2188,43 @@ startSandbox() {
     powerGridDirty: true, // Флаг: нужно ли пересчитать провода?
 
 
-toggleTerritoryMode() {
+zoom: 1,
+    zoomAnim: null,
+
+    // --- ПЛАВНЫЙ ЗУМ (КНОПКАМИ) ---
+    doSmoothZoom(targetDelta) {
+        if (this.zoomAnim) clearInterval(this.zoomAnim); 
+        
+        let steps = 15; 
+        let currentStep = 0;
+        let stepZoom = targetDelta / steps;
+        
+        let cx = canvas.width / 2;
+        let cy = canvas.height / 2;
+
+        this.zoomAnim = setInterval(() => {
+            currentStep++;
+            let oldZoom = this.zoom;
+            
+            // Ограничиваем зум (от 0.5 - отдалили, до 2.5 - приблизили)
+            this.zoom = Math.max(0.5, Math.min(2.5, this.zoom + stepZoom));
+            
+            // Корректируем позицию камеры в центр
+            this.camera.x += cx / oldZoom - cx / this.zoom;
+            this.camera.y += cy / oldZoom - cy / this.zoom;
+
+            if (currentStep >= steps) {
+                clearInterval(this.zoomAnim);
+                this.zoomAnim = null;
+            }
+        }, 16);
+    },
+
+    toggleTerritoryMode() {
         this.territoryMode++;
-        // Теперь у нас 4 режима (от 0 до 3)
-        if (this.territoryMode > 3) this.territoryMode = 0;
-        const modes = ["ВЫКЛ", "ЗОНЫ", "ЛИНИИ", "ПОЛИТИКА"];
+        // Теперь у нас 5 режимов (от 0 до 4)
+        if (this.territoryMode > 4) this.territoryMode = 0;
+        const modes = ["ВЫКЛ", "БЛОКИ", "ЛИНИИ", "ПОЛИТИКА", "ТОЧНАЯ (3px)"];
         this.showError(`РЕЖИМ КАРТЫ: ${modes[this.territoryMode]}`);
     },
 
@@ -2290,9 +2327,15 @@ setFilter(type) {
         tCtx.clearRect(0, 0, w, h);
 
         this.lastTerritoryCam = { x: this.camera.x, y: this.camera.y };
-        this.lastTerritoryTime = this.frameCount;
+this.lastTerritoryTime = this.frameCount;
 
-        const step = 12; 
+        // Выбираем шаг сетки
+        let step = 12; 
+        if (this.territoryMode === 1) step = 15;
+        else if (this.territoryMode === 2) step = 8;
+        else if (this.territoryMode === 3) step = 12;
+        else if (this.territoryMode === 4) step = 3; // СВЕРХТОЧНЫЙ РЕЖИМ
+        
         const cols = Math.ceil(w / step);
         const rows = Math.ceil(h / step);
         
@@ -3737,9 +3780,16 @@ if (!this.isSpectator) {
         document.getElementById('end-btn').onclick = win ? () => Game.nextLevel() : () => Game.restartLevel();
     },
 
-    getMouse(e) {
+getMouse(e) {
         const r = canvas.getBoundingClientRect();
-        return { x: e.clientX - r.left + this.camera.x, y: e.clientY - r.top + this.camera.y, rawX: e.clientX, rawY: e.clientY };
+        let z = this.zoom || 1;
+        // Делим на зум, чтобы курсор всегда совпадал с миром
+        return { 
+            x: (e.clientX - r.left) / z + this.camera.x, 
+            y: (e.clientY - r.top) / z + this.camera.y, 
+            rawX: e.clientX, 
+            rawY: e.clientY 
+        };
     },
 
 onDown(e) {
@@ -4742,6 +4792,15 @@ draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
+
+    // --- ПРИМЕНЯЕМ ЗУМ КО ВСЕМУ МИРУ ---
+        let z = this.zoom || 1;
+        ctx.scale(z, z);
+    ctx.translate(-this.camera.x, -this.camera.y);
+
+    // Расширяем зону отрисовки, чтобы по краям не исчезали объекты при отдалении камеры
+        let cWidth = canvas.width / z;
+        let cHeight = canvas.height / z;
 
         // --- 1. ОТРИСОВКА ФОНА И ТЕКСТУРЫ ЗЕМЛИ (ВО ВСЕХ РЕЖИМАХ) ---
         if (this.groundPattern) {

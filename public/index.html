@@ -4757,55 +4757,49 @@ draw() {
 
 // --- ОТРИСОВКА ПОСТРОЕННЫХ ДОРОГ ---
         if (MapUtils.roadGrid && MapUtils.roadGrid.size > 0) {
-            // Генерируем фазу анимации (меняется каждые 5000 мс = 5 сек)
             let animPhase = Math.floor(Date.now() / 5000);
 
             MapUtils.roadGrid.forEach((type, key) => {
                 if (typeof key !== 'string') { key = type; type = 'ROAD'; }
 
                 let [cx, cy] = key.split(',').map(Number);
-                let px = cx * 30; 
-                let py = cy * 30;
+                
+                // ИСПРАВЛЕНИЕ: добавляем +15, чтобы получить идеальный центр клетки.
+                // Теперь дороги будут ложиться миллиметр в миллиметр с зеленой сеткой!
+                let px = cx * 30 + 15; 
+                let py = cy * 30 + 15;
                 
                 if (px > this.camera.x - 60 && px < this.camera.x + canvas.width + 60 &&
                     py > this.camera.y - 60 && py < this.camera.y + canvas.height + 60) {
                     
-                 if (type === 'ASPHALT') {
+                    if (type === 'ASPHALT') {
                         ctx.fillStyle = '#222';
                         ctx.fillRect(px - 15, py - 15, 30, 30); 
                         
                         // Смотрим, есть ли асфальт в соседних клетках
-                        let t = MapUtils.roadGrid.get(`${cx},${cy-1}`) === 'ASPHALT'; // Сверху
-                        let b = MapUtils.roadGrid.get(`${cx},${cy+1}`) === 'ASPHALT'; // Снизу
-                        let l = MapUtils.roadGrid.get(`${cx-1},${cy}`) === 'ASPHALT'; // Слева
-                        let r = MapUtils.roadGrid.get(`${cx+1},${cy}`) === 'ASPHALT'; // Справа
+                        let t = MapUtils.roadGrid.get(`${cx},${cy-1}`) === 'ASPHALT';
+                        let b = MapUtils.roadGrid.get(`${cx},${cy+1}`) === 'ASPHALT';
+                        let l = MapUtils.roadGrid.get(`${cx-1},${cy}`) === 'ASPHALT';
+                        let r = MapUtils.roadGrid.get(`${cx+1},${cy}`) === 'ASPHALT';
 
-                        // Определяем форму участка дороги
                         let isHorizontal = (l || r) && !t && !b;
                         let isVertical = (t || b) && !l && !r;
-                        let isIntersection = (l || r) && (t || b); // Перекресток или поворот
+                        let isIntersection = (l || r) && (t || b);
 
-                        // Анимированная дорожная разметка
                         ctx.fillStyle = '#fff';
                         if (isHorizontal) {
-                            if ((cx + animPhase) % 2 === 0) {
-                                ctx.fillRect(px - 8, py - 2, 16, 4); // Горизонтальная полоса
-                            }
+                            if ((cx + animPhase) % 2 === 0) ctx.fillRect(px - 8, py - 2, 16, 4);
                         } else if (isVertical) {
-                            if ((cy + animPhase) % 2 === 0) {
-                                ctx.fillRect(px - 2, py - 8, 4, 16); // Вертикальная полоса
-                            }
+                            if ((cy + animPhase) % 2 === 0) ctx.fillRect(px - 2, py - 8, 4, 16);
                         } else if (isIntersection) {
-                            // На перекрестках рисуем тусклый квадрат по центру (как стоп-линия/центр)
                             ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                             ctx.fillRect(px - 3, py - 3, 6, 6);
                         }
                     } else if (type === 'ROAD') {
-                        // Квадратная тропинка
                         if (Game.roadTexture) {
                             ctx.drawImage(Game.roadTexture, px - 15, py - 15, 30, 30);
                         } else {
-                            ctx.fillStyle = '#5c4033'; // Коричневый цвет тропинки
+                            ctx.fillStyle = '#5c4033';
                             ctx.fillRect(px - 15, py - 15, 30, 30);
                         }
                     }

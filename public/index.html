@@ -5112,6 +5112,63 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.fillText(`$${cost}`, window.mousePos.x + 20, window.mousePos.y - 20);
             ctx.restore();
         }
+
+// --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
+        // Активируется, если выбран строитель или мы тянем дорогу
+        if ((this.selection && this.selection.some(u => u.isBuilder)) || this.roadDragStart) {
+            ctx.save();
+            
+            // Вычисляем только видимую часть экрана, чтобы не было лагов!
+            let startCx = Math.floor(this.camera.x / 30);
+            let endCx = Math.ceil((this.camera.x + canvas.width) / 30);
+            let startCy = Math.floor(this.camera.y / 30);
+            let endCy = Math.ceil((this.camera.y + canvas.height) / 30);
+
+            for (let cx = startCx; cx <= endCx; cx++) {
+                for (let cy = startCy; cy <= endCy; cy++) {
+                    let px = cx * 30 + 15; // Центр проверяемой клетки
+                    let py = cy * 30 + 15;
+                    
+                    let isValid = true;
+                    
+                    // 1. Твоя ли это территория?
+                    if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
+                    
+                    // 2. Мешают ли горы или вода?
+                    if (isValid && (MapUtils.checkWater(px, py) || MapUtils.checkMountain(px, py, 12))) isValid = false;
+                    
+                    // 3. Занята ли клетка дорогой?
+                    if (isValid && MapUtils.checkRoad(px, py)) isValid = false;
+                    
+                    // 4. Занята ли клетка юнитами, зданиями или деревьями?
+                    if (isValid) {
+                        let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
+                        // Проверяем всех живых в радиусе 20 пикселей от центра клетки
+                        let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 20);
+                        if (occupied) isValid = false;
+                    }
+
+                    // Отрисовка подложки клетки
+                    // Зеленый цвет для свободных, красный для занятых
+                    ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.15)';
+                    ctx.strokeStyle = isValid ? 'rgba(0, 255, 0, 0.25)' : 'rgba(255, 0, 0, 0.25)';
+                    
+                    // Рисуем саму клеточку чуть меньше (28x28 вместо 30x30), чтобы получился красивый зазор сетки
+                    ctx.fillRect(cx * 30 + 1, cy * 30 + 1, 28, 28);
+                    
+                    // Если клетка занята, рисуем в ней красный крестик (опционально для красоты)
+                    if (!isValid) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx * 30 + 5, cy * 30 + 5);
+                        ctx.lineTo(cx * 30 + 25, cy * 30 + 25);
+                        ctx.moveTo(cx * 30 + 25, cy * 30 + 5);
+                        ctx.lineTo(cx * 30 + 5, cy * 30 + 25);
+                        ctx.stroke();
+                    }
+                }
+            }
+            ctx.restore();
+        }
     
     if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos;

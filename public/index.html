@@ -286,7 +286,7 @@ canvas { display: block; cursor: crosshair; }
 
 <div id="ui-layer">
     <button id="mobile-toggle-btn" class="clickable" onclick="MobileControls.toggle()" style="position:absolute; top:70px; right:10px; z-index:999; padding:5px; background:#333; color:#fff; border:1px solid #fff; opacity:0.7;">📱</button>
-    <button class="menu-btn" style="position:absolute; left:15px; bottom:15px; min-width: 45px; height: 45px; padding: 0; pointer-events: auto; z-index: 999999;" onclick="ChatManager.isOpen ? ChatManager.closeChat() : ChatManager.openChat()">💬</button>
+    <button class="menu-btn" style="position:absolute; left:15px; bottom:15px; min-width: 45px; height: 45px; padding: 0; pointer-events: auto; z-index: 999999;" onclick="event.stopPropagation(); ChatManager.isOpen ? ChatManager.closeChat() : ChatManager.openChat()">💬</button>
 
     <div style="position: absolute; right: 15px; top: 130px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto;">
         <button class="menu-btn" style="min-width: 45px; height: 45px; padding: 0; font-size: 1.8em; display: flex; justify-content: center; align-items: center; background: rgba(10,10,15,0.8); border-color: #0af;" onclick="Game.doSmoothZoom(0.4)">+</button>
@@ -7792,37 +7792,34 @@ const InitialLoader = {
 InitialLoader.init();
 
     // --- МЕНЕДЖЕР ЧАТА ---
+// --- МЕНЕДЖЕР ЧАТА (ИСПРАВЛЕННЫЙ И БРОНЕБОЙНЫЙ) ---
 const ChatManager = {
     init() {
         this.messagesDiv = document.getElementById('chat-messages');
         this.inputEl = document.getElementById('chat-input');
         this.isOpen = false;
 
-        if (!this.inputEl || !this.messagesDiv) {
-            console.error("ОШИБКА: HTML элементы чата не найдены!");
-            return;
-        }
+        // Если HTML элементов нет, прерываемся, чтобы не было краша
+        if (!this.inputEl || !this.messagesDiv) return;
 
-        // Открытие чата на Enter (ловим глобально)
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !this.isOpen) {
                 this.openChat();
             }
         });
 
-this.inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.stopPropagation(); // <--- Добавить это!
-        this.sendMessage();
-    } else if (e.key === 'Escape') {
-        e.stopPropagation(); // <--- Добавить это!
-        this.closeChat();
-    }
-});
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.stopPropagation(); // <-- Чинит зависание чата
+                this.sendMessage();
+            } else if (e.key === 'Escape') {
+                e.stopPropagation();
+                this.closeChat();
+            }
+        });
 
-        // Подключаемся к серверу
         let checkSocket = setInterval(() => {
-            if (typeof Game !== 'undefined' && Game.socket && !this.socketLinked) {
+            if (Game && Game.socket && !this.socketLinked) {
                 Game.socket.on('chat_message', (data) => {
                     this.addMessage(data.sender, data.text, data.color);
                 });
@@ -7833,27 +7830,27 @@ this.inputEl.addEventListener('keydown', (e) => {
     },
 
     openChat() {
+        if (!this.inputEl) return;
         this.isOpen = true;
         this.inputEl.style.display = 'block';
-        
-        // Небольшая задержка перед фокусом, чтобы Enter не напечатался в поле
-        setTimeout(() => { this.inputEl.focus(); }, 10);
+        this.inputEl.focus();
     },
 
     closeChat() {
+        if (!this.inputEl) return;
         this.isOpen = false;
         this.inputEl.style.display = 'none';
         this.inputEl.value = '';
-        if (typeof canvas !== 'undefined') canvas.focus(); 
+        canvas.focus(); // Возвращаем фокус игре
     },
 
     sendMessage() {
+        if (!this.inputEl) return;
         const text = this.inputEl.value.trim();
         if (text.length > 0) {
-            if (typeof Game !== 'undefined' && Game.socket && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
+            if (Game.socket && typeof CURRENT_ROOM !== 'undefined' && CURRENT_ROOM) {
                 let myColor = Game.myRole === 'enemy' ? '#ff4444' : '#4488ff';
                 let senderName = (typeof FACTIONS !== 'undefined' && FACTIONS[Game.myRole]) ? FACTIONS[Game.myRole].name : Game.myRole;
-
                 Game.socket.emit('chat_message', {
                     roomName: CURRENT_ROOM,
                     sender: senderName.toUpperCase(),
@@ -7861,14 +7858,14 @@ this.inputEl.addEventListener('keydown', (e) => {
                     color: myColor
                 });
             } else {
-                // Если мы в песочнице (без сети)
-                this.addMessage("Я (Тест)", text, '#00ff00');
+                this.addMessage("Я (Оффлайн)", text, '#00ff00');
             }
         }
         this.closeChat();
     },
 
     addMessage(sender, text, color) {
+        if (!this.messagesDiv) return;
         const msg = document.createElement('div');
         msg.style.background = 'rgba(0, 0, 0, 0.4)';
         msg.style.padding = '3px 8px';
@@ -7877,17 +7874,16 @@ this.inputEl.addEventListener('keydown', (e) => {
         msg.style.wordWrap = 'break-word';
         msg.style.maxWidth = '100%';
         msg.innerHTML = `<b style="color: ${color || '#fff'}">${sender}:</b> ${text}`;
-        
         this.messagesDiv.appendChild(msg);
         this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight;
-
         if (this.messagesDiv.children.length > 20) {
             this.messagesDiv.removeChild(this.messagesDiv.firstChild);
         }
     }
 };
 
-window.addEventListener('load', () => ChatManager.init());
+// ВАЖНО: Запускаем СРАЗУ, не дожидаясь картинок!
+ChatManager.init();
 
 </script>
 </body>

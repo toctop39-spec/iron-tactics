@@ -5127,14 +5127,11 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
 
 // --- ПРЕВЬЮ ПОСТРОЙКИ (ПРИМАГНИЧЕННОЕ К СЕТКЕ) ---
         if (this.pendingConstruction && window.mousePos) {
-            // Берем УЖЕ ГОТОВЫЕ мировые координаты (с учетом зума и камеры)
             let m = window.mousePos; 
-            
             let bType = this.pendingConstruction;
             let bRad = UNITS[bType].radius;
             let GAP = (bType === 'WALL') ? -10 : 15; 
             
-            // Идеально примагничиваем к сетке
             let snapX = Math.floor(m.x / 30) * 30 + 15;
             let snapY = Math.floor(m.y / 30) * 30 + 15;
             
@@ -5149,12 +5146,9 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             let isValid = !inWater && !onMountain && !onRoad && (owner === this.myRole) && !busy;
 
             ctx.save();
-            
-            // 1. Рисуем квадрат клетки-фундамента
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.15)' : 'rgba(255, 0, 0, 0.15)';
             ctx.fillRect(snapX - 15, snapY - 15, 30, 30);
 
-            // 2. Рисуем сам кружок здания
             ctx.beginPath();
             ctx.arc(snapX, snapY, bRad, 0, Math.PI * 2);
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
@@ -5163,7 +5157,6 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // 3. Рисуем пунктирный радиус (если это ПВО или СЭС)
             if (UNITS[bType].range || UNITS[bType].energyGen) {
                 let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
                 ctx.beginPath();
@@ -5172,9 +5165,26 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
             }
-            
             ctx.restore();
         }
+
+        // =======================================================
+        // ВАЖНО: ВОТ ЗДЕСЬ ЗАКАНЧИВАЕТСЯ МИР И ОТКЛЮЧАЕТСЯ ЗУМ!
+        ctx.restore(); 
+        // =======================================================
+
+        // --- РАМКА ВЫДЕЛЕНИЯ (В экранных координатах, поверх зума) ---
+        if (this.dragStart && this.dragCurr) {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            const w = this.dragCurr.x - this.dragStart.rx;
+            const h = this.dragCurr.y - this.dragStart.ry;
+            ctx.strokeStyle = '#0f0'; 
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.dragStart.rx, this.dragStart.ry, w, h);
+            ctx.restore();
+        }
+
 
 // --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
         // Активируется, если выбран строитель или мы тянем дорогу

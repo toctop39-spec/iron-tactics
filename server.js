@@ -103,12 +103,19 @@ io.on('connection', (socket) => {
         io.emit('update_room_list', getPublicRoomList());
 
         // Если в комнате теперь 2 или более игрока - отправляем сигнал старта
-        // (Мы отправляем настройки, чтобы клиенты знали, какую карту грузить)
         if (room.players.length >= 2) {
              io.to(name).emit('start_game_signal', room.settings);
         }
         
         console.log(`User ${socket.id} joined room ${name} as ${myRole}`);
+    });
+
+    // --- НОВОЕ: Обработка сообщений из чата ---
+    socket.on('chat_message', (data) => {
+        // Берем сообщение и пересылаем его ВСЕМ игрокам в этой конкретной комнате
+        if (data.roomName) {
+            io.to(data.roomName).emit('chat_message', data);
+        }
     });
 
     // 4. Пересылка игровых команд
@@ -137,11 +144,10 @@ io.on('connection', (socket) => {
                     delete rooms[name];
                     console.log(`Room ${name} deleted (empty)`);
                 } else {
-                    // Если кто-то остался, сообщаем, что игрок вышел
+                    // Если кто-то остался, сообщаем, что игрок вышел, 
+                    // но НЕ УДАЛЯЕМ КОМНАТУ, чтобы оставшийся игрок мог продолжить играть.
                     io.to(name).emit('playerLeft');
-                    // В текущей версии лучше удалить комнату, чтобы избежать рассинхрона, 
-                    // так как игра 1 на 1 (или требует перезапуска)
-                    delete rooms[name]; 
+                    console.log(`Игрок вышел. Комната ${name} сохранена. Осталось игроков: ${room.players.length}`);
                 }
                 
                 // Обновляем список комнат у всех
@@ -156,4 +162,3 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-

@@ -3875,11 +3875,11 @@ onDown(e) {
 
             if (this.isSpectator) return;
 
-            // 3. СТРОЙКА (Постановка фундамента) - ИДЕАЛЬНОЕ ПРИМАГНИЧИВАНИЕ К СЕТКЕ
+        // 3. СТРОЙКА (Постановка фундамента) - ИДЕАЛЬНОЕ ПРИМАГНИЧИВАНИЕ К СЕТКЕ
             if (this.pendingConstruction) {
                 const bType = this.pendingConstruction;
                 
-                // Протяжка дороги и асфальта (использует сырые координаты мыши для плавности)
+                // Протяжка дороги и асфальта
                 if (bType === 'ROAD' || bType === 'ASPHALT') {
                     this.roadDragStart = { x: m.x, y: m.y, type: bType };
                     return; 
@@ -3888,10 +3888,12 @@ onDown(e) {
                 // === МАГНИТ К СЕТКЕ 30x30 ДЛЯ ЗДАНИЙ ===
                 let snapX = Math.floor(m.x / 30) * 30 + 15;
                 let snapY = Math.floor(m.y / 30) * 30 + 15;
+                let bRad = UNITS[bType].radius;
+                let GAP = (bType === 'WALL') ? -10 : 15; // Зазор между зданиями
 
                 // Используем snapX и snapY для всех проверок ландшафта
                 const inWater = MapUtils.checkWater(snapX, snapY);
-                const onMountain = MapUtils.checkMountain(snapX, snapY, 12);
+                const onMountain = MapUtils.checkMountain(snapX, snapY, bRad);
                 if (inWater || onMountain) { this.showError(onMountain ? "ЭТО ГОРА! 🏔️" : "ЭТО ВОДА! 💧"); return; }
                 
                 if (this.getTerritoryOwner(snapX, snapY) !== this.myRole) { this.showError("ДАЛЕКО ОТ БАЗЫ!"); return; }
@@ -3900,9 +3902,10 @@ onDown(e) {
                     this.showError("НЕЛЬЗЯ СТРОИТЬ НА ДОРОГЕ!"); return;
                 }
 
-                // Проверка пересечений с помощью быстрой сетки SpatialHash
-                let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: snapX, y: snapY}) : Game.units;
-                let isOccupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - snapX, u.y - snapY) < 20);
+                // ЖЕСТКАЯ И СИНХРОНИЗИРОВАННАЯ ПРОВЕРКА ПЕРЕСЕЧЕНИЙ
+                let isOccupied = this.units.some(u => u.hp > 0 && Math.hypot(u.x - snapX, u.y - snapY) < u.radius + bRad + GAP) ||
+                                 this.constructions.some(c => Math.hypot(c.x - snapX, c.y - snapY) < UNITS[c.type].radius + bRad + GAP);
+                
                 if (isOccupied) { 
                      this.showError("МЕСТО ЗАНЯТО!"); return; 
                 }
@@ -5145,7 +5148,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                     if (isValid) {
                         let neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
                         // Проверяем всех живых в радиусе 20 пикселей от центра клетки
-                        let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < 20);
+                        let occupied = neighbors.some(u => u.hp > 0 && Math.hypot(u.x - px, u.y - py) < u.radius + 15);
                         if (occupied) isValid = false;
                     }
 
@@ -5170,28 +5173,34 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             }
             ctx.restore();
         }
-    
+
     if (this.pendingConstruction && window.mousePos) {
             let m = window.mousePos;
             let bType = this.pendingConstruction;
             let bRad = UNITS[bType].radius;
+            let GAP = (bType === 'WALL') ? -10 : 15; // Точно такой же зазор, как при клике!
+            
+            // СИНХРОНИЗИРУЕМ ПРЕВЬЮ С ТОЧКОЙ ПРИМАГНИЧИВАНИЯ СЕТКИ
+            let snapX = Math.floor(m.x / 30) * 30 + 15;
+            let snapY = Math.floor(m.y / 30) * 30 + 15;
             
             // Проверяем все те же правила, что и при клике строительства
-            let inWater = MapUtils.checkWater(m.x, m.y);
-            let onMountain = MapUtils.checkMountain(m.x, m.y, 40);
-            let owner = this.getTerritoryOwner(m.x, m.y);
-            let GAP = (bType === 'WALL') ? -15 : 30;
+            let inWater = MapUtils.checkWater(snapX, snapY);
+            let onMountain = MapUtils.checkMountain(snapX, snapY, bRad);
+            let owner = this.getTerritoryOwner(snapX, snapY);
+            let onRoad = MapUtils.checkRoad(snapX, snapY);
             
             // Проверяем, не пересекаемся ли мы с другими юнитами или стройками
-            let busy = this.units.some(u => Math.hypot(u.x-m.x, u.y-m.y) < u.radius + bRad + GAP) ||
-                       this.constructions.some(c => Math.hypot(c.x-m.x, c.y-m.y) < UNITS[bType].radius + GAP);
+            let busy = this.units.some(u => u.hp > 0 && Math.hypot(u.x-snapX, u.y-snapY) < u.radius + bRad + GAP) ||
+                       this.constructions.some(c => Math.hypot(c.x-snapX, c.y-snapY) < UNITS[c.type].radius + bRad + GAP);
             
-            // Итоговый вердикт: можно тут строить или нет?
-            let isValid = !inWater && !onMountain && (owner === this.myRole) && !busy;
+            // Итоговый вердикт
+            let isValid = !inWater && !onMountain && !onRoad && (owner === this.myRole) && !busy;
 
             ctx.save();
             ctx.beginPath();
-            ctx.arc(m.x, m.y, bRad, 0, Math.PI*2);
+            // РИСУЕМ КРУГ ИМЕННО ТАМ, КУДА ЗДАНИЕ ВСТАНЕТ!
+            ctx.arc(snapX, snapY, bRad, 0, Math.PI*2);
             
             // Если можно - заливаем зеленым, если нельзя - красным
             ctx.fillStyle = isValid ? 'rgba(0, 255, 0, 0.4)' : 'rgba(255, 0, 0, 0.4)';
@@ -5200,12 +5209,12 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // БОНУС: Если строим ПВО или СЭС, сразу рисуем пунктиром их радиус действия!
+            // Радиус действия ПВО и СЭС
             if (UNITS[bType].range || UNITS[bType].energyGen) {
                 let range = UNITS[bType].range || (bType === 'NUCLEAR_PLANT' ? 800 : 300);
                 ctx.beginPath();
-                ctx.arc(m.x, m.y, range, 0, Math.PI*2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.arc(snapX, snapY, range, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
             }

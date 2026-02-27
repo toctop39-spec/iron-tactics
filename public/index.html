@@ -5214,6 +5214,10 @@ draw() {
             let u = this.units[i];
             if(u.isFlying) u.draw(ctx);
         }
+    // 5. ПУЛИ И РАКЕТЫ (Вот эта строчка у нас пропала!)
+        for(let i=0; i<this.bullets.length; i++) {
+            this.bullets[i].draw(ctx);
+        }
 
         // --- РЕЖИМ 3 (ПОЛИТИКА): Рисуем ПОВЕРХ армии и зданий ---
         if (this.territoryMode === 3 && this.territoryCanvas) {
@@ -7908,7 +7912,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
         });
     }
 
-    draw(ctx) {
+ draw(ctx) {
         // --- ОПТИМИЗАЦИЯ: НЕ РИСУЕМ ПУЛИ ЗА КАДРОМ ---
         let z = Game.zoom || 1;
         if (this.visX + 50 < Game.camera.x || 
@@ -7924,7 +7928,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             ctx.translate(this.visX, this.visY); 
             let vx = this.visX - this.prevVisX; 
             let vy = this.visY - this.prevVisY;
-            if (vx === 0 && vy === 0) { vx = this.dx; vy = this.dy; } // Фикс стартового угла
+            if (vx === 0 && vy === 0) { vx = this.dx; vy = this.dy; } 
             let angle = Math.atan2(vy, vx); 
             
             ctx.rotate(angle + Math.PI / 4); 
@@ -7949,16 +7953,16 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
         // Определяем точное направление полета для поворота модельки
         let vx = this.visX - this.prevVisX;
         let vy = this.visY - this.prevVisY;
-        if (vx === 0 && vy === 0) { vx = this.dx; vy = this.dy; } // Если только вылетела
+        if (vx === 0 && vy === 0) { vx = this.dx; vy = this.dy; } 
         let angle = Math.atan2(vy, vx);
         ctx.rotate(angle);
 
         if (this.arty || isHIMARS) {
             // ==========================================
-            // КРАСИВАЯ МОДЕЛЬ РАКЕТЫ (Вместо смайликов)
+            // КРАСИВАЯ МОДЕЛЬ РАКЕТЫ (Град, Хаймарс, Бункер)
             // ==========================================
-            let rLen = this.isNuke ? 30 : (this.splashRadius > 100 ? 22 : 16); // Длина
-            let rWid = this.isNuke ? 10 : (this.splashRadius > 100 ? 6 : 4);   // Толщина
+            let rLen = this.isNuke ? 30 : (this.splashRadius > 100 ? 22 : 16); 
+            let rWid = this.isNuke ? 10 : (this.splashRadius > 100 ? 6 : 4);   
 
             // 1. Огонь из сопла (реактивная струя)
             ctx.fillStyle = '#ffaa00';
@@ -7966,7 +7970,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             ctx.fillStyle = '#ff0000';
             ctx.beginPath(); ctx.moveTo(-rLen/2, -rWid/4); ctx.lineTo(-rLen*0.8, 0); ctx.lineTo(-rLen/2, rWid/4); ctx.fill();
 
-            // 2. Корпус ракеты (Ядерка черная, обычные оливковые)
+            // 2. Корпус ракеты 
             ctx.fillStyle = this.isNuke ? '#222' : '#556655';
             ctx.fillRect(-rLen/2, -rWid/2, rLen, rWid);
 
@@ -7981,13 +7985,12 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
 
         } else {
             // ==========================================
-            // СВЕТЯЩИЙСЯ ТРАССЕР ДЛЯ ТАНКОВ И ПЕХОТЫ
+            // СВЕТЯЩИЙСЯ ТРАССЕР (Танки и пехота)
             // ==========================================
             let isTank = this.splashRadius > 0;
-            let tLen = isTank ? 20 : 10; // Танковый снаряд в два раза длиннее
-            let tThick = isTank ? 4 : 2; // И в два раза толще
+            let tLen = isTank ? 20 : 10; 
+            let tThick = isTank ? 4 : 2; 
 
-            // Градиент: от прозрачного хвоста к горячему раскаленному носу
             let grad = ctx.createLinearGradient(-tLen, 0, 0, 0);
             grad.addColorStop(0, 'rgba(255, 255, 0, 0)');
             grad.addColorStop(0.7, isTank ? 'rgba(255, 100, 0, 0.8)' : 'rgba(255, 255, 0, 0.8)');
@@ -7996,14 +7999,13 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             ctx.fillStyle = grad;
             ctx.fillRect(-tLen, -tThick/2, tLen, tThick);
 
-            // Белое ядро летящей пули
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(0, 0, tThick/2, 0, Math.PI*2); ctx.fill();
         }
 
         ctx.restore();
 
-        // Тень на земле рисуем только для артиллерии (обычные пули летят слишком низко и быстро)
+        // Рисуем тень на земле (только для ракет)
         if (this.arty || isHIMARS) {
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();

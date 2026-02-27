@@ -3209,6 +3209,38 @@ showError(msg) {
         }, 2000);
     },
 
+    spawnRealisticExplosion(x, y, scale = 1) {
+        // 1. Огонь (яркий центр, быстро исчезает)
+        for(let i = 0; i < 15 * scale; i++) {
+            this.effects.push({
+                type: 'fire', x: x, y: y,
+                vx: (Math.random()-0.5) * 12 * scale, vy: (Math.random()-0.5) * 12 * scale,
+                size: (10 + Math.random()*15) * scale, life: 15 + Math.random()*15, maxLife: 30
+            });
+        }
+        // 2. Густой серо-коричневый дым (расширяется и висит долго)
+        for(let i = 0; i < 20 * scale; i++) {
+            let gray = 40 + Math.random()*30; // Оттенки грязи
+            this.effects.push({
+                type: 'dark_smoke', x: x, y: y,
+                vx: (Math.random()-0.5) * 8 * scale, vy: (Math.random()-0.5) * 8 * scale - 2, // Дым тянется вверх (-2)
+                baseSize: (5 + Math.random()*10) * scale, growth: 20 * scale, 
+                life: 40 + Math.random()*40, maxLife: 80,
+                color: `rgba(${gray+20}, ${gray}, ${gray-10}, `, // Незакрытая скобка нужна для альфы в draw
+                angle: Math.random() * Math.PI * 2
+            });
+        }
+        // 3. Разлетающиеся куски земли/осколки
+        for(let i = 0; i < 15 * scale; i++) {
+            this.effects.push({
+                type: 'dirt', x: x, y: y,
+                vx: (Math.random()-0.5) * 18 * scale, vy: (Math.random()-0.5) * 18 * scale - 5,
+                size: 2 + Math.random()*4, life: 30 + Math.random()*30,
+                color: Math.random() > 0.5 ? '#111' : '#333'
+            });
+        }
+    },
+
     executeCommand(cmd) {
         if (cmd.type === 'spawn') {
             const exists = this.units.find(u => u.id === cmd.id);
@@ -3639,7 +3671,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                     // 1. УНИЧТОЖЕНИЕ ВЕРТОЛЕТА В ВОЗДУХЕ
                     if (u.type === 'HELICOPTER') {
                          SoundManager.play('explosion', 100, vol * 1.2); // Звук громче
-                         Game.effects.push({x:u.x, y:u.y, char:'💥', life:30, size: 60}); 
+                        Game.spawnRealisticExplosion(u.x, u.y, 2.0);
                          Game.effects.push({type: 'shockwave', x: u.x, y: u.y, radius: 20, maxRadius: 150, life: 40, color: 'rgba(255, 100, 0, 0.5)'});
 
                          // Разлет горящих обломков и дыма
@@ -3659,7 +3691,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                     // 2. УНИЧТОЖЕНИЕ ТЯЖЕЛОЙ НАЗЕМНОЙ ТЕХНИКИ
                     else if (['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
                          SoundManager.play('explosion', 90, vol);
-                         Game.effects.push({x:u.x, y:u.y, char:'💥', life:25});
+                        Game.spawnRealisticExplosion(u.x, u.y, 1.5);
                          
                          // Мощный выброс земли и огня вверх и в стороны
                          for(let i=0; i < 40; i++) {
@@ -3678,7 +3710,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 // 3. ОБЫЧНЫЙ ВЗРЫВ (Здания, лодки)
                     else if (u.type !== 'TREE' && !u.isBuilder && !(UNITS[u.type] && UNITS[u.type].isInfantry)) {
                         SoundManager.play('explosion', 80, vol);
-                        Game.effects.push({x:u.x, y:u.y, char:'💥', life:20});
+                        Game.spawnRealisticExplosion(u.x, u.y, 1.2);
                     }
                     // 4. СМЕРТЬ ПЕХОТЫ (Тихая, без взрыва)
                     else if (u.isBuilder || (UNITS[u.type] && UNITS[u.type].isInfantry)) {
@@ -5014,6 +5046,27 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                 ctx.beginPath(); 
                 ctx.arc(e.x, e.y, r, 0, Math.PI*2); 
                 ctx.fill(); 
+                e.life--;
+            }
+                else if (e.type === 'fire') {
+                let ratio = e.life / e.maxLife;
+                ctx.globalCompositeOperation = 'lighter'; // Режим наложения для эффекта свечения
+                ctx.fillStyle = `rgba(255, ${Math.floor(100 + 155 * ratio)}, 0, ${ratio})`;
+                ctx.beginPath(); ctx.arc(e.x, e.y, e.size * ratio, 0, Math.PI*2); ctx.fill();
+                ctx.globalCompositeOperation = 'source-over'; // Возвращаем обратно!
+                e.x += e.vx; e.y += e.vy;
+                e.vx *= 0.9; e.vy *= 0.9; // Замедление
+                e.life--;
+            }
+            else if (e.type === 'dark_smoke') {
+                let ratio = e.life / e.maxLife;
+                let r = e.baseSize + (1 - ratio) * e.growth; // Дым расширяется со временем
+                ctx.fillStyle = e.color + (ratio * 0.7) + ')'; // e.color содержит начало 'rgba(...'
+                ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+                ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.8, 0, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+                e.x += e.vx; e.y += e.vy;
+                e.vx *= 0.92; e.vy *= 0.92;
                 e.life--;
             }
             else if (e.type === 'shockwave') {
@@ -7554,7 +7607,8 @@ hit() {
                 }
                 
                 // Искры от попадания рисуем для всех
-                Game.effects.push({x: this.x, y: this.y, char: '💥', life: 10});
+             // Если это артиллерия/танк - взрыв большой (scale 1.5), если пуля пехоты - маленький (scale 0.5)
+Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             }
         }
         

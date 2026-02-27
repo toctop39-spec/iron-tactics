@@ -5186,7 +5186,7 @@ draw() {
         // 1. Здания
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) u.draw(ctx);
+            if(UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) u.draw(ctx);
         }
         // 2. Лодки
         for(let i=0; i<this.units.length; i++) {
@@ -5196,7 +5196,7 @@ draw() {
         // 3. Наземная техника
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) u.draw(ctx);
+            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) u.draw(ctx);
         }
         // 4. Летуны
         for(let i=0; i<this.units.length; i++) {

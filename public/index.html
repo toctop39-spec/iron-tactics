@@ -1145,26 +1145,24 @@ roadPaths: [],
     },
 
 getTerrain(x, y) {
-    // 1. Дороги и мосты всегда считаются сушей
-    if (this.checkRoad(x, y)) return 'LAND'; 
+        if (this.checkRoad(x, y)) return 'LAND'; 
 
-    // 2. ФИЗИКА ДЛЯ КАРТЫ ЗЕМЛИ
-    if (Game.isEarthMode && Game.earthCollisionMap) {
-        const px = Math.floor(x * (800 / MAP_W));
-        const py = Math.floor(y * (400 / MAP_H));
-        // Если вышли за края карты - считаем океаном
-        if (px < 0 || px >= 800 || py < 0 || py >= 400) return 'DEEP'; 
-        return Game.earthCollisionMap[py * 800 + px] === 1 ? 'LAND' : 'DEEP';
-    }
+        if (Game.isEarthMode && Game.earthCollisionMap) {
+            const ew = Game.earthW || 2000;
+            const eh = Game.earthH || 1000;
+            const px = Math.floor(x * (ew / MAP_W));
+            const py = Math.floor(y * (eh / MAP_H));
+            if (px < 0 || px >= ew || py < 0 || py >= eh) return 'DEEP'; 
+            return Game.earthCollisionMap[py * ew + px] === 1 ? 'LAND' : 'DEEP';
+        }
 
-    // 3. ФИЗИКА ДЛЯ ОСТРОВОВ И ОБЫЧНОЙ КАРТЫ
-    if (!Game.isIslandMode) return 'LAND';
-    
-    const h = this.getWorldHeight(x, y);
-    if (h >= 0.48) return 'LAND';
-    if (h >= 0.42) return 'SHALLOW'; 
-    return 'DEEP';
-},
+        if (!Game.isIslandMode) return 'LAND';
+        
+        const h = this.getWorldHeight(x, y);
+        if (h >= 0.48) return 'LAND';
+        if (h >= 0.42) return 'SHALLOW'; 
+        return 'DEEP';
+    },
     
     checkMountain(x, y, radius) {
         for (let m of this.mountains) {
@@ -1173,31 +1171,27 @@ getTerrain(x, y) {
         return null;
     },
 
-    // Отрисовка огромной карты один раз (очень ускорит игру)
-renderBackground() {
-        this.bgCanvas = document.createElement('canvas');
+// Замените блок "ОТРИСОВКА КАРТЫ ЗЕМЛИ" внутри renderBackground() на это:
+    if (Game.isEarthMode && Game.earthCollisionMap) {
+        const ew = Game.earthW || 2000;
+        const eh = Game.earthH || 1000;
+        this.bgCanvas.width = ew; 
+        this.bgCanvas.height = eh;
+        const ctx = this.bgCanvas.getContext('2d');
         
-        // --- ОТРИСОВКА КАРТЫ ЗЕМЛИ ---
-        if (Game.isEarthMode && Game.earthCollisionMap) {
-            this.bgCanvas.width = 800; // Разрешение пиксельной карты
-            this.bgCanvas.height = 400;
-            const ctx = this.bgCanvas.getContext('2d');
-            
-            // Вода
-            ctx.fillStyle = '#050a14';
-            ctx.fillRect(0, 0, 800, 400);
-            
-            // Суша
-            ctx.fillStyle = '#1e3b20'; // Красивый темно-зеленый цвет джунглей
-            for (let y = 0; y < 400; y++) {
-                for (let x = 0; x < 800; x++) {
-                    if (Game.earthCollisionMap[y * 800 + x] === 1) {
-                        ctx.fillRect(x, y, 1, 1);
-                    }
+        ctx.fillStyle = '#050a14';
+        ctx.fillRect(0, 0, ew, eh);
+        
+        ctx.fillStyle = '#1e3b20'; 
+        for (let y = 0; y < eh; y++) {
+            for (let x = 0; x < ew; x++) {
+                if (Game.earthCollisionMap[y * ew + x] === 1) {
+                    ctx.fillRect(x, y, 1, 1);
                 }
             }
-            return; // Выходим! Острова рисовать не нужно
         }
+        return; 
+    }
 
         // --- СТАРЫЙ КОД (ОСТРОВА) ---
         const scale = 0.5; 
@@ -3025,35 +3019,39 @@ loadPvpLevel(settings) {
         }
     },
 
-    transitToEarth() {
+transitToEarth() {
         this.transition(async () => {
-            // Показываем плашку загрузки
             document.getElementById('menu-screen').classList.add('hidden');
             const warn = document.getElementById('connection-warning');
             warn.style.display = 'block';
             warn.innerText = 'ЗАГРУЗКА ДАННЫХ ЗЕМЛИ...';
             
-            // Если карта еще не скачана - качаем и генерируем (один раз за сессию)
             if (!Game.earthCollisionMap) {
                 try {
                     const res = await fetch('https://unpkg.com/world-atlas@2/countries-110m.json');
                     const topo = await res.json();
                     const geo = topojson.feature(topo, topo.objects.countries);
                     
+                    // --- НОВОЕ ВЫСОКОЕ РАЗРЕШЕНИЕ (2000x1000 вместо 800x400) ---
+                    const EW = 2000;
+                    const EH = 1000;
+                    Game.earthW = EW;
+                    Game.earthH = EH;
+
                     const c = document.createElement('canvas');
-                    c.width = 800; c.height = 400;
+                    c.width = EW; c.height = EH;
                     const cCtx = c.getContext('2d');
                     
-                    const proj = d3.geoEquirectangular().fitSize([800, 400], geo);
+                    const proj = d3.geoEquirectangular().fitSize([EW, EH], geo);
                     const path = d3.geoPath().projection(proj).context(cCtx);
                     
-                    cCtx.fillStyle = '#000'; cCtx.fillRect(0,0,800,400); // Океан
+                    cCtx.fillStyle = '#000'; cCtx.fillRect(0,0,EW,EH); 
                     cCtx.beginPath(); path(geo);
-                    cCtx.fillStyle = '#fff'; cCtx.fill(); // Суша
+                    cCtx.fillStyle = '#fff'; cCtx.fill(); 
                     
-                    const imgData = cCtx.getImageData(0,0,800,400).data;
-                    Game.earthCollisionMap = new Uint8Array(800*400);
-                    for(let i=0; i<800*400; i++) {
+                    const imgData = cCtx.getImageData(0,0,EW,EH).data;
+                    Game.earthCollisionMap = new Uint8Array(EW*EH);
+                    for(let i=0; i<EW*EH; i++) {
                         Game.earthCollisionMap[i] = imgData[i*4] > 100 ? 1 : 0;
                     }
                 } catch (e) {
@@ -3068,38 +3066,41 @@ loadPvpLevel(settings) {
         });
     },
 
-    loadEarthMode() {
+   loadEarthMode() {
         this.isMultiplayer = false;
         this.isIslandMode = false;
-        this.isEarthMode = true; // ВАЖНО: Новый флаг
+        this.isEarthMode = true; 
         this.isSpectator = false;
         this.myRole = 'player';
         this.state = 'BATTLE';
         this.money = 4000;
         
-        MAP_W = 10000; // Размеры карты 2:1
-        MAP_H = 5000;
+        // ДЕЛАЕМ МИР ГИГАНТСКИМ
+        MAP_W = 20000; 
+        MAP_H = 10000;
         
-        // Очищаем игру
         this.resetGameData(); 
 
-        // Игрок + 6 ботов (как ты и просил)
         const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
         
-        // Встроенный умный поиск случайной точки спавна на суше
         const getEarthSpawn = () => {
+            const ew = Game.earthW || 2000;
+            const eh = Game.earthH || 1000;
             for(let attempts=0; attempts<10000; attempts++) {
-                let px = Math.floor(Math.random() * 800);
-                let py = Math.floor(Math.random() * 400);
-                if (Game.earthCollisionMap[py * 800 + px] === 1) {
-                    let gx = px * (MAP_W/800);
-                    let gy = py * (MAP_H/400);
-                    // Проверяем, чтобы новая база не спавнилась прямо на другой
-                    let tooClose = this.units.some(u => Math.hypot(u.x-gx, u.y-gy) < 800);
+                let px = Math.floor(Math.random() * ew);
+                let py = Math.floor(Math.random() * eh);
+                if (Game.earthCollisionMap[py * ew + px] === 1) {
+                    let gx = px * (MAP_W/ew);
+                    let gy = py * (MAP_H/eh);
+                    
+                    // ИСПРАВЛЕНИЕ: Ищем пересечения ТОЛЬКО С БАЗАМИ (HOUSE), а не с деревьями!
+                    // Дистанцию увеличили до 2500, так как карта теперь огромная
+                    let tooClose = this.units.some(u => u.type === 'HOUSE' && Math.hypot(u.x-gx, u.y-gy) < 2500);
+                    
                     if (!tooClose) return { x: gx, y: gy };
                 }
             }
-            return { x: MAP_W/2, y: MAP_H/2 }; // Резерв на случай сбоя
+            return { x: Math.random()*MAP_W, y: Math.random()*MAP_H }; 
         };
 
         factions.forEach((side) => {
@@ -3110,15 +3111,12 @@ loadPvpLevel(settings) {
             if (side !== 'player') {
                 this.bots.push(new BotAI(side));
             } else {
-                // Центрируем камеру на нашей базе
                 this.camera.x = sp.x - canvas.width/2;
                 this.camera.y = sp.y - canvas.height/2;
             }
         });
         
-        // Вызываем отрисовку фона
         MapUtils.renderBackground();
-        
         this.generateBuffs();
         this.startGameUI("ГЛОБАЛЬНЫЙ КОНФЛИКТ");
         document.getElementById('start-btn').classList.add('hidden');

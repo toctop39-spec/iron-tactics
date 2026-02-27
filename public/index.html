@@ -3484,9 +3484,13 @@ else if (cmd.type === 'build_start') {
                 Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
             }
         }
-        else if (cmd.type === 'arty_shot') {
+ else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);
-            if (shooter) shooter.fireArty(cmd.tx, cmd.ty, true);
+            if (shooter) {
+                shooter.gradSeq = 240;
+                shooter.gradTarget = {x: cmd.tx, y: cmd.ty};
+                shooter.target = null;
+            }
         }
 
 // --- СИНХРОНИЗАЦИЯ ДОРОГ ---
@@ -4207,15 +4211,22 @@ onDown(e) {
                 return;
             }
               
-            // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
+    // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
                 if (this.money >= ARTY_COST) {
                     const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
                         this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
-                            setTimeout(() => g.fireArty(m.x, m.y), i * 300);
-                            if (this.isMultiplayer && CURRENT_ROOM) setTimeout(() => this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'arty_shot', id: g.id, tx: m.x, ty: m.y }), i * 300);
+                            // ИСПРАВЛЕНИЕ: Никаких setTimeout! Запускаем красивую подготовку (секвенцию) к выстрелу.
+                            // i * 10 делает так, чтобы Грады стреляли по очереди (эффект Катюши), не нагружая процессор
+                            g.gradSeq = 240 + (i * 10); 
+                            g.gradTarget = {x: m.x, y: m.y};
+                            g.target = null; // Град останавливается для подготовки
+                            
+                            if (this.isMultiplayer && CURRENT_ROOM) {
+                                this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'arty_shot', id: g.id, tx: m.x, ty: m.y });
+                            }
                         });
                         this.artyMode = false; document.body.style.cursor = 'default';
                     } else this.showError("НЕТ БОЕПРИПАСОВ!");
@@ -5996,18 +6007,19 @@ attemptAutoProduction() {
             return;
         }
 
-        // --- ЛОГИКА ГРАДА (ЗАЛП) ---
-        if (this.type === 'GRAD' && this.gradSeq > 0) {
+// --- ЛОГИКА АРТИЛЛЕРИИ (ПОДГОТОВКА И ЗАЛП) ---
+        if ((this.type === 'GRAD' || this.type === 'HIMARS') && this.gradSeq > 0) {
             this.gradSeq--;
-            // Дым перед выстрелом
-            if (this.gradSeq > 180) { 
-                if (Game.frameCount % 10 === 0) Game.effects.push({type: 'smoke', x: this.x + (Math.random()*20-10), y: this.y, life: 40}); 
+            
+            // Дым во время подготовки (наведения и поднятия ракетницы)
+            if (this.gradSeq > 10) { 
+                if (Game.frameCount % 15 === 0) Game.effects.push({type: 'smoke', x: this.x + (Math.random()*20-10), y: this.y, life: 40}); 
             }
-            // Сам выстрел
-            else if (this.gradSeq === 180 && this.gradTarget) {
+            // Сам выстрел (когда таймер доходит до 10)
+            else if (this.gradSeq === 10 && this.gradTarget) {
                 this.fireArty(this.gradTarget.x, this.gradTarget.y);
             }
-            return; // Град не двигается во время залпа
+            return; // Установка стоит на месте во время прицеливания и залпа
         }
 
 // --- ЛОГИКА АВИАЦИИ (ВЗЛЕТ/ПОСАДКА) ---

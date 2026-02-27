@@ -3891,6 +3891,22 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
            // Удаляем мертвых и обновляем провода
             let lenBefore = this.units.length;
             this.units = this.units.filter(u => u.hp > 0);
+            // 1. Очищаем выделение от трупов
+this.selection = this.selection.filter(u => u.hp > 0);
+
+// 2. Сбрасываем цели у всех живых юнитов, если цель мертва
+this.units.forEach(u => {
+    if (u.targetUnit && u.targetUnit.hp <= 0) {
+        u.targetUnit = null;
+    }
+});
+
+// 3. Сбрасываем цели у ракет
+this.bullets.forEach(b => {
+    if (b.targetUnit && b.targetUnit.hp <= 0) {
+        b.targetUnit = null;
+    }
+});
             if (this.units.length !== lenBefore) this.powerGridDirty = true;
         
             

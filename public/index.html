@@ -5215,18 +5215,30 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
 
 
 
-// --- ГЛОБАЛЬНАЯ СЕТКА ПРИГОДНОСТИ ДЛЯ ПОСТРОЙКИ ---
-        if ((this.selection && this.selection.some(u => u.isBuilder)) || this.roadDragStart) {
+// --- УМНАЯ СЕТКА СТРОИТЕЛЬСТВА (ОПТИМИЗИРОВАННАЯ) ---
+        let builder = this.selection.find(u => u.isBuilder && u.side === this.myRole);
+        
+        // Показываем сетку ТОЛЬКО если УЖЕ нажата кнопка здания (pendingConstruction) или тянется дорога
+        if ((builder && this.pendingConstruction) || this.roadDragStart) {
             ctx.save();
-            let startCx = Math.floor(this.camera.x / 30);
-            let endCx = Math.ceil((this.camera.x + canvas.width / (this.zoom || 1)) / 30);
-            let startCy = Math.floor(this.camera.y / 30);
-            let endCy = Math.ceil((this.camera.y + canvas.height / (this.zoom || 1)) / 30);
+            
+            let radius = 800; // Сетка рисуется только в этом радиусе вокруг строителя
+            let centerX = this.roadDragStart ? this.roadDragStart.x : builder.x;
+            let centerY = this.roadDragStart ? this.roadDragStart.y : builder.y;
+
+            // Ограничиваем цикл только квадратом видимости (огромный буст FPS!)
+            let startCx = Math.floor(Math.max(0, centerX - radius) / 30);
+            let endCx = Math.ceil(Math.min(MAP_W, centerX + radius) / 30);
+            let startCy = Math.floor(Math.max(0, centerY - radius) / 30);
+            let endCy = Math.ceil(Math.min(MAP_H, centerY + radius) / 30);
 
             for (let cx = startCx; cx <= endCx; cx++) {
                 for (let cy = startCy; cy <= endCy; cy++) {
                     let px = cx * 30 + 15; 
                     let py = cy * 30 + 15;
+                    
+                    // Обрезаем углы, чтобы сетка была круглой
+                    if (Math.hypot(px - centerX, py - centerY) > radius) continue;
                     
                     let isValid = true;
                     if (this.getTerritoryOwner(px, py) !== this.myRole) isValid = false;
@@ -5250,6 +5262,16 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
                     }
                 }
             }
+            
+            // Рисуем красивую границу зоны застройки
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
             ctx.restore();
         }
 

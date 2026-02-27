@@ -1171,6 +1171,9 @@ getTerrain(x, y) {
         return null;
     },
 
+renderBackground() {
+        this.bgCanvas = document.createElement('canvas');
+        
 // Замените блок "ОТРИСОВКА КАРТЫ ЗЕМЛИ" внутри renderBackground() на это:
     if (Game.isEarthMode && Game.earthCollisionMap) {
         const ew = Game.earthW || 2000;
@@ -1213,6 +1216,7 @@ getTerrain(x, y) {
         }
     }
 };
+
 
 // --- КОНФИГУРАЦИЯ HYPERPARAMETERS ---
 const RL_CONFIG = {

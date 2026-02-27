@@ -5214,6 +5214,20 @@ draw() {
 
 for (let i = this.effects.length - 1; i >= 0; i--) {
             const e = this.effects[i];
+            
+            // --- ОПТИМИЗАЦИЯ: ПРОПУСКАЕМ ОТРИСОВКУ ЭФФЕКТОВ ЗА КАДРОМ ---
+            let z = this.zoom || 1;
+            if (e.x + 100 < this.camera.x || e.x - 100 > this.camera.x + (canvas.width/z) ||
+                e.y + 100 < this.camera.y || e.y - 100 > this.camera.y + (canvas.height/z)) {
+                // Физику частиц все равно считаем (чтобы они исчезли вовремя)
+                if (e.vx) e.x += e.vx; 
+                if (e.vy) e.y += e.vy;
+                e.life--;
+                if (e.life <= 0) this.effects.splice(i, 1);
+                continue; // Пропускаем весь код отрисовки (ctx...) ниже!
+            }
+        
+ // --- СТАРЫЕ ЭФФЕКТЫ ---
         
  // --- СТАРЫЕ ЭФФЕКТЫ ---
             if (e.type === 'smoke') {
@@ -6585,6 +6599,17 @@ if (dist < 15) {
         }
 
     draw(ctx) {
+
+        // --- СУПЕР-ОПТИМИЗАЦИЯ: НЕ РИСУЕМ ТО, ЧТО ЗА КАДРОМ ---
+        let z = Game.zoom || 1;
+        let padding = this.radius + 80; // Запас, чтобы не пропадали резко на краях
+        if (this.x + padding < Game.camera.x || 
+            this.x - padding > Game.camera.x + (canvas.width / z) || 
+            this.y + padding < Game.camera.y || 
+            this.y - padding > Game.camera.y + (canvas.height / z)) {
+            return; // ВЫХОДИМ! Видеокарта отдыхает.
+        }
+        
 // --- ПОЛНАЯ ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
         if (Game.selection.includes(this) && this.target && !this.isProducer) {
             ctx.save();
@@ -7871,6 +7896,14 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
         });
     }
     draw(ctx) {
+        // --- ОПТИМИЗАЦИЯ: НЕ РИСУЕМ ПУЛИ ЗА КАДРОМ ---
+        let z = Game.zoom || 1;
+        if (this.visX + 50 < Game.camera.x || 
+            this.visX - 50 > Game.camera.x + (canvas.width / z) || 
+            this.visY + 50 < Game.camera.y || 
+            this.visY - 50 > Game.camera.y + (canvas.height / z)) {
+            return; 
+        }
         // --- ОТРИСОВКА КРЫЛАТОЙ РАКЕТЫ ---
         if (this.isCruise) {
             ctx.save(); 

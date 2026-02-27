@@ -684,19 +684,16 @@ const LEVELS = [
 { id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
 ];
 
-    // --- ФРАКЦИИ И ЦВЕТА ---
 const FACTIONS = {
-    'player': { name: 'СИНИЕ', color: '#44aaff' },
-    'enemy':  { name: 'КРАСНЫЕ', color: '#e53935' },
-    'bot1':   { name: 'ОРАНЖЕВЫЕ', color: '#ffaa00' },
-    'bot2':   { name: 'ФИОЛЕТОВЫЕ', color: '#aa00ff' },
-    'bot3':   { name: 'БИРЮЗОВЫЕ', color: '#00ccaa' },
-    'bot4':   { name: 'ЖЕЛТЫЕ', color: '#ffff00' },
-    'bot5':   { name: 'РОЗОВЫЕ', color: '#ff00ff' },
-    'bot6':   { name: 'ЗЕЛЕНЫЕ', color: '#00ff00' },
-    'bot7':   { name: 'СВЕТЛО-СИНИЕ', color: '#00aaff' },
-    'bot8':   { name: 'ТЕМНО-КРАСНЫЕ', color: '#880000' },
-    'neutral':{ name: 'НЕЙТРАЛ', color: '#aaaaaa' }
+    'player': { name: "СИНИЕ", color: "#4488ff" },
+    'enemy': { name: "КРАСНЫЕ", color: "#ff4444" },
+    'neutral': { name: "НЕЙТРАЛЫ", color: "#aaaaaa" },
+    'bot1': { name: "БОТ 1", color: "#e11d48" },
+    'bot2': { name: "БОТ 2", color: "#d97706" },
+    'bot3': { name: "БОТ 3", color: "#16a34a" },
+    'bot4': { name: "БОТ 4", color: "#9333ea" },
+    'bot5': { name: "БОТ 5", color: "#db2777" },
+    'bot6': { name: "БОТ 6", color: "#0284c7" }
 };
 
     
@@ -1359,6 +1356,7 @@ class BotAI {
         this.side = side;
         this.money = 8000; 
         this.energyFactor = 1;
+        this.color = FACTIONS[side] ? FACTIONS[side].color : '#ff0000';
         this.timer = 0;
         this.resources = { iron: 0, chem: 0, chips: 0 };
     }

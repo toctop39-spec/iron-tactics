@@ -3371,6 +3371,7 @@ showError(msg) {
     },
 
     spawnRealisticExplosion(x, y, scale = 1) {
+        if (this.effects.length > 500) return;
         // 1. Огонь (яркий центр, быстро исчезает)
         for(let i = 0; i < 15 * scale; i++) {
             this.effects.push({
@@ -3888,27 +3889,25 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                 }
             });
             
-           // Удаляем мертвых и обновляем провода
+// Удаляем мертвых и очищаем память от их остатков!
             let lenBefore = this.units.length;
             this.units = this.units.filter(u => u.hp > 0);
-            // 1. Очищаем выделение от трупов
-this.selection = this.selection.filter(u => u.hp > 0);
-
-// 2. Сбрасываем цели у всех живых юнитов, если цель мертва
-this.units.forEach(u => {
-    if (u.targetUnit && u.targetUnit.hp <= 0) {
-        u.targetUnit = null;
-    }
-});
-
-// 3. Сбрасываем цели у ракет
-this.bullets.forEach(b => {
-    if (b.targetUnit && b.targetUnit.hp <= 0) {
-        b.targetUnit = null;
-    }
-});
-            if (this.units.length !== lenBefore) this.powerGridDirty = true;
-        
+            if (this.units.length !== lenBefore) {
+                this.powerGridDirty = true;
+                // 1. Очистка выделения от убитых
+                this.selection = this.selection.filter(u => u.hp > 0);
+                // 2. Сброс мертвых целей у всех живых (ГЛАВНАЯ ПРИЧИНА ЛАГОВ)
+                for (let i = 0; i < this.units.length; i++) {
+                    if (this.units[i].targetUnit && this.units[i].targetUnit.hp <= 0) {
+                        this.units[i].targetUnit = null;
+                    }
+                }
+                for (let i = 0; i < this.bullets.length; i++) {
+                    if (this.bullets[i].targetUnit && this.bullets[i].targetUnit.hp <= 0) {
+                        this.bullets[i].targetUnit = null;
+                    }
+                }
+            }
             
             if (this.selectedProducer && (this.selectedProducer.hp <= 0 || this.selectedProducer.side !== this.myRole)) {
                 this.selectedProducer = null;
@@ -5182,24 +5181,28 @@ draw() {
             ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2, 6);
             ctx.fillStyle = '#6cf'; ctx.fillRect(s.x - UNITS[s.type].radius, s.y + UNITS[s.type].radius + 8, UNITS[s.type].radius * 2 * pct, 6);
         });
-// 1. Здания и статичные объекты
-        const buildings = this.units.filter(u => UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
-        
-        // 2. Лодки (выделяем в отдельный слой)
-        const boats = this.units.filter(u => u.type === 'BOAT');
-        
-        // 3. Наземная техника и пехота (всё, что не летает и не плавает)
-        const ground = this.units.filter(u => !u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
-        
-        // 4. Авиация (Вертолеты и FPV дроны)
-        const flying = this.units.filter(u => u.isFlying);
-        
-        // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ (от земли к небу):
-        buildings.forEach(u => u.draw(ctx)); 
-        boats.forEach(u => u.draw(ctx));      // Лодка под ногами
-        ground.forEach(u => u.draw(ctx));     // Солдаты и танки
-        flying.forEach(u => u.draw(ctx));     // Авиация перекрывает всё на земле
-        this.bullets.forEach(b => b.draw(ctx)); // Снаряды летят поверх вообще всего
+
+    // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ БЕЗ ФИЛЬТРОВ И ТОРМОЗОВ:
+        // 1. Здания
+        for(let i=0; i<this.units.length; i++) {
+            let u = this.units[i];
+            if(UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) u.draw(ctx);
+        }
+        // 2. Лодки
+        for(let i=0; i<this.units.length; i++) {
+            let u = this.units[i];
+            if(u.type === 'BOAT') u.draw(ctx);
+        }
+        // 3. Наземная техника
+        for(let i=0; i<this.units.length; i++) {
+            let u = this.units[i];
+            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)) u.draw(ctx);
+        }
+        // 4. Летуны
+        for(let i=0; i<this.units.length; i++) {
+            let u = this.units[i];
+            if(u.isFlying) u.draw(ctx);
+        }
 
         // --- РЕЖИМ 3 (ПОЛИТИКА): Рисуем ПОВЕРХ армии и зданий ---
         if (this.territoryMode === 3 && this.territoryCanvas) {

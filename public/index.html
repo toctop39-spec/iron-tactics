@@ -989,25 +989,6 @@ getWorldHeight(x, y) {
         return Math.max(0, Math.min(1, h));
     },
 
-getTerrain(x, y) {
-        // --- ФИЗИКА ДЛЯ КАРТЫ ЗЕМЛИ ---
-        if (Game.isEarthMode && Game.earthCollisionMap) {
-            const px = Math.floor(x * (800 / MAP_W));
-            const py = Math.floor(y * (400 / MAP_H));
-            if (px < 0 || px >= 800 || py < 0 || py >= 400) return 'DEEP'; // Океан за краем карты
-            return Game.earthCollisionMap[py * 800 + px] === 1 ? 'LAND' : 'DEEP';
-        }
-
-        // --- СТАРЫЙ КОД ДЛЯ ОСТРОВОВ ---
-        if (!Game.isIslandMode) return 'LAND';
-        if (this.checkRoad(x, y)) return 'LAND'; 
-        
-        const h = this.getWorldHeight(x, y);
-        if (h >= 0.48) return 'LAND';
-        if (h >= 0.42) return 'SHALLOW'; 
-        return 'DEEP';
-    },
-
     isWater(x, y) { 
         if (Game.isEarthMode) return this.getTerrain(x, y) !== 'LAND';
         return Game.isIslandMode && this.getTerrain(x, y) !== 'LAND'; 
@@ -1163,15 +1144,27 @@ roadPaths: [],
         return 'NORMAL';
     },
 
-    getTerrain(x, y) {
-        if (!Game.isIslandMode) return 'LAND';
-        if (this.checkRoad(x, y)) return 'LAND'; // МОСТ НАД ВОДОЙ считается сушей!
-        
-        const h = this.getWorldHeight(x, y);
-        if (h >= 0.48) return 'LAND';
-        if (h >= 0.42) return 'SHALLOW'; 
-        return 'DEEP';
-    },
+getTerrain(x, y) {
+    // 1. Дороги и мосты всегда считаются сушей
+    if (this.checkRoad(x, y)) return 'LAND'; 
+
+    // 2. ФИЗИКА ДЛЯ КАРТЫ ЗЕМЛИ
+    if (Game.isEarthMode && Game.earthCollisionMap) {
+        const px = Math.floor(x * (800 / MAP_W));
+        const py = Math.floor(y * (400 / MAP_H));
+        // Если вышли за края карты - считаем океаном
+        if (px < 0 || px >= 800 || py < 0 || py >= 400) return 'DEEP'; 
+        return Game.earthCollisionMap[py * 800 + px] === 1 ? 'LAND' : 'DEEP';
+    }
+
+    // 3. ФИЗИКА ДЛЯ ОСТРОВОВ И ОБЫЧНОЙ КАРТЫ
+    if (!Game.isIslandMode) return 'LAND';
+    
+    const h = this.getWorldHeight(x, y);
+    if (h >= 0.48) return 'LAND';
+    if (h >= 0.42) return 'SHALLOW'; 
+    return 'DEEP';
+},
     
     checkMountain(x, y, radius) {
         for (let m of this.mountains) {
@@ -3969,8 +3962,8 @@ if (!this.isSpectator) {
              return;
         }
         
-        if (this.isIslandMode || this.isMultiplayer) {
-            const myEss = this.units.filter(u => u.side === this.myRole && (u.isProducer || u.isBuilder)).length;
+if (this.isIslandMode || this.isMultiplayer || this.isEarthMode) { // <-- Добавлено || this.isEarthMode
+    const myEss = this.units.filter(u => u.side === this.myRole && (u.isProducer || u.isBuilder)).length;
             const enemies = this.units.filter(u => u.side !== this.myRole && (u.isProducer || u.isBuilder)).length;
             if (myEss === 0 && this.units.filter(u => u.side === this.myRole).length === 0) {
                  this.showError("ВЫ ПРОИГРАЛИ");

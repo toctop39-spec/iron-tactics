@@ -1630,62 +1630,59 @@ manageIndustry() {
         });
     }
     
-    manageHouse() {
-        const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
+manageHouse() {
+        const myUnits = Game.units.filter(u => u.side === this.side);
+        const houses = myUnits.filter(u => u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
         
-        // --- ЛОГИСТИКА: Перемешиваем дома, чтобы распределять очередь ---
+        // Перемешиваем дома, чтобы распределять очередь
         houses.sort(() => 0.5 - Math.random());
 
-        // 1. Считаем текущую армию ОДИН РАЗ до цикла (это очень ускорит игру)
-        let builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
-        // 2. Считаем строителей, которые УЖЕ заказаны и делаются прямо сейчас!
-        let buildersInProd = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
+        let totalBuilders = myUnits.filter(u => u.isBuilder).length + 
+                            myUnits.filter(u => u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
         
-        // Складываем живых и заказанных
-        let totalBuilders = builders + buildersInProd;
+        let snipers = myUnits.filter(u => u.type === 'SNIPER').length;
+        let army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
+        
+        let houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
+        let factoryCount = myUnits.filter(u => u.type === 'FACTORY').length;
 
-        let snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
-        let army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
+        // БЕСКОНЕЧНЫЙ РОСТ: 4 пехотинца и 1 снайпер на КАЖДЫЙ построенный дом!
+        let maxArmy = houseCount * 4;
+        let maxSnipers = houseCount * 1;
+        
+        // ФИКС ЭКОНОМИКИ: Если заводов мало, оставляем "неприкосновенный запас" денег на их постройку
+        // Бот не купит солдата, если у него меньше 1500$, пока не построит хотя бы 2 завода
+        let reserve = factoryCount < 2 ? 1500 : 300; 
 
         houses.forEach(h => {
-            // Ограничение: максимум 20 строителей (включая тех, что еще крафтятся)
-            if (totalBuilders < 10 && this.money >= UNITS.BUILDER.cost) { 
-                this.craft(h, 'BUILDER'); 
-                totalBuilders++; // Мгновенно увеличиваем счетчик, чтобы следующий дом его уже учел!
-                return; 
+            // Строителей тоже масштабируем: базово 5 + по 1 на каждые 4 дома
+            if (totalBuilders < 5 + Math.floor(houseCount/4) && this.money >= UNITS.BUILDER.cost) { 
+                this.craft(h, 'BUILDER'); totalBuilders++; return; 
             }
-            // То же самое делаем для снайперов и пехоты
-            if (snipers < 5 && this.money >= UNITS.SNIPER.cost) { 
-                this.craft(h, 'SNIPER'); 
-                snipers++;
-                return; 
+            if (snipers < maxSnipers && this.money >= UNITS.SNIPER.cost + reserve) { 
+                this.craft(h, 'SNIPER'); snipers++; return; 
             }
-            if (army < 15 && this.money >= UNITS.SOLDIER.cost) { 
-                this.craft(h, 'SOLDIER'); 
-                army++;
-                return;
+            // Покупаем пехоту, только если хватает денег И на солдата, И на зарезервированный завод
+            if (army < maxArmy && this.money >= UNITS.SOLDIER.cost + reserve) { 
+                this.craft(h, 'SOLDIER'); army++; return;
             }
         });
     }
 
 manageCombat() {
         const myUnits = Game.units.filter(u => u.side === this.side);
-        // Отделяем армию от лодок
         const army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'SILO' && u.type !== 'BOAT');
         const boats = myUnits.filter(u => u.type === 'BOAT');
-        
         const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE');
+        
         if (enemies.length === 0) return;
 
-// 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
+        // 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
         army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
             if (g.type === 'GRAD') {
                 const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
-                // БЫЛО: if (t && !g.gradSeq) g.fireArty(t.x, t.y);
-                // СТАЛО (Заставляем бота ждать 6 секунд перед залпом, как и игрока):
                 if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
             }
-            // HIMARS сам найдет вертолеты в Unit.update(), мы его просто двигаем с армией
         });
 
         // 2. ПЕРЕЗАРЯДКА
@@ -1697,61 +1694,69 @@ manageCombat() {
             }
         });
 
-        // 3. АТАКА И ЛОГИСТИКА
-        if (army.length > 8) {
-            // Приоритет целей: Сначала чужие заводы/дома (для захвата территории), затем всё остальное
-            let target = enemies.find(e => e.type === 'FACTORY' || e.type === 'HOUSE');
-            if (!target) target = enemies[0];
+        // 3. АТАКА, ЛОГИСТИКА И ОБОРОНА
+        let houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
+        // Чем больше у бота база, тем большую армию он копит перед атакой
+        let attackThreshold = Math.max(12, houseCount * 3); 
 
-            // Движение армии
+        if (army.length > attackThreshold) {
+            // ФИКС ЦЕЛИ: Ищем ближайшую базу врага с помощью математики, а не первую в списке!
+            let bestTarget = null;
+            let minDistance = Infinity;
+            
+            // Ищем сначала здания (чтобы захватывать/сносить базу)
+            let bldgs = enemies.filter(e => e.type === 'FACTORY' || e.type === 'HOUSE');
+            let potentialTargets = bldgs.length > 0 ? bldgs : enemies;
+
+            // Берем координаты нашего первого юнита, чтобы отсчитывать дистанцию от него
+            let startPoint = army[0] || myUnits[0];
+
+            potentialTargets.forEach(e => {
+                let dist = Math.hypot(e.x - startPoint.x, e.y - startPoint.y);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    bestTarget = e;
+                }
+            });
+
+            let target = bestTarget || enemies[0];
+
+            // Движение армии в атаку
             army.forEach(u => { 
-                if (u.type === 'SENTINEL' || u.target) return; // Статика и занятые стоят
-
-                // ТАКТИКА FPV-ДРОНОВ
+                if (u.type === 'SENTINEL' || u.target) return;
                 if (u.type === 'FPV') {
-                    // Ищут ПВО или заводы
-                    let fpvTarget = enemies.find(e => e.type === 'AA_DEFENSE' || e.type === 'FACTORY');
-                    if (!fpvTarget) fpvTarget = target;
+                    let fpvTarget = enemies.find(e => e.type === 'AA_DEFENSE' || e.type === 'FACTORY') || target;
                     u.moveCmd(fpvTarget.x, fpvTarget.y);
                     return;
                 }
-
-                // ТАКТИКА ЛОДОК (Если мы на островах)
                 if (Game.isIslandMode && !u.isFlying) {
                     let distToTarget = Math.hypot(target.x - u.x, target.y - u.y);
-                    
-                    // Если цель далеко (на другом острове) и есть лодки
                     if (distToTarget > 600 && boats.length > 0) {
-                        // Ищем ближайшую лодку
                         let closestBoat = boats.sort((a, b) => Math.hypot(a.x - u.x, a.y - u.y) - Math.hypot(b.x - u.x, b.y - u.y))[0];
-                        
                         if (closestBoat) {
-                            // Если мы рядом с лодкой, залазим и "жмемся" к ней
-                            if (Math.hypot(closestBoat.x - u.x, closestBoat.y - u.y) < 150) {
-                                u.moveCmd(closestBoat.x, closestBoat.y);
-                            } else {
-                                // Иначе бежим к берегу, где лодка
-                                u.moveCmd(closestBoat.x, closestBoat.y);
-                            }
+                            if (Math.hypot(closestBoat.x - u.x, closestBoat.y - u.y) < 150) u.moveCmd(closestBoat.x, closestBoat.y);
+                            else u.moveCmd(closestBoat.x, closestBoat.y);
                         }
-                    } else {
-                        // Если на одном острове - просто атакуем
-                        u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250);
-                    }
-                } 
-                // ОБЫЧНАЯ АТАКА
-                else {
+                    } else u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250);
+                } else {
                     u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250); 
                 }
             });
 
-            // УПРАВЛЕНИЕ САМИМИ ЛОДКАМИ
             boats.forEach(b => {
-                if (!b.target) {
-                    // Плывем к врагу, высаживаем десант!
-                    b.moveCmd(target.x + (Math.random()-0.5)*300, target.y + (Math.random()-0.5)*300);
-                }
+                if (!b.target) b.moveCmd(target.x + (Math.random()-0.5)*300, target.y + (Math.random()-0.5)*300);
             });
+        } else {
+            // ФИКС ЗАЩИТЫ: Если армия меньше порога (мы копим силы), патрулируем СВОЮ базу!
+            let myBaseCenter = myUnits.find(u => u.type === 'FACTORY' || u.type === 'HOUSE');
+            if (myBaseCenter) {
+                army.forEach(u => {
+                    // Если юнит ничего не делает, ставим его случайным образом вокруг базы (радиус 300)
+                    if (!u.target && u.type !== 'SENTINEL') {
+                        u.moveCmd(myBaseCenter.x + (Math.random()-0.5)*600, myBaseCenter.y + (Math.random()-0.5)*600);
+                    }
+                });
+            }
         }
     }
 

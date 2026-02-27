@@ -991,15 +991,29 @@ getWorldHeight(x, y) {
         return Math.max(0, Math.min(1, h));
     },
 
-    getTerrain(x, y) {
+getTerrain(x, y) {
+        // --- ФИЗИКА ДЛЯ КАРТЫ ЗЕМЛИ ---
+        if (Game.isEarthMode && Game.earthCollisionMap) {
+            const px = Math.floor(x * (800 / MAP_W));
+            const py = Math.floor(y * (400 / MAP_H));
+            if (px < 0 || px >= 800 || py < 0 || py >= 400) return 'DEEP'; // Океан за краем карты
+            return Game.earthCollisionMap[py * 800 + px] === 1 ? 'LAND' : 'DEEP';
+        }
+
+        // --- СТАРЫЙ КОД ДЛЯ ОСТРОВОВ ---
         if (!Game.isIslandMode) return 'LAND';
+        if (this.checkRoad(x, y)) return 'LAND'; 
+        
         const h = this.getWorldHeight(x, y);
         if (h >= 0.48) return 'LAND';
         if (h >= 0.42) return 'SHALLOW'; 
         return 'DEEP';
     },
 
-    isWater(x, y) { return Game.isIslandMode && this.getTerrain(x, y) !== 'LAND'; },
+    isWater(x, y) { 
+        if (Game.isEarthMode) return this.getTerrain(x, y) !== 'LAND';
+        return Game.isIslandMode && this.getTerrain(x, y) !== 'LAND'; 
+    },
     checkWater(x, y) { return this.isWater(x, y); },
 
     // Тот самый УМНЫЙ поиск точек старта
@@ -1141,6 +1155,7 @@ roadPaths: [],
     
     getGroundType(x, y) {
         if (this.checkRoad(x, y)) return 'ROAD'; // Дороги в приоритете (даже над водой)
+        if (Game.isEarthMode && this.getTerrain(x, y) !== 'LAND') return 'WATER';
         if (Game.isIslandMode && this.getWorldHeight(x, y) < 0.48) return 'WATER';
 
         let biomeNoise = SimplexNoise.noise(x * 0.0015, y * 0.0015);
@@ -1168,9 +1183,33 @@ roadPaths: [],
     },
 
     // Отрисовка огромной карты один раз (очень ускорит игру)
-    renderBackground() {
+renderBackground() {
         this.bgCanvas = document.createElement('canvas');
-        const scale = 0.5; // Рендерим в полразмера для скорости
+        
+        // --- ОТРИСОВКА КАРТЫ ЗЕМЛИ ---
+        if (Game.isEarthMode && Game.earthCollisionMap) {
+            this.bgCanvas.width = 800; // Разрешение пиксельной карты
+            this.bgCanvas.height = 400;
+            const ctx = this.bgCanvas.getContext('2d');
+            
+            // Вода
+            ctx.fillStyle = '#050a14';
+            ctx.fillRect(0, 0, 800, 400);
+            
+            // Суша
+            ctx.fillStyle = '#1e3b20'; // Красивый темно-зеленый цвет джунглей
+            for (let y = 0; y < 400; y++) {
+                for (let x = 0; x < 800; x++) {
+                    if (Game.earthCollisionMap[y * 800 + x] === 1) {
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            return; // Выходим! Острова рисовать не нужно
+        }
+
+        // --- СТАРЫЙ КОД (ОСТРОВА) ---
+        const scale = 0.5; 
         this.bgCanvas.width = MAP_W * scale;
         this.bgCanvas.height = MAP_H * scale;
         const ctx = this.bgCanvas.getContext('2d', { alpha: true });
@@ -1178,17 +1217,13 @@ roadPaths: [],
         for (let y = 0; y < this.bgCanvas.height; y++) {
             for (let x = 0; x < this.bgCanvas.width; x++) {
                 const h = this.getWorldHeight(x / scale, y / scale);
-                
                 if (h < 0.42) {
-                    // Глубокая вода (темная)
                     ctx.fillStyle = '#050a14'; 
                     ctx.fillRect(x, y, 1, 1);
                 } else if (h < 0.48) {
-                    // Мелководье (полупрозрачный голубой, сквозь него будет видно дно!)
                     ctx.fillStyle = 'rgba(0, 150, 200, 0.4)'; 
                     ctx.fillRect(x, y, 1, 1);
                 }
-                // Суша (h >= 0.48) остается ПРОЗРАЧНОЙ, чтобы было видно камуфляж
             }
         }
     }
@@ -2996,6 +3031,107 @@ loadPvpLevel(settings) {
                 });
             }, 1500); 
         }
+    },
+
+    transitToEarth() {
+        this.transition(async () => {
+            // Показываем плашку загрузки
+            document.getElementById('menu-screen').classList.add('hidden');
+            const warn = document.getElementById('connection-warning');
+            warn.style.display = 'block';
+            warn.innerText = 'ЗАГРУЗКА ДАННЫХ ЗЕМЛИ...';
+            
+            // Если карта еще не скачана - качаем и генерируем (один раз за сессию)
+            if (!Game.earthCollisionMap) {
+                try {
+                    const res = await fetch('https://unpkg.com/world-atlas@2/countries-110m.json');
+                    const topo = await res.json();
+                    const geo = topojson.feature(topo, topo.objects.countries);
+                    
+                    const c = document.createElement('canvas');
+                    c.width = 800; c.height = 400;
+                    const cCtx = c.getContext('2d');
+                    
+                    const proj = d3.geoEquirectangular().fitSize([800, 400], geo);
+                    const path = d3.geoPath().projection(proj).context(cCtx);
+                    
+                    cCtx.fillStyle = '#000'; cCtx.fillRect(0,0,800,400); // Океан
+                    cCtx.beginPath(); path(geo);
+                    cCtx.fillStyle = '#fff'; cCtx.fill(); // Суша
+                    
+                    const imgData = cCtx.getImageData(0,0,800,400).data;
+                    Game.earthCollisionMap = new Uint8Array(800*400);
+                    for(let i=0; i<800*400; i++) {
+                        Game.earthCollisionMap[i] = imgData[i*4] > 100 ? 1 : 0;
+                    }
+                } catch (e) {
+                    alert("Ошибка загрузки карты Земли! Проверьте интернет.");
+                    warn.style.display = 'none';
+                    return this.backToMenu();
+                }
+            }
+            
+            warn.style.display = 'none';
+            this.loadEarthMode();
+        });
+    },
+
+    loadEarthMode() {
+        this.isMultiplayer = false;
+        this.isIslandMode = false;
+        this.isEarthMode = true; // ВАЖНО: Новый флаг
+        this.isSpectator = false;
+        this.myRole = 'player';
+        this.state = 'BATTLE';
+        this.money = 4000;
+        
+        MAP_W = 10000; // Размеры карты 2:1
+        MAP_H = 5000;
+        
+        // Очищаем игру
+        this.resetGameData(); 
+
+        // Игрок + 6 ботов (как ты и просил)
+        const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
+        
+        // Встроенный умный поиск случайной точки спавна на суше
+        const getEarthSpawn = () => {
+            for(let attempts=0; attempts<10000; attempts++) {
+                let px = Math.floor(Math.random() * 800);
+                let py = Math.floor(Math.random() * 400);
+                if (Game.earthCollisionMap[py * 800 + px] === 1) {
+                    let gx = px * (MAP_W/800);
+                    let gy = py * (MAP_H/400);
+                    // Проверяем, чтобы новая база не спавнилась прямо на другой
+                    let tooClose = this.units.some(u => Math.hypot(u.x-gx, u.y-gy) < 800);
+                    if (!tooClose) return { x: gx, y: gy };
+                }
+            }
+            return { x: MAP_W/2, y: MAP_H/2 }; // Резерв на случай сбоя
+        };
+
+        factions.forEach((side) => {
+            const sp = getEarthSpawn();
+            this.units.push(new Unit('HOUSE', sp.x, sp.y, side));
+            this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, side));
+            
+            if (side !== 'player') {
+                this.bots.push(new BotAI(side));
+            } else {
+                // Центрируем камеру на нашей базе
+                this.camera.x = sp.x - canvas.width/2;
+                this.camera.y = sp.y - canvas.height/2;
+            }
+        });
+        
+        // Вызываем отрисовку фона
+        MapUtils.renderBackground();
+        
+        this.generateBuffs();
+        this.startGameUI("ГЛОБАЛЬНЫЙ КОНФЛИКТ");
+        document.getElementById('start-btn').classList.add('hidden');
+        document.getElementById('speed-controls').style.display = 'flex';
+        this.updateUI(Object.keys(UNITS));
     },
  
     
@@ -4956,7 +5092,7 @@ draw() {
         }
 
         // 2. Отрисовка ОСТРОВОВ и ВОДЫ (кэшированный ландшафт)
-        if (this.isIslandMode && MapUtils.bgCanvas) {
+      if ((this.isIslandMode || this.isEarthMode) && MapUtils.bgCanvas) {
             ctx.imageSmoothingEnabled = false; // Сохраняем "пиксельный" органичный стиль
             ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
             ctx.imageSmoothingEnabled = true;

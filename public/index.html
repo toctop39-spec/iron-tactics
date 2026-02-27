@@ -1295,7 +1295,7 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 3000; 
+        this.money = 8000; 
         this.energyFactor = 1;
         this.timer = 0;
         this.resources = { iron: 0, chem: 0, chips: 0 };
@@ -1387,11 +1387,16 @@ manageBase() {
 
         // --- ПРИОРИТЕТЫ СТРОЙКИ ---
         
-        // 1. УМНАЯ СЭС (Если энергия падает ИЛИ есть здания без света)
+// 1. УМНАЯ СЭС (Если энергия падает ИЛИ есть здания без света)
         const unpowered = myUnits.filter(u => !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
         
-        if ((this.energyFactor < 1.4 || unpowered.length > 0) && this.money >= UNITS.POWER_PLANT.cost) {
-            if (this.placePowerPlantSmart(builder)) return;
+        if (this.energyFactor < 1.4 || unpowered.length > 0) {
+            if (this.money >= UNITS.POWER_PLANT.cost) {
+                if (this.placePowerPlantSmart(builder)) return;
+            } else {
+                // ФИКС: БОТ НА МЕЛИ! Запрещаем ему строить другие здания, пока не накопит 1600$ на СЭС!
+                return;
+            }
         }
 
         let buildTarget = null;
@@ -1412,13 +1417,12 @@ manageBase() {
         }
     }
 
-    // --- НОВАЯ СУПЕР-ФУНКЦИЯ ДЛЯ СЭС ---
-    placePowerPlantSmart(builder) {
+placePowerPlantSmart(builder) {
         const myUnits = Game.units.filter(u => u.side === this.side);
-        
+
         // 1. Кого спасать? (Здания без энергии)
         const targets = myUnits.filter(u => !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
-        
+
         // Если спасать некого, но энергия в целом нужна - берем просто центр базы или заводы
         const anchors = targets.length > 0 ? targets : myUnits.filter(u => u.type === 'FACTORY' || u.type === 'HOUSE');
 
@@ -1426,45 +1430,40 @@ manageBase() {
         let bestX = 0;
         let bestY = 0;
 
-        // Радиус покрытия СЭС (примерно 150-180, зависит от настроек игры, возьмем с запасом)
-        const POWER_RANGE = 180; 
+        const bRad = UNITS['POWER_PLANT'].radius; // 33
+        const POWER_RANGE = 280; // Чуть меньше реального радиуса (300) для надежности
 
-        // Перебираем потенциальные точки вокруг проблемных зданий
         for (let k = 0; k < anchors.length; k++) {
             const anchor = anchors[k];
-            
-            // Проверяем 8 точек вокруг каждого здания на расстоянии 80px
+
+            // ФИКС: Ищем точки ровно за границей зданий (Радиус Дома + Радиус СЭС + 20px зазор)
+            const distFromAnchor = anchor.radius + bRad + 20; 
+
             for (let i = 0; i < 8; i++) {
                 const angle = (Math.PI * 2 / 8) * i;
-                const tx = anchor.x + Math.cos(angle) * 80;
-                const ty = anchor.y + Math.sin(angle) * 80;
+                const tx = anchor.x + Math.cos(angle) * distFromAnchor;
+                const ty = anchor.y + Math.sin(angle) * distFromAnchor;
 
                 // Валидация места
                 if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
-                if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, 60)) continue;
-                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < 100) || 
-                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < 100);
+                if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRad)) continue;
+
+                // ФИКС: ПРАВИЛЬНАЯ проверка на занятость с учетом всех радиусов
+                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRad + 15) || 
+                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRad + 15);
                 if (busy) continue;
 
                 // --- СЧИТАЕМ ОЧКИ ПОЛЕЗНОСТИ ЭТОГО МЕСТА ---
                 let score = 0;
                 
-                // Проверяем, сколько зданий зацепит СЭС, если поставить её сюда
                 myUnits.forEach(u => {
                     const dist = Math.hypot(u.x - tx, u.y - ty);
-                    
                     if (dist < POWER_RANGE && u.type !== 'POWER_PLANT' && u.type !== 'WALL') {
-                        // Если здание без энергии - это ОЧЕНЬ важно
-                        if (!u.isPowered) {
-                             score += 50; // Жирный плюс
-                        } else {
-                             // Если уже с энергией - тоже хорошо (резерв)
-                             score += 5;
-                        }
+                        if (!u.isPowered) score += 50;
+                        else score += 5;
                     }
                 });
 
-                // Если очков больше, чем у предыдущего лучшего места - запоминаем
                 if (score > bestScore) {
                     bestScore = score;
                     bestX = tx;
@@ -1473,17 +1472,14 @@ manageBase() {
             }
         }
 
-        // Если нашли хорошее место (score > 0)
         if (bestScore > 0) {
             this.money -= UNITS.POWER_PLANT.cost;
-            const site = { id: Date.now()+Math.random(), type: 'POWER_PLANT', x: bestX, y: bestY, total: UNITS.POWER_PLANT.constructTime*60, remaining: UNITS.POWER_PLANT.constructTime*60, owner: this.side };
+            const site = { id: Date.now()+Math.random(), type: 'POWER_PLANT', x: bestX, y: bestY, total: UNITS.POWER_PLANT.constructTime*60, remaining: UNITS.POWER_PLANT.constructTime*60, owner: this.side, idleTime: 0 };
             Game.constructions.push(site);
             builder.assignSite(site);
             return true;
         }
 
-        // Если умный алгоритм не нашел места (все запитано, но энергии мало)
-        // Вызываем обычную стройку
         return this.placeBuildingGeneral(builder, 'POWER_PLANT');
     }
 
@@ -1631,40 +1627,44 @@ manageIndustry() {
     }
     
 manageHouse() {
-        const myUnits = Game.units.filter(u => u.side === this.side);
-        const houses = myUnits.filter(u => u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
+        const houses = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.spawnCooldown <= 0 && u.isPowered);
         
-        // Перемешиваем дома, чтобы распределять очередь
+        // --- ЛОГИСТИКА: Перемешиваем дома, чтобы распределять очередь ---
         houses.sort(() => 0.5 - Math.random());
 
-        let totalBuilders = myUnits.filter(u => u.isBuilder).length + 
-                            myUnits.filter(u => u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
-        
-        let snipers = myUnits.filter(u => u.type === 'SNIPER').length;
-        let army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
-        
-        let houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
-        let factoryCount = myUnits.filter(u => u.type === 'FACTORY').length;
+        let builders = Game.units.filter(u => u.side === this.side && u.isBuilder).length;
+        let buildersInProd = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
+        let totalBuilders = builders + buildersInProd;
 
-        // БЕСКОНЕЧНЫЙ РОСТ: 4 пехотинца и 1 снайпер на КАЖДЫЙ построенный дом!
-        let maxArmy = houseCount * 4;
-        let maxSnipers = houseCount * 1;
-        
-        // ФИКС ЭКОНОМИКИ: Если заводов мало, оставляем "неприкосновенный запас" денег на их постройку
-        // Бот не купит солдата, если у него меньше 1500$, пока не построит хотя бы 2 завода
-        let reserve = factoryCount < 2 ? 1500 : 300; 
+        let snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
+        let army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
+
+        // ФИКС ЭКОНОМИКИ: Проверяем, нужна ли нам СЭС
+        let factoryCount = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY').length;
+        let needPower = this.energyFactor < 1.2 || Game.units.some(u => u.side === this.side && !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
+
+        let reserve = 0;
+        if (needPower) reserve = 1600; // Копим 1600 на электростанцию
+        else if (factoryCount < 2) reserve = 1500; // Копим на заводы в начале игры
 
         houses.forEach(h => {
-            // Строителей тоже масштабируем: базово 5 + по 1 на каждые 4 дома
-            if (totalBuilders < 5 + Math.floor(houseCount/4) && this.money >= UNITS.BUILDER.cost) { 
-                this.craft(h, 'BUILDER'); totalBuilders++; return; 
+            // Исключение: Если строителей НОЛЬ, тратим деньги игнорируя резерв (чтобы было кому строить СЭС)
+            let currentReserve = (totalBuilders === 0) ? 0 : reserve;
+
+            if (totalBuilders < 10 && this.money >= UNITS.BUILDER.cost + currentReserve) { 
+                this.craft(h, 'BUILDER'); 
+                totalBuilders++; 
+                return; 
             }
-            if (snipers < maxSnipers && this.money >= UNITS.SNIPER.cost + reserve) { 
-                this.craft(h, 'SNIPER'); snipers++; return; 
+            if (snipers < 5 && this.money >= UNITS.SNIPER.cost + reserve) { 
+                this.craft(h, 'SNIPER'); 
+                snipers++;
+                return; 
             }
-            // Покупаем пехоту, только если хватает денег И на солдата, И на зарезервированный завод
-            if (army < maxArmy && this.money >= UNITS.SOLDIER.cost + reserve) { 
-                this.craft(h, 'SOLDIER'); army++; return;
+            if (army < 15 && this.money >= UNITS.SOLDIER.cost + reserve) { 
+                this.craft(h, 'SOLDIER'); 
+                army++;
+                return;
             }
         });
     }

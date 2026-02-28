@@ -6355,13 +6355,14 @@ if (this.type === 'AA_DEFENSE') {
                 let min = this.range + 50; 
                 let near = null;
                 
-  // --- СУПЕР-ОПТИМИЗАЦИЯ: ПОИСК ПО ПРОСТРАНСТВЕННОЙ СЕТКЕ ---
-                let minSq = min * min; // Используем квадраты расстояний (работает быстрее корней)
+// 1. "ЛЕНИВЫЕ МОЗГИ": Ищем новую цель только 3 раза в секунду (каждый 20-й кадр)
+            if (!this.targetUnit && Game.frameCount % 20 === (this.id % 20)) {
+                let minSq = min * min; 
                 
-                // Берем только соседей по квадратам сетки, а не перебираем всех на карте
+                // Берем только соседей по квадратам сетки
                 let targetsToCheck = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
 
-                // Используем классический цикл for (он работает быстрее, чем forEach)
+                // Используем классический цикл for
                 for (let i = 0; i < targetsToCheck.length; i++) {
                     let u = targetsToCheck[i];
                     
@@ -6369,7 +6370,6 @@ if (this.type === 'AA_DEFENSE') {
                         let dx = u.x - this.x;
                         let dy = u.y - this.y;
                         
-                        // Быстрое вычисление дистанции: x*x + y*y работает в разы быстрее, чем Math.hypot
                         let distSq = dx*dx + dy*dy;
                         
                         if (distSq < minSq) {
@@ -6383,9 +6383,13 @@ if (this.type === 'AA_DEFENSE') {
 
             let busy = false;
             
-          // Если цель есть - действуем
+            // Если цель есть - действуем
             if (this.targetUnit) {
-                let d = Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y);
+                // 2. УБИРАЕМ ТОРМОЗНОЙ Math.hypot ТУТ ТОЖЕ!
+                let dx = this.targetUnit.x - this.x;
+                let dy = this.targetUnit.y - this.y;
+                let dSq = dx*dx + dy*dy;
+                let d = Math.sqrt(dSq); // Math.sqrt работает значительно быстрее, чем Math.hypot
                 
                 // Камикадзе (FPV)
                 if (this.isKamikaze) {
@@ -6624,6 +6628,21 @@ if (dist < 15) {
             this.y + padding < Game.camera.y || 
             this.y - padding > Game.camera.y + (canvas.height / z)) {
             return; // ВЫХОДИМ! Видеокарта отдыхает.
+        }
+
+        // --- НОВЫЙ ТРЮК: УПРОЩЕНИЕ ВДАЛИ (LOD) ---
+        // Если мы сильно отдалили камеру (зум меньше 0.5) и это не большое здание
+        if (z < 0.5 && !this.isProducer && this.type !== 'HOUSE') {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius || 10, 0, Math.PI * 2);
+            ctx.fill();
+            // Рисуем маленькую полоску ХП и ВЫХОДИМ (не рисуем пушки и башни!)
+            if (this.hp < this.maxHp) {
+                ctx.fillStyle = 'red'; ctx.fillRect(this.x - 10, this.y - 12, 20, 3);
+                ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 10, this.y - 12, 20 * (this.hp / this.maxHp), 3);
+            }
+            return; 
         }
         
 // --- ПОЛНАЯ ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
@@ -7922,10 +7941,8 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             return; 
         }
 
-     let z = Game.zoom || 1;
-        if (this.x + padding < Game.camera.x || ... /* и так далее */) return;
-
-        // --- НОВЫЙ ТРЮК: УПРОЩЕНИЕ ВДАЛИ (LOD) ---
+     
+     // --- НОВЫЙ ТРЮК: УПРОЩЕНИЕ ВДАЛИ (LOD) ---
         // Если мы сильно отдалили камеру (зум меньше 0.5) и это не большое здание
         if (z < 0.5 && !this.isProducer && this.type !== 'HOUSE') {
             ctx.fillStyle = this.color;

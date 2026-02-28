@@ -5227,7 +5227,8 @@ draw() {
             ctx.drawImage(this.territoryCanvas, dx, dy);
         }
 
-for (let i = this.effects.length - 1; i >= 0; i--) {
+    let maxDirt = Game.effects.length > 300 ? 20 : 150;
+for (let i = 0; i < maxDirt; i++) {
             const e = this.effects[i];
             
             // --- ОПТИМИЗАЦИЯ: ПРОПУСКАЕМ ОТРИСОВКУ ЭФФЕКТОВ ЗА КАДРОМ ---
@@ -5426,7 +5427,7 @@ for (let i = this.effects.length - 1; i >= 0; i--) {
         if ((builder && this.pendingConstruction) || this.roadDragStart) {
             ctx.save();
             
-            let radius = 800; // Сетка рисуется только в этом радиусе вокруг строителя
+            let radius = 300; // Сетка рисуется только в этом радиусе вокруг строителя
             let centerX = this.roadDragStart ? this.roadDragStart.x : builder.x;
             let centerY = this.roadDragStart ? this.roadDragStart.y : builder.y;
 
@@ -5868,7 +5869,9 @@ attemptAutoProduction() {
    update() {
        if (this.type === 'TREE') return;
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
-        this.checkPower();
+       if (Game.frameCount % 30 === (this.id % 30)) {
+            this.checkPower();
+        }
 
    // --- ЛОГИКА РУБКИ ЛЕСА ---
         if (this.isBuilder || this.type === 'BUILDER') {
@@ -6489,19 +6492,24 @@ if (this.type === 'AA_DEFENSE') {
     }
 
 _movePhysics() {
-        let currentSpeed = this.speed;
-        let onWater = false;
-        
-        let prevX = this.x; // Сохраняем старую позицию (для перевозки)
-        let prevY = this.y;
+      // Кэшируем тип грунта и проверяем его только раз в 15 кадров (4 раза в секунду)
+    if (this.lastGroundCheck === undefined || Game.frameCount % 15 === (this.id % 15)) {
+        this.currentTerrain = MapUtils.getTerrain(this.x, this.y);
+        this.currentGround = MapUtils.getGroundType(this.x, this.y);
+        this.lastGroundCheck = Game.frameCount;
+    }
 
-    // --- КРУТИМ ГУСЕНИЦЫ ---
-            if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
+    let currentSpeed = this.speed;
+    let onWater = false;
+    let prevX = this.x; 
+    let prevY = this.y;
 
-// --- ЛОГИКА ЛАНДШАФТА (ВОДА, ГРЯЗЬ, ДОРОГИ, ПОЛЯ) ---
-        if (!this.isFlying) {
-            const terrain = MapUtils.getTerrain(this.x, this.y); // Старая проверка для воды
-            const ground = MapUtils.getGroundType(this.x, this.y); // Новая проверка для биомов
+    if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
+
+    if (!this.isFlying) {
+        // Используем закэшированные значения!
+        const terrain = this.currentTerrain; 
+        const ground = this.currentGround;
             
             // Лодки
             if (this.type === 'BOAT') {

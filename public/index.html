@@ -5227,9 +5227,8 @@ draw() {
             ctx.drawImage(this.territoryCanvas, dx, dy);
         }
 
-    let maxDirt = Game.effects.length > 300 ? 20 : 150;
-for (let i = 0; i < maxDirt; i++) {
-            const e = this.effects[i];
+for (let i = 0; i < this.effects.length; i++) {
+    const e = this.effects[i];
             
             // --- ОПТИМИЗАЦИЯ: ПРОПУСКАЕМ ОТРИСОВКУ ЭФФЕКТОВ ЗА КАДРОМ ---
             let z = this.zoom || 1;
@@ -5538,7 +5537,28 @@ for (let i = 0; i < maxDirt; i++) {
         }
     }, // <-- КОНЕЦ ФУНКЦИИ draw()
 
-    renderLoop() { if (!document.hidden) { this.draw(); } requestAnimationFrame(() => this.renderLoop()); },
+   fpsLimit: 60,                // Желаемый лимит FPS
+    lastRenderTime: 0,           // Время последнего кадра
+    renderInterval: 1000 / 60,   // Сколько миллисекунд должно пройти между кадрами (16.6мс)
+
+    renderLoop() {
+        // Обязательно сразу планируем следующий вызов, чтобы цикл не прервался
+        requestAnimationFrame(() => this.renderLoop());
+
+        if (document.hidden) return;
+
+        // Смотрим, сколько времени прошло с последней отрисовки
+        const now = performance.now();
+        const elapsed = now - (this.lastRenderTime || now);
+
+        // Если прошло достаточно времени (16.6 мс для 60 FPS) — рисуем кадр
+        if (elapsed >= this.renderInterval || !this.lastRenderTime) {
+            // Корректируем время, чтобы не было "дерганий" (микрофризов)
+            this.lastRenderTime = now - (elapsed % this.renderInterval);
+            
+            this.draw(); // Вызываем саму отрисовку
+        }
+    },
 
     startWorkerHeartbeat() {
         const workerCode = `let interval = 1000 / 60; let timerID = null; self.onmessage = function(e) { if (e.data === "start") { timerID = setInterval(function() { postMessage("tick"); }, interval); } else if (e.data === "stop") { clearInterval(timerID); } };`;

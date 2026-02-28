@@ -7922,6 +7922,24 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             return; 
         }
 
+     let z = Game.zoom || 1;
+        if (this.x + padding < Game.camera.x || ... /* и так далее */) return;
+
+        // --- НОВЫЙ ТРЮК: УПРОЩЕНИЕ ВДАЛИ (LOD) ---
+        // Если мы сильно отдалили камеру (зум меньше 0.5) и это не большое здание
+        if (z < 0.5 && !this.isProducer && this.type !== 'HOUSE') {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius || 10, 0, Math.PI * 2);
+            ctx.fill();
+            // Рисуем маленькую полоску ХП и ВЫХОДИМ (не рисуем пушки и башни!)
+            if (this.hp < this.maxHp) {
+                ctx.fillStyle = 'red'; ctx.fillRect(this.x - 10, this.y - 12, 20, 3);
+                ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 10, this.y - 12, 20 * (this.hp / this.maxHp), 3);
+            }
+            return; 
+        }
+
         // --- ОТРИСОВКА КРЫЛАТОЙ РАКЕТЫ (Картинкой) ---
         if (this.isCruise) {
             ctx.save(); 

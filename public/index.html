@@ -600,8 +600,8 @@ FPV: {
     
     POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 1600, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 150 },
 NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 800 },
-SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000, hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 5 },
-    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
+SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artillery.png', cost: 1000,  dmg: 60,  hp: 500, range: 500, reload: 50, color: '#556677', radius: 15, constructTime: 25, energyUse: 15, maxAmmo: 3 },
+    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, resCost: { iron: 18, chips: 5 }, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER'] },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
@@ -675,13 +675,13 @@ const LEVELS = [
 { id:2,  budget:13000,  unlock:['SOLDIER'], enemies:{ SOLDIER:22 }, note:'Численное превосходство' },
 { id:3,  budget:61000,  unlock:['SOLDIER'], enemies:{ SOLDIER:100 }, note:'Численное превосходство' },
 { id:4,  budget:12000,  unlock:['SOLDIER','SNIPER'], enemies:{ SOLDIER:6, SNIPER:5 }, note:'Первая дальняя угроза' },
-{ id:5,  budget:15000, unlock:['SOLDIER','SNIPER'], enemies:{ SOLDIER:14, TANK: 3 }, note:'Экономика важнее армии' },
-{ id:6,  budget:40000, unlock:['SOLDIER','TANK','SNIPER'], enemies:{ SNIPER:25, SOLDIER:18 }, note:'Раш без техники' },
+{ id:5,  budget:15000, unlock:['SOLDIER','SNIPER', 'BUILDER'], enemies:{ SOLDIER:14, TANK: 3 }, note:'Экономика важнее армии' },
+{ id:6,  budget:40000, unlock:['SOLDIER','TANK','SNIPER','BUILDER'], enemies:{ SNIPER:25, SOLDIER:18 }, note:'Раш без техники' },
 { id:7,  budget:32000, unlock:['SOLDIER','SNIPER'], enemies:{ SOLDIER:20, SNIPER:24 }, note:'Контроль дистанции' },
 { id:8,  budget:23000, unlock:['SOLDIER','SNIPER',], enemies:{ SNIPER:6, TANK:6 }, note:'Мало врагов, но больно' },
-{ id:9,  budget:40000, unlock:['SOLDIER','SNIPER', 'GRAD'], enemies:{ SOLDIER:20, SNIPER:6, TANK:22 }, note:'Смешанная линия фронта' },
-{ id:10,  budget:45000, unlock:['SOLDIER','SNIPER','TANK','HELICOPTER','GRAD'], enemies:{ TANK:10, SOLDIER:20, HELICOPTER:3 }, note:'Первый танк — шок' },
-{ id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
+{ id:9,  budget:40000, unlock:['SOLDIER','SNIPER', 'GRAD', 'BUILDER'], enemies:{ SOLDIER:20, SNIPER:6, TANK:22 }, note:'Смешанная линия фронта' },
+{ id:10,  budget:45000, unlock:['SOLDIER','SNIPER','TANK','HELICOPTER','GRAD', 'BUILDER'], enemies:{ TANK:10, SOLDIER:20, HELICOPTER:3 }, note:'Первый танк — шок' },
+{ id:11, budget:50000, unlock:['SNIPER','TANK','GRAD','HELICOPTER', 'BUILDER'], enemies:{ TANK:30, HELICOPTER:17, SNIPER:40 }, note:'Броня против тактики' }
 ];
 
 const FACTIONS = {
@@ -6028,7 +6028,7 @@ attemptAutoProduction() {
                 if (target) {
                     this.ammo--; 
                     this.reload = this.reloadMax;
-                    Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, 100, this.side, true, target, this, 50, false, 1, 8));
+                    Game.bullets.push(new Bullet(this.x, this.y, target.x, target.y, this.damage, this.side, true, target, this, 50, false, 1, 8));
                 }
             }
             return;
@@ -7908,6 +7908,17 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
                 
                 if (d < range) {
                     let damage = this.dmg;
+
+                    // --- НОВОЕ: ПАДЕНИЕ УРОНА ОТ ЦЕНТРА ВЗРЫВА ---
+    // Не применяем к ядерке (у нее своя логика) и к прямым попаданиям без сплэша
+    if (!this.isNuke && this.splashRadius > 0 && d > 0) {
+        // d - это расстояние до цели. range - максимальный радиус взрыва.
+        let falloff = 1 - (d / range); // Возвращает от 1 (прямо в центре) до 0 (на самом краю)
+        
+        // В самом центре цель получит 100% урона. 
+        // На самом краю - 20%. Можешь менять эти цифры.
+        damage = Math.floor(damage * (0.2 + 0.8 * falloff));
+    }
                     
                     if (this.isNuke) {
                         if (u.type === 'SILO') damage = 0; // Бункер неуязвим

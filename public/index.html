@@ -513,15 +513,51 @@ canvas { display: block; cursor: crosshair; }
                 </div>
             </div>
         </div>
-<div class="hoi4-footer" style="justify-content: space-between; padding: 10px;">
-            <button id="ci-war-btn" class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #600; border-color: #f00; color: #fff;" onclick="Diplomacy.sendDeclareWar()">ОБЪЯВИТЬ ВОЙНУ</button>
-            <button id="ci-peace-btn" class="menu-btn hidden" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #060; border-color: #0f0; color: #fff;" onclick="Diplomacy.sendPeaceOffer()">ЗАКЛЮЧИТЬ МИР</button>
-            <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
+<div class="hoi4-footer" style="justify-content: center; gap: 10px; padding: 10px; flex-wrap: wrap;">
+            <button id="ci-war-btn" class="menu-btn" style="min-width: 180px; max-width: 200px; padding: 8px; font-size: 0.85em; background: #600; border-color: #f00; color: #fff;" onclick="Diplomacy.sendDeclareWar()">ОБЪЯВИТЬ ВОЙНУ</button>
+            <button id="ci-peace-btn" class="menu-btn hidden" style="min-width: 180px; max-width: 200px; padding: 8px; font-size: 0.85em; background: #060; border-color: #0f0; color: #fff;" onclick="Diplomacy.sendPeaceOffer()">ЗАКЛЮЧИТЬ МИР</button>
+            <button class="menu-btn" style="min-width: 120px; max-width: 150px; padding: 8px; font-size: 0.85em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
         </div>
     </div>
 </div>
     <div id="country-info-screen" class="screen hidden" style="background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center;" onclick="this.classList.add('hidden')">
     </div>
+
+<!-- ОКНО ПРЕДЛОЖЕНИЯ МИРА В СТИЛЕ HOI4 -->
+<div id="peace-offer-screen" class="screen hidden" style="position: absolute; top: 50%; right: 20px; transform: translateY(-50%); width: 380px; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border: 2px solid #444; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1); z-index: 400; font-family: 'Exo 2', sans-serif;">
+    <div style="background: linear-gradient(90deg, #8B4513 0%, #CD853F 50%, #8B4513 100%); padding: 12px; border-radius: 6px 6px 0 0; border-bottom: 2px solid #5a2a0a;">
+        <h3 style="color: #fff; margin: 0; font-size: 1.1em; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); text-align: center; font-weight: bold;">
+            🕊️ ПРЕДЛОЖЕНИЕ МИРА 🕊️
+        </h3>
+    </div>
+    
+    <div style="padding: 20px; color: #fff;">
+        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 4px; border: 1px solid #333; margin-bottom: 20px;">
+            <div style="font-size: 0.9em; color: #bbb; margin-bottom: 8px;">ПРЕДЛОЖЕНИЕ ОТ:</div>
+            <div id="peace-from-country" style="font-size: 1.1em; font-weight: bold; color: #4CAF50; text-shadow: 0 0 5px rgba(76, 175, 80, 0.5);">СТРАНА</div>
+        </div>
+        
+        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 4px; border: 1px solid #333; margin-bottom: 20px;">
+            <div style="font-size: 0.9em; color: #bbb; margin-bottom: 8px;">СООБЩЕНИЕ:</div>
+            <div style="font-size: 0.95em; color: #ddd; line-height: 1.4;">
+                "Давайте прекратим эту бессмысленную войну и заключим мир для процветания наших народов."
+            </div>
+        </div>
+        
+        <div id="peace-timer" style="text-align: center; font-size: 0.85em; color: #ff9800; margin-bottom: 15px; font-weight: bold;">
+            ⏱️ Предложение действительно в течение 30 секунд
+        </div>
+    </div>
+    
+    <div style="padding: 0 20px 20px; display: flex; gap: 10px;">
+        <button id="peace-accept-btn" class="menu-btn" style="flex: 1; background: linear-gradient(135deg, #4CAF50, #45a049); border: 1px solid #2e7d32; color: white; font-weight: bold; padding: 12px; font-size: 0.9em;">
+            ✅ ПРИНЯТЬ МИР
+        </button>
+        <button id="peace-reject-btn" class="menu-btn" style="flex: 1; background: linear-gradient(135deg, #f44336, #d32f2f); border: 1px solid #b71c1c; color: white; font-weight: bold; padding: 12px; font-size: 0.9em;">
+            ❌ ОТКЛОНИТЬ
+        </button>
+    </div>
+</div>
 
 <div id="chat-container" style="position: absolute; left: 15px; bottom: 80px; width: 300px; display: flex; flex-direction: column; pointer-events: none; z-index: 999999;">
     <div id="chat-messages" style="overflow-y: auto; color: white; text-shadow: 1px 1px 2px black; font-size: 15px; margin-bottom: 5px; display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto; padding-right: 5px; max-height: 200px;">
@@ -855,9 +891,12 @@ this.close();
 const Diplomacy = {
     relations: {}, // relations['player']['enemy'] = true (значит идет война)
     selectedTarget: null,
+    lastPeaceOfferTime: {}, // lastPeaceOfferTime['player'] = timestamp
+    peaceOfferTimer: null, // Таймер для текущего предложения
 
     init() {
         this.relations = {};
+        this.lastPeaceOfferTime = {};
     },
 
     isAtWar(sideA, sideB) {
@@ -865,6 +904,13 @@ const Diplomacy = {
         if (sideA === 'neutral' || sideB === 'neutral') return true; // Деревья можно рубить всегда
         if (!this.relations[sideA]) return false;
         return this.relations[sideA][sideB] === true;
+    },
+
+    canSendPeaceOffer(side) {
+        const now = Date.now();
+        const lastOffer = this.lastPeaceOfferTime[side] || 0;
+        const threeMinutes = 3 * 60 * 1000; // 3 минуты в миллисекундах
+        return (now - lastOffer) > threeMinutes;
     },
 
     sendDeclareWar() {
@@ -882,6 +928,17 @@ const Diplomacy = {
     sendPeaceOffer() {
         if (!this.selectedTarget || this.selectedTarget === Game.myRole) return;
         
+        // Проверяем, можно ли отправить предложение (ограничение 3 минуты)
+        if (!this.canSendPeaceOffer(Game.myRole)) {
+            const now = Date.now();
+            const lastOffer = this.lastPeaceOfferTime[Game.myRole] || 0;
+            const timeLeft = Math.ceil((3 * 60 * 1000 - (now - lastOffer)) / 1000);
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            Game.showError(`⏰ Нельзя отправлять предложения мира так часто! Осталось: ${minutes}м ${seconds}с`);
+            return;
+        }
+        
         // Отправляем предложение мира
         if (Game.isMultiplayer && CURRENT_ROOM) {
             Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'peace_offer', from: Game.myRole, to: this.selectedTarget });
@@ -890,7 +947,61 @@ const Diplomacy = {
             // В игре с ботами автоматически принимаем мир
             Game.executeCommand({ type: 'make_peace', sideA: Game.myRole, sideB: this.selectedTarget });
         }
+        
+        // Запоминаем время отправки предложения
+        this.lastPeaceOfferTime[Game.myRole] = Date.now();
         document.getElementById('country-info-screen').classList.add('hidden');
+    },
+
+    showPeaceOfferWindow(from, to) {
+        const fromName = FACTIONS[from] ? FACTIONS[from].name : from;
+        document.getElementById('peace-from-country').innerText = fromName.toUpperCase();
+        
+        // Показываем окно
+        document.getElementById('peace-offer-screen').classList.remove('hidden');
+        
+        // Запускаем таймер на 30 секунд
+        let timeLeft = 30;
+        const timerElement = document.getElementById('peace-timer');
+        
+        // Очищаем предыдущий таймер
+        if (this.peaceOfferTimer) {
+            clearInterval(this.peaceOfferTimer);
+        }
+        
+        this.peaceOfferTimer = setInterval(() => {
+            timeLeft--;
+            timerElement.innerText = `⏱️ Предложение действительно в течение ${timeLeft} секунд`;
+            
+            if (timeLeft <= 0) {
+                clearInterval(this.peaceOfferTimer);
+                document.getElementById('peace-offer-screen').classList.add('hidden');
+                Game.showError(`⏰ Предложение мира от ${fromName} истекло`);
+                
+                // Уведомляем отправителя об истечении времени
+                if (Game.isMultiplayer && CURRENT_ROOM) {
+                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'peace_expired', from: from, to: to });
+                }
+            }
+        }, 1000);
+        
+        // Назначаем обработчики кнопок
+        document.getElementById('peace-accept-btn').onclick = () => {
+            clearInterval(this.peaceOfferTimer);
+            document.getElementById('peace-offer-screen').classList.add('hidden');
+            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'accept_peace', from: from, to: to });
+        };
+        
+        document.getElementById('peace-reject-btn').onclick = () => {
+            clearInterval(this.peaceOfferTimer);
+            document.getElementById('peace-offer-screen').classList.add('hidden');
+            Game.showError(`❌ ${to === Game.myRole ? 'Вы' : to} отклонили предложение мира от ${fromName}`);
+            
+            // Уведомляем отправителя об отклонении
+            if (Game.isMultiplayer && CURRENT_ROOM) {
+                Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'peace_rejected', from: from, to: to });
+            }
+        };
     },
 
     acceptPeaceOffer(from, to) {
@@ -2964,9 +3075,12 @@ window.addEventListener('keyup', e => {
 
     getTerritoryOwner(x, y) {
         let owner = null;
-        let min = 500; 
+        let min = 200; // Уменьшаем радиус поиска для более точного определения
         this.units.forEach(u => {
             if (u.isFlying) return; 
+            // Считаем только здания и основных юнитов для определения территории
+            if (!u.isProducer && !UNITS[u.type].isBuilding && !['TANK', 'SOLDIER', 'HELICOPTER', 'GRAD', 'HIMARS', 'FPV', 'BOAT'].includes(u.type)) return;
+            
             let d = Math.hypot(u.x - x, u.y - y);
             if (d < min) {
                 min = d;
@@ -3504,13 +3618,21 @@ else if (cmd.type === 'declare_war') {
         }
 
         else if (cmd.type === 'peace_offer') {
-            // В мультиплеере показываем предложение другому игроку
+            // В мультиплеере показываем красивое окно другому игроку
             if (cmd.to === Game.myRole) {
-                const fromName = FACTIONS[cmd.from] ? FACTIONS[cmd.from].name : cmd.from;
-                if (confirm(`${fromName} предлагает заключить мир. Принять?`)) {
-                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'accept_peace', from: cmd.from, to: cmd.to });
-                }
+                Diplomacy.showPeaceOfferWindow(cmd.from, cmd.to);
             }
+        }
+
+        else if (cmd.type === 'peace_expired') {
+            const fromName = FACTIONS[cmd.from] ? FACTIONS[cmd.from].name : cmd.from;
+            Game.showError(`⏰ Ваше предложение мира ${fromName} истекло. Можно отправить новое.`);
+        }
+
+        else if (cmd.type === 'peace_rejected') {
+            const fromName = FACTIONS[cmd.from] ? FACTIONS[cmd.from].name : cmd.from;
+            const toName = FACTIONS[cmd.to] ? FACTIONS[cmd.to].name : cmd.to;
+            Game.showError(`❌ ${toName} отклонил ваше предложение мира.`);
         }
 
         else if (cmd.type === 'accept_peace') {
@@ -4169,10 +4291,27 @@ onDown(e) {
 
         // --- ПЕРЕХВАТ КЛИКА В ПОЛИТИЧЕСКОМ РЕЖИМЕ ---
         if (this.territoryMode === 3) {
+            // Проверяем, что фильтры выключены
+            if (this.selectionFilter) {
+                this.showError("ВЫКЛЮЧИТЕ ФИЛЬТРЫ ДЛЯ ПОЛИТИЧЕСКОГО РЕЖИМА");
+                return;
+            }
+            
             let owner = this.getTerritoryOwner(m.x, m.y);
-            if (owner) {
-                CountryEditor.showInfo(owner);
-                SoundManager.play('steps', 0, 0.5); // Легкий звук клика
+            
+            // Проверяем, есть ли реальные здания/юниты этой фракции рядом
+            if (owner && owner !== 'neutral') {
+                const hasRealUnits = this.units.some(u => 
+                    u.side === owner && 
+                    !u.isFlying && 
+                    (u.isProducer || UNITS[u.type].isBuilding || ['TANK', 'SOLDIER', 'HELICOPTER', 'GRAD', 'HIMARS', 'FPV', 'BOAT'].includes(u.type)) &&
+                    Math.hypot(u.x - m.x, u.y - m.y) < 200
+                );
+                
+                if (hasRealUnits) {
+                    CountryEditor.showInfo(owner);
+                    SoundManager.play('steps', 0, 0.5); // Легкий звук клика
+                }
             }
             return; // Выходим, чтобы не выделять рамкой
         }

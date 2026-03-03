@@ -513,7 +513,9 @@ canvas { display: block; cursor: crosshair; }
                 </div>
             </div>
         </div>
-        <div class="hoi4-footer" style="justify-content: center; padding: 10px;">
+<div class="hoi4-footer" style="justify-content: space-between; padding: 10px;">
+            <button id="ci-war-btn" class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #600; border-color: #f00; color: #fff;" onclick="Diplomacy.sendDeclareWar()">ОБЪЯВИТЬ ВОЙНУ</button>
+            <button id="ci-peace-btn" class="menu-btn hidden" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #060; border-color: #0f0; color: #fff;" onclick="Diplomacy.sendPeaceOffer()">ЗАКЛЮЧИТЬ МИР</button>
             <button class="menu-btn" style="min-width: 200px; padding: 8px; font-size: 0.9em; background: #333; border-color: #666;" onclick="document.getElementById('country-info-screen').classList.add('hidden')">ЗАКРЫТЬ</button>
         </div>
     </div>
@@ -771,14 +773,13 @@ init() {
         if (typeof Game !== 'undefined' && Game.isMultiplayer && CURRENT_ROOM) {
             Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_country', side: Game.myRole, data: this.data });
         }
-        
-        this.close();
-        if (Game.showError) Game.showError("ДАННЫЕ СТРАНЫ СОХРАНЕНЫ");
-    }
 
-    , // Запятая после saveAndClose() обязательна!
+this.close();
+        if (Game.showError) Game.showError("ДАННЫЕ СТРАНЫ СОХРАНЕНЫ");
+    },
     
     showInfo(side) {
+        
         // Достаем данные: либо свои, либо сохраненные из сети (чужие)
         let cData = (side === Game.myRole) ? this.data : (Game.countryData && Game.countryData[side]);
         
@@ -791,6 +792,42 @@ init() {
                 govType: 'non-aligned',
                 description: 'Сведения об этом государстве засекречены или отсутствуют...'
             };
+        }
+
+// --- ЛОГИКА КНОПКИ ВОЙНЫ ---
+        Diplomacy.selectedTarget = side;
+        const warBtn = document.getElementById('ci-war-btn');
+        if (side === Game.myRole || side === 'neutral') {
+            warBtn.style.display = 'none';
+        } else {
+            warBtn.style.display = 'block';
+            if (Diplomacy.isAtWar(Game.myRole, side)) {
+                warBtn.innerText = "В СОСТОЯНИИ ВОЙНЫ";
+                warBtn.style.background = "#222";
+                warBtn.style.color = "#777";
+                warBtn.style.pointerEvents = "none";
+            } else {
+                warBtn.innerText = "ОБЪЯВИТЬ ВОЙНУ";
+                warBtn.style.background = "#600";
+                warBtn.style.color = "#fff";
+                warBtn.style.pointerEvents = "auto";
+            }
+        }
+
+// --- ЛОГИКА КНОПКИ МИРА ---
+        const peaceBtn = document.getElementById('ci-peace-btn');
+        if (side === Game.myRole || side === 'neutral') {
+            peaceBtn.classList.add('hidden');
+        } else {
+            if (Diplomacy.isAtWar(Game.myRole, side)) {
+                peaceBtn.classList.remove('hidden');
+                peaceBtn.innerText = "ЗАКЛЮЧИТЬ МИР";
+                peaceBtn.style.background = "#060";
+                peaceBtn.style.color = "#fff";
+                peaceBtn.style.pointerEvents = "auto";
+            } else {
+                peaceBtn.classList.add('hidden');
+            }
         }
 
         document.getElementById('ci-name').innerText = cData.name.toUpperCase();
@@ -811,6 +848,83 @@ init() {
         document.getElementById('ci-gov').style.color = govColor[cData.govType] || '#fff';
 
         document.getElementById('country-info-screen').classList.remove('hidden');
+    }
+};
+
+// --- СИСТЕМА ДИПЛОМАТИИ ---
+const Diplomacy = {
+    relations: {}, // relations['player']['enemy'] = true (значит идет война)
+    selectedTarget: null,
+
+    init() {
+        this.relations = {};
+    },
+
+    isAtWar(sideA, sideB) {
+        if (sideA === sideB) return false;
+        if (sideA === 'neutral' || sideB === 'neutral') return true; // Деревья можно рубить всегда
+        if (!this.relations[sideA]) return false;
+        return this.relations[sideA][sideB] === true;
+    },
+
+    sendDeclareWar() {
+        if (!this.selectedTarget || this.selectedTarget === Game.myRole) return;
+        
+        // Отправляем приказ себе и всем в сети
+        if (Game.isMultiplayer && CURRENT_ROOM) {
+            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: Game.myRole, defender: this.selectedTarget });
+        } else {
+            Game.executeCommand({ type: 'declare_war', attacker: Game.myRole, defender: this.selectedTarget });
+        }
+        document.getElementById('country-info-screen').classList.add('hidden');
+    },
+
+    sendPeaceOffer() {
+        if (!this.selectedTarget || this.selectedTarget === Game.myRole) return;
+        
+        // Отправляем предложение мира
+        if (Game.isMultiplayer && CURRENT_ROOM) {
+            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'peace_offer', from: Game.myRole, to: this.selectedTarget });
+            Game.showError(`🕊️ Предложение мира отправлено ${FACTIONS[this.selectedTarget]?.name || this.selectedTarget}`);
+        } else {
+            // В игре с ботами автоматически принимаем мир
+            Game.executeCommand({ type: 'make_peace', sideA: Game.myRole, sideB: this.selectedTarget });
+        }
+        document.getElementById('country-info-screen').classList.add('hidden');
+    },
+
+    acceptPeaceOffer(from, to) {
+        Game.executeCommand({ type: 'make_peace', sideA: from, sideB: to });
+    },
+
+    makePeace(sideA, sideB) {
+        if (!this.relations[sideA]) this.relations[sideA] = {};
+        if (!this.relations[sideB]) this.relations[sideB] = {};
+        
+        this.relations[sideA][sideB] = false;
+        this.relations[sideB][sideA] = false;
+
+        let nameA = FACTIONS[sideA] ? FACTIONS[sideA].name : sideA;
+        let nameB = FACTIONS[sideB] ? FACTIONS[sideB].name : sideB;
+        
+        // Глобальное уведомление о мире
+        Game.showError(`🕊️ ${nameA.toUpperCase()} И ${nameB.toUpperCase()} ЗАКЛЮЧИЛИ МИР! 🕊️`);
+        SoundManager.play('build', 0, 1.0); // Звук строительства/мира
+    },
+
+    setWar(attacker, defender) {
+        if (!this.relations[attacker]) this.relations[attacker] = {};
+        if (!this.relations[defender]) this.relations[defender] = {};
+        
+        this.relations[attacker][defender] = true;
+        this.relations[defender][attacker] = true; // Война двусторонняя
+
+        let atkName = FACTIONS[attacker] ? FACTIONS[attacker].name : attacker;
+        let defName = FACTIONS[defender] ? FACTIONS[defender].name : defender;
+        
+        // Глобальное уведомление на весь экран
+        Game.showError(`🔴 ${atkName.toUpperCase()} ОБЪЯВИЛ(А) ВОЙНУ ${defName.toUpperCase()}! 🔴`);
+        SoundManager.play('explosion', 0, 1.0); // Звук гонга/взрыва при объявлении
     }
 };
 
@@ -1724,92 +1838,63 @@ manageCombat() {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'SILO' && u.type !== 'BOAT');
         const boats = myUnits.filter(u => u.type === 'BOAT');
-        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE');
         
-        if (enemies.length === 0) return;
+        // Ищем только тех врагов, с кем МЫ УЖЕ В СОСТОЯНИИ ВОЙНЫ
+        const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE' && Diplomacy.isAtWar(this.side, u.side));
+        
+        let attackThreshold = Math.max(12, myUnits.filter(u => u.type === 'HOUSE').length * 3); 
 
-        // 1. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД и HIMARS)
-        army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
-            if (g.type === 'GRAD') {
-                const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
-                if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
-            }
-        });
-
-        // 2. ПЕРЕЗАРЯДКА
-        const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
-        emptyUnits.forEach(u => {
-            if (this.money >= 1000) { 
-                this.money -= 1000; u.ammo = u.maxAmmo; 
-                Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); 
-            }
-        });
-
-        // 3. АТАКА, ЛОГИСТИКА И ОБОРОНА
-        let houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
-        // Чем больше у бота база, тем большую армию он копит перед атакой
-        let attackThreshold = Math.max(12, houseCount * 3); 
-
-        if (army.length > attackThreshold) {
-            // ФИКС ЦЕЛИ: Ищем ближайшую базу врага с помощью математики, а не первую в списке!
-            let bestTarget = null;
-            let minDistance = Infinity;
-            
-            // Ищем сначала здания (чтобы захватывать/сносить базу)
-            let bldgs = enemies.filter(e => e.type === 'FACTORY' || e.type === 'HOUSE');
-            let potentialTargets = bldgs.length > 0 ? bldgs : enemies;
-
-            // Берем координаты нашего первого юнита, чтобы отсчитывать дистанцию от него
-            let startPoint = army[0] || myUnits[0];
-
-            potentialTargets.forEach(e => {
-                let dist = Math.hypot(e.x - startPoint.x, e.y - startPoint.y);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    bestTarget = e;
-                }
-            });
-
-            let target = bestTarget || enemies[0];
-
-            // Движение армии в атаку
-            army.forEach(u => { 
-                if (u.type === 'SENTINEL' || u.target) return;
-                if (u.type === 'FPV') {
-                    let fpvTarget = enemies.find(e => e.type === 'AA_DEFENSE' || e.type === 'FACTORY') || target;
-                    u.moveCmd(fpvTarget.x, fpvTarget.y);
-                    return;
-                }
-                if (Game.isIslandMode && !u.isFlying) {
-                    let distToTarget = Math.hypot(target.x - u.x, target.y - u.y);
-                    if (distToTarget > 600 && boats.length > 0) {
-                        let closestBoat = boats.sort((a, b) => Math.hypot(a.x - u.x, a.y - u.y) - Math.hypot(b.x - u.x, b.y - u.y))[0];
-                        if (closestBoat) {
-                            if (Math.hypot(closestBoat.x - u.x, closestBoat.y - u.y) < 150) u.moveCmd(closestBoat.x, closestBoat.y);
-                            else u.moveCmd(closestBoat.x, closestBoat.y);
-                        }
-                    } else u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250);
+        // --- ЛОГИКА ОБЪЯВЛЕНИЯ ВОЙНЫ ---
+        // Если армия готова, но врагов нет (со всеми мир)
+        if (army.length > attackThreshold && enemies.length === 0) {
+            // Ищем все живые фракции (кроме себя и нейтралов)
+            let aliveFactions = [...new Set(Game.units.map(u => u.side))].filter(s => s !== this.side && s !== 'neutral');
+            if (aliveFactions.length > 0) {
+                // Выбираем случайную страну и нападаем!
+                let victim = aliveFactions[Math.floor(Math.random() * aliveFactions.length)];
+                
+                if (Game.isMultiplayer && CURRENT_ROOM) {
+                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: this.side, defender: victim });
                 } else {
-                    u.moveCmd(target.x + (Math.random()-0.5)*250, target.y + (Math.random()-0.5)*250); 
+                    Game.executeCommand({ type: 'declare_war', attacker: this.side, defender: victim });
                 }
-            });
+                return; // Ждем следующего тика для атаки
+            }
+        }
 
-            boats.forEach(b => {
-                if (!b.target) b.moveCmd(target.x + (Math.random()-0.5)*300, target.y + (Math.random()-0.5)*300);
-            });
-        } else {
-            // ФИКС ЗАЩИТЫ: Если армия меньше порога (мы копим силы), патрулируем СВОЮ базу!
+        if (enemies.length === 0) {
+            // ПАТРУЛЬ СВОЕЙ БАЗЫ В МИРНОЕ ВРЕМЯ
             let myBaseCenter = myUnits.find(u => u.type === 'FACTORY' || u.type === 'HOUSE');
             if (myBaseCenter) {
                 army.forEach(u => {
-                    // Если юнит ничего не делает, ставим его случайным образом вокруг базы (радиус 300)
                     if (!u.target && u.type !== 'SENTINEL') {
                         u.moveCmd(myBaseCenter.x + (Math.random()-0.5)*600, myBaseCenter.y + (Math.random()-0.5)*600);
                     }
                 });
             }
+            return;
         }
-    }
+
+        // АТАКА (если война идет)
+        army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
+            const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
+            if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
+        });
+
+        const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
+        emptyUnits.forEach(u => {
+            if (this.money >= 1000) { this.money -= 1000; u.ammo = u.maxAmmo; Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); }
+        });
+
+        if (army.length > attackThreshold) {
+            let bestTarget = enemies.find(e => e.type === 'FACTORY' || e.type === 'HOUSE') || enemies[0];
+            army.forEach(u => { 
+                if (u.type === 'SENTINEL' || u.target) return;
+                u.moveCmd(bestTarget.x + (Math.random()-0.5)*250, bestTarget.y + (Math.random()-0.5)*250); 
+            });
+          }
+        }
+
 
     craft(b, type) {
         if (type.startsWith('CRAFT_')) {
@@ -2384,7 +2469,7 @@ setFilter(type) {
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
     patterns: {}, 
 
-    updateTerritoryCache() {;
+ updateTerritoryCache() {;
         
         const margin = 100; 
         const w = canvas.width + margin * 2;
@@ -2526,6 +2611,7 @@ const searchMargin = RADIUS_PX + 50;
                 }
             }
         }
+
                             
         // --- ОТРИСОВКА НАЗВАНИЙ ГОСУДАРСТВ ---
         if (this.territoryMode === 3) {
@@ -3221,6 +3307,7 @@ loadLevel(lvlId) {
 
 
  resetGameData() {
+Diplomacy.init();
      if (typeof SoundManager !== 'undefined' && SoundManager.bgm) {
             SoundManager.bgm.pause();
         }
@@ -3411,6 +3498,29 @@ showError(msg) {
                 this.effects.push({x: cmd.x, y: cmd.y, char: '⚡', life: 30});
             }
         }
+
+else if (cmd.type === 'declare_war') {
+            Diplomacy.setWar(cmd.attacker, cmd.defender);
+        }
+
+        else if (cmd.type === 'peace_offer') {
+            // В мультиплеере показываем предложение другому игроку
+            if (cmd.to === Game.myRole) {
+                const fromName = FACTIONS[cmd.from] ? FACTIONS[cmd.from].name : cmd.from;
+                if (confirm(`${fromName} предлагает заключить мир. Принять?`)) {
+                    Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'accept_peace', from: cmd.from, to: cmd.to });
+                }
+            }
+        }
+
+        else if (cmd.type === 'accept_peace') {
+            Diplomacy.makePeace(cmd.from, cmd.to);
+        }
+
+        else if (cmd.type === 'make_peace') {
+            Diplomacy.makePeace(cmd.sideA, cmd.sideB);
+        }
+
         else if (cmd.type === 'production_start') {
             const prod = this.units.find(u => u.id === cmd.producerId);
             if (prod) prod.startProduction(cmd.unitType, true);
@@ -3677,6 +3787,24 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
             this.resources.chem = 9999;
             this.resources.chips = 9999;
             this.energyFactor = 2; // Энергия всегда 200%
+        }
+
+// --- СОДЕРЖАНИЕ АРМИИ (КАЖДЫЕ 3000 КАДРОВ) ---
+        if (this.frameCount % 3000 === 0 && !this.isSpectator && this.state === 'BATTLE') {
+            // Считаем военных юнитов игрока
+            let militaryCount = this.units.filter(u => u.side === this.myRole && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)).length;
+            
+            if (militaryCount > 0) {
+                let cost = militaryCount * 100;
+                this.money -= cost; // Деньги могут уйти в минус!
+                this.showError(`💸 СОДЕРЖАНИЕ АРМИИ: -${cost}$ (Юнитов: ${militaryCount})`);
+            }
+
+            // БОТЫ тоже платят налоги
+            this.bots.forEach(b => {
+                let botMil = this.units.filter(u => u.side === b.side && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','POWER_PLANT','SENTINEL'].includes(u.type)).length;
+                b.money -= botMil * 100;
+            });
         }
 
  if (this.frameCount % 60 === 0) {
@@ -4213,6 +4341,12 @@ onDown(e) {
               
     // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
             if (this.artyMode) {
+let targetOwner = this.getTerritoryOwner(m.x, m.y);
+                if (targetOwner && targetOwner !== this.myRole && targetOwner !== 'neutral' && !Diplomacy.isAtWar(this.myRole, targetOwner)) {
+                    this.showError("⛔ ВЫ НЕ В СОСТОЯНИИ ВОЙНЫ С ЭТОЙ СТРАНОЙ!");
+                    this.artyMode = false; document.body.style.cursor = 'default';
+                    return;
+                }
                 if (this.money >= ARTY_COST) {
                     const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
@@ -4889,6 +5023,17 @@ onRight(e) {
 
         // 2. ВЫЧИСЛЯЕМ КООРДИНАТЫ МЫШИ (Используем твою встроенную функцию!)
         const m = this.getMouse(e);
+
+// --- ПРОВЕРКА ГРАНИЦ ---
+        if (this.state === 'BATTLE') {
+            let targetOwner = this.getTerritoryOwner(m.x, m.y);
+            if (targetOwner && targetOwner !== this.myRole && targetOwner !== 'neutral') {
+                if (!Diplomacy.isAtWar(this.myRole, targetOwner)) {
+                    this.showError("⛔ ВЫ НЕ В СОСТОЯНИИ ВОЙНЫ С ЭТОЙ СТРАНОЙ!");
+                    return; // Блокируем движение
+                }
+            }
+        }
 
         // 3. --- ВОЗВРАТ СРЕДСТВ В РЕЖИМЕ РАССТАНОВКИ ('PLACE') ---
         if (this.state === 'PLACE') {
@@ -6021,6 +6166,11 @@ attemptAutoProduction() {
                     const isBuilding = u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type);
                     if (isBuilding) return false;
                     
+                    // ПРОВЕРКА ВОЙНЫ - НЕ СТРЕЛЯЕМ ПО ТЕМ, С КЕМ НЕТ ВОЙНЫ
+                    if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
+                        if (!Diplomacy.isAtWar(this.side, u.side)) return false;
+                    }
+                    
                     // Проверка дистанции
                     return Math.hypot(u.x - this.x, u.y - this.y) < this.range;
                 });
@@ -6262,7 +6412,18 @@ if (this.type === 'AA_DEFENSE') {
     // Поиск новой цели
     if (!this.aaTarget && this.reload <= 0) {
         // 1. Ищем ракеты в радиусе
-        const rockets = Game.bullets.filter(b => b.arty && b.side !== this.side && !b.dead && !b.isCruise && Math.hypot(b.x - this.x, b.y - this.y) < this.range * this.buffRangeMult);
+        const rockets = Game.bullets.filter(b => {
+            if (!b.arty || b.dead || b.isCruise) return false;
+            if (b.side === this.side) return false;
+            if (Math.hypot(b.x - this.x, b.y - this.y) >= this.range * this.buffRangeMult) return false;
+            
+            // ПРОВЕРКА ВОЙНЫ - сбиваем только ракеты врагов, с которыми есть война
+            if (b.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
+                if (!Diplomacy.isAtWar(this.side, b.side)) return false;
+            }
+            
+            return true;
+        });
         
         // УМНЫЙ ФИЛЬТР: Проверяем траекторию. Летит ли на НАШУ территорию?
         const dangerousRockets = rockets.filter(r => {
@@ -6276,7 +6437,17 @@ if (this.type === 'AA_DEFENSE') {
             Game.effects.push({x: this.x, y: this.y - 30, char: '📡', life: 30}); // Анимация просчета
         } else { 
             // 2. Если опасных ракет нет, ищем вертолеты
-            const helis = Game.units.filter(u => u.isFlying && u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < this.range * this.buffRangeMult); 
+            const helis = Game.units.filter(u => {
+                if (!u.isFlying || u.side === this.side) return false;
+                if (Math.hypot(u.x - this.x, u.y - this.y) >= this.range * this.buffRangeMult) return false;
+                
+                // ПРОВЕРКА ВОЙНЫ - сбиваем только тех, с кем есть война
+                if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
+                    if (!Diplomacy.isAtWar(this.side, u.side)) return false;
+                }
+                
+                return true;
+            }); 
             if (helis.length > 0) {
                 this.aaTarget = helis[0]; 
                 this.aaThinkTimer = 0; // Вертолеты бьем без раздумий
@@ -6373,7 +6544,7 @@ if (this.type === 'AA_DEFENSE') {
             // Дистанция до текущей цели
             let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
 
-            // 1. БЛОК ПОИСКА ЦЕЛИ
+// 1. БЛОК ПОИСКА ЦЕЛИ
             if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
                 this.targetUnit = null;                
                 let min = this.range + 50; 
@@ -6386,7 +6557,46 @@ if (this.type === 'AA_DEFENSE') {
 
                     for (let i = 0; i < targetsToCheck.length; i++) {
                         let u = targetsToCheck[i];
-                        if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+// 1. АРТИЛЛЕРИЯ: пропускаем цель, если с ее владельцем мир
+    if (this.type === 'GRAD' || this.type === 'HIMARS') {
+        // Проверяем через твой объект Diplomacy (игнорируем нейтралов, проверяем состояние войны)
+        if (u.side !== 'neutral' && u.side !== this.side && typeof Diplomacy !== 'undefined') {
+            if (!Diplomacy.isAtWar(this.side, u.side)) {
+                continue; // Мир, цель пропускаем
+            }
+        }
+    }
+
+    // 2. ТАНКИ: не стреляют по летающим объектам
+    if (this.type === 'TANK') {
+        if (u.type === 'HELICOPTER' || u.isFlying || (UNITS[u.type] && UNITS[u.type].isFlying)) {
+            continue; // Воздушная цель, пропускаем
+        }
+    }
+
+    // 3. ВЕРТОЛЕТ: не стреляет, пока находится на земле
+    if (this.type === 'HELICOPTER') {
+        // У тебя вертолеты используют flyState (0 - на земле, 1 - запуск, и т.д.)
+        if (this.flyState === 0) {
+            continue; // Сидит на земле, пропускаем захват цели
+        }
+    }
+
+// 4. СЕНТИНЕЛ (SENTINEL): не стреляет по тем, с кем нет войны
+    if (this.type === 'SENTINEL') {
+        if (u.side !== 'neutral' && u.side !== this.side && typeof Diplomacy !== 'undefined') {
+            if (!Diplomacy.isAtWar(this.side, u.side)) {
+                continue; // Пропускаем цель, так как нет войны
+            }
+        }
+    }
+
+                        // Для Sentinel отдельная логика - проверка была выше
+                        if (this.type !== 'SENTINEL' && u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+                            
+                            // Для остальных юнитов проверяем войну
+                            if (!Diplomacy.isAtWar(this.side, u.side)) continue;
+                            
                             let dx = u.x - this.x;
                             let dy = u.y - this.y;
                             let distSq = dx*dx + dy*dy;
@@ -6397,6 +6607,30 @@ if (this.type === 'AA_DEFENSE') {
                             }
                         }
                     }
+
+// 5. ОТДЕЛЬНАЯ ЛОГИКА ДЛЯ SENTINEL
+                    if (this.type === 'SENTINEL') {
+                        for (let i = 0; i < targetsToCheck.length; i++) {
+                            let u = targetsToCheck[i];
+                            
+                            // Проверяем только врагов, с которыми есть война
+                            if (u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
+                                if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
+                                    if (Diplomacy.isAtWar(this.side, u.side)) {
+                                        let dx = u.x - this.x;
+                                        let dy = u.y - this.y;
+                                        let distSq = dx*dx + dy*dy;
+                                        
+                                        if (distSq < minSq) {
+                                            minSq = distSq;
+                                            near = u;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     this.targetUnit = near;
                 }
             } // <--- ВАЖНО: ЗАКРЫВАЕМ БЛОК ПОИСКА ЗДЕСЬ!

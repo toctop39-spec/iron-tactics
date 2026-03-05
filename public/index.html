@@ -318,7 +318,7 @@ canvas { display: block; cursor: crosshair; }
     <div id="top-bar" class="clickable" style="display: none;">
         <div style="display: flex; align-items: center;">
             <div id="player-stats">
-              <div class="res-group" title="Деньги">💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span></div>
+              <div id="money-group" class="res-group" title="Деньги">💵 <span id="money">0</span> <span id="income-display" style="font-size:0.7em; color:#4f4;">(+0)</span></div>
 <div class="res-group" title="Население">👥 <span id="pop-val" class="res-val" style="color: #44aaff;">0/0</span></div>
 <div class="res-group" title="Железо"><span class="res-icon">🔩</span> <span id="res-iron" class="res-val">0</span></div>
                 <div class="res-group" title="Химия"><span class="res-icon">🧪</span> <span id="res-chem" class="res-val">0</span></div>
@@ -369,7 +369,7 @@ canvas { display: block; cursor: crosshair; }
             <button class="menu-btn" onclick="Game.transitToLevel(1)">👤 ОДИНОЧНАЯ КАМПАНИЯ</button>
             <button class="menu-btn" style="border-color: #00ffcc; color: #00ffcc; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);" onclick="Game.transitToSandbox()">🧪 ПЕСОЧНИЦА (ТЕСТ)</button>
             <button class="menu-btn" style="border-color: #ffd700; color: #ffd700;" onclick="Game.transitToAdvanced()">🏝️ ПРОДВИНУТЫЙ (TERRITORY)</button>
-            <button class="menu-btn" onclick="Game.transitToEarth()" style="background: linear-gradient(90deg, #1d4ed8, #047857); border-color: #34d399;">🌍 КАРТА МИРА</button>
+            <button class="menu-btn" onclick="Game.transitToFog()" style="background: linear-gradient(90deg, #1d4ed8, #047857); border-color: #34d399;">🌫️ ТУМАН ВОЙНЫ</button>
             <button class="menu-btn" style="background:rgba(0, 68, 136, 0.4); border-color:#0af;" onclick="Lobby.initTransition()">🌐МУЛЬТИПЛЕЕР</button>
             <button class="menu-btn" style="border-color: #ffaa00; color: #ffaa00; box-shadow: 0 0 15px rgba(255, 170, 0, 0.2);" onclick="CountryEditor.open()">📜 РЕДАКТОР СТРАНЫ</button>
         </div>
@@ -481,6 +481,7 @@ canvas { display: block; cursor: crosshair; }
                     <option value="democracy">Демократия</option>
                     <option value="communism">Коммунизм</option>
                     <option value="fascism">Фашизм</option>
+                    <option value="fascism">Терорризм</option>
                     <option value="non-aligned">Нейтралитет</option>
                 </select>
 
@@ -541,7 +542,7 @@ canvas { display: block; cursor: crosshair; }
         <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 4px; border: 1px solid #333; margin-bottom: 20px;">
             <div style="font-size: 0.9em; color: #bbb; margin-bottom: 8px;">СООБЩЕНИЕ:</div>
             <div style="font-size: 0.95em; color: #ddd; line-height: 1.4;">
-                "Давайте прекратим эту бессмысленную войну и заключим мир для процветания наших народов."
+                "Давай прекратим эту бессмысленную войну и заключим мир"
             </div>
         </div>
         
@@ -608,7 +609,17 @@ const UNITS = {
 
 BOAT: { 
         type:'unit', name: 'Лодка', cost: 1500, imageSrc: 'https://static.vecteezy.com/system/resources/previews/024/554/198/original/gray-boat-on-the-sea-png.png', resCost: { iron: 25, chem: 5 }, 
-        hp: 800, dmg: 0, range: 0, speed: 1.2, color: '#666', radius: 20, buildTime: 12 
+        hp: 800, dmg: 0, range: 0, speed: 1.2, color: '#666', radius: 20, buildTime: 12,
+        capacity: 12
+    },
+
+    BOAT_BOMBER: {
+        type:'unit', name: 'Лодка-Бомбардировщик', emoji: '🛳️',
+        imageSrc: 'Destroyer.png',
+        cost: 25000, resCost: { iron: 120, chips: 6, chem: 18 },
+        hp: 2200, dmg: 200, range: 1400, speed: 0.85, reload: 260, color: '#445', radius: 60, buildTime: 30,
+        maxAmmo: 8, splash: 120, isArty: true,
+        capacity: 100
     },
 
 HIMARS: {
@@ -646,7 +657,7 @@ SENTINEL: { type:'bldg', name: 'Турель', emoji: '🏯', imageSrc: 'artille
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
              
 // Замените строчку spawnList у FACTORY на эту:
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BOAT_BOMBER', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 15 },
@@ -659,7 +670,7 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
         hp: 800, radius: 45, constructTime: 15, energyUse: 5, color: '#8d6e63' 
     },
 
-    WALL: { type: 'bldg', name: 'Стена', emoji: '🧱', cost: 100, hp: 1000, radius: 20, constructTime: 5, energyUse: 0, color: '#555555' },
+    WALL: { type: 'bldg', name: 'Колючая проволока', emoji: '🪤', imageSrc: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2264%22%20height%3D%2264%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22none%22/%3E%3Cline%20x1%3D%2212%22%20y1%3D%2218%22%20x2%3D%2212%22%20y2%3D%2248%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%3Cline%20x1%3D%2252%22%20y1%3D%2218%22%20x2%3D%2252%22%20y2%3D%2248%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2026%20C20%2016%2044%2016%2054%2026%22%20fill%3D%22none%22%20stroke%3D%22%23d1d5db%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2032%20C20%2022%2044%2022%2054%2032%22%20fill%3D%22none%22%20stroke%3D%22%23e5e7eb%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2038%20C20%2028%2044%2028%2054%2038%22%20fill%3D%22none%22%20stroke%3D%22%23d1d5db%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22/%3E%3Cg%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%3E%3Cline%20x1%3D%2220%22%20y1%3D%2224%22%20x2%3D%2224%22%20y2%3D%2228%22/%3E%3Cline%20x1%3D%2224%22%20y1%3D%2224%22%20x2%3D%2220%22%20y2%3D%2228%22/%3E%3Cline%20x1%3D%2238%22%20y1%3D%2230%22%20x2%3D%2242%22%20y2%3D%2234%22/%3E%3Cline%20x1%3D%2242%22%20y1%3D%2230%22%20x2%3D%2238%22%20y2%3D%2234%22/%3E%3Cline%20x1%3D%2230%22%20y1%3D%2236%22%20x2%3D%2234%22%20y2%3D%2240%22/%3E%3Cline%20x1%3D%2234%22%20y1%3D%2236%22%20x2%3D%2230%22%20y2%3D%2240%22/%3E%3C/g%3E%3C/svg%3E', cost: 100, hp: 1000, radius: 18, constructTime: 5, energyUse: 0, color: '#555555' },
     ROAD: { type: 'bldg', name: 'Тропинка', emoji: '🟤', cost: 200, hp: 100, radius: 15, constructTime: 1, color: '#555' },
     ASPHALT: { type: 'bldg', name: 'Асфальт', emoji: '🛣️', cost: 600, hp: 500, radius: 15, constructTime: 1, color: '#222' },
 
@@ -2402,6 +2413,182 @@ SoundManager.init();
     
 const Game = {
 isSandbox: false, sandboxSide: 'player', // <--- Добавляем флаги
+    isFogMode: false,
+    fogEnabled: false,
+    fogCellSize: 90,
+    fogCols: 0,
+    fogRows: 0,
+    fogExplored: null,
+    fogVisible: null,
+    fogLastUpdateFrame: -999,
+    lastFogTime: -100,
+
+    getPlayerResLimit() {
+        // Используем существующую константу RES_LIMIT
+        return RES_LIMIT;
+    },
+    
+    fogCtx: null,
+    lastFogCam: { x: 0, y: 0 },
+    lastFogTime: -100,
+    
+    initFog() {
+        this.fogCols = Math.ceil(MAP_W / this.fogCellSize);
+        this.fogRows = Math.ceil(MAP_H / this.fogCellSize);
+        this.fogExplored = new Uint8Array(this.fogCols * this.fogRows);
+        this.fogVisible = new Uint8Array(this.fogCols * this.fogRows);
+        this.fogLastUpdateFrame = -999;
+    },
+
+    fogIndexFromWorld(x, y) {
+        const cx = Math.floor(x / this.fogCellSize);
+        const cy = Math.floor(y / this.fogCellSize);
+        if (cx < 0 || cy < 0 || cx >= this.fogCols || cy >= this.fogRows) return -1;
+        return cy * this.fogCols + cx;
+    },
+
+    revealFogCircle(x, y, radius) {
+        const r = radius;
+        const minX = Math.max(0, Math.floor((x - r) / this.fogCellSize));
+        const maxX = Math.min(this.fogCols - 1, Math.floor((x + r) / this.fogCellSize));
+        const minY = Math.max(0, Math.floor((y - r) / this.fogCellSize));
+        const maxY = Math.min(this.fogRows - 1, Math.floor((y + r) / this.fogCellSize));
+        const r2 = r * r;
+
+        for (let cy = minY; cy <= maxY; cy++) {
+            for (let cx = minX; cx <= maxX; cx++) {
+                const wx = cx * this.fogCellSize + this.fogCellSize / 2;
+                const wy = cy * this.fogCellSize + this.fogCellSize / 2;
+                const dx = wx - x;
+                const dy = wy - y;
+                if (dx * dx + dy * dy > r2) continue;
+                const idx = cy * this.fogCols + cx;
+                this.fogExplored[idx] = 1;
+                this.fogVisible[idx] = 1;
+            }
+        }
+    },
+
+    updateFog() {
+        if (!this.fogEnabled || !this.fogVisible) return;
+        if (this.frameCount - this.fogLastUpdateFrame < 45) return;
+        this.fogLastUpdateFrame = this.frameCount;
+        this.fogVisible.fill(0);
+
+        const mySide = this.myRole;
+        const sources = this.units.filter(u =>
+            u.hp > 0 &&
+            u.side === mySide &&
+            !u.visualOnly &&
+            (u.type === 'AA_DEFENSE' || u.isBuilder || u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg'))
+        );
+
+        for (let i = 0; i < sources.length; i++) {
+            const u = sources[i];
+            let r = 0;
+
+            if (u.type === 'AA_DEFENSE') {
+                if (u.isPowered) {
+                    const mult = (u.buffRangeMult || 1);
+                    r = Math.max(1200, (u.range || 600) * 2.5) * mult;
+                } else {
+                    r = 0;
+                }
+            } else if (u.isBuilder || u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) {
+                r = 520;
+            } else if (u.isFlying) {
+                r = 700;
+            } else {
+                r = 450;
+            }
+
+            if (r > 0) this.revealFogCircle(u.x, u.y, r);
+        }
+    },
+
+    isWorldVisible(x, y) {
+        if (!this.fogEnabled || !this.fogVisible) return true;
+        const idx = this.fogIndexFromWorld(x, y);
+        if (idx < 0) return true;
+        return this.fogVisible[idx] === 1;
+    },
+
+    renderFogCache() {
+        if (!this.fogEnabled || !this.fogExplored || !this.fogVisible) return;
+
+        const margin = 80;
+        const w = canvas.width + margin * 2;
+        const h = canvas.height + margin * 2;
+
+        if (!this.fogCanvas || this.fogCanvas.width !== w || this.fogCanvas.height !== h) {
+            this.fogCanvas = document.createElement('canvas');
+            this.fogCanvas.width = w;
+            this.fogCanvas.height = h;
+            this.fogCtx = this.fogCanvas.getContext('2d');
+        }
+
+        const fCtx = this.fogCtx;
+        fCtx.clearRect(0, 0, w, h);
+
+        this.lastFogCam = { x: this.camera.x, y: this.camera.y };
+        this.lastFogTime = this.frameCount;
+
+        const cell = this.fogCellSize;
+        const startCx = Math.max(0, Math.floor((this.lastFogCam.x - margin) / cell));
+        const startCy = Math.max(0, Math.floor((this.lastFogCam.y - margin) / cell));
+        const endCx = Math.min(this.fogCols - 1, Math.floor((this.lastFogCam.x + canvas.width + margin) / cell));
+        const endCy = Math.min(this.fogRows - 1, Math.floor((this.lastFogCam.y + canvas.height + margin) / cell));
+
+        fCtx.save();
+
+        for (let cy = startCy; cy <= endCy; cy++) {
+            for (let cx = startCx; cx <= endCx; cx++) {
+                const idx = cy * this.fogCols + cx;
+                const explored = this.fogExplored[idx] === 1;
+                const visible = this.fogVisible[idx] === 1;
+                if (visible) continue;
+
+                const wx = cx * cell - (this.lastFogCam.x - margin);
+                const wy = cy * cell - (this.lastFogCam.y - margin);
+
+                if (!explored) fCtx.fillStyle = 'rgba(0,0,0,0.98)';
+                else fCtx.fillStyle = 'rgba(0,0,0,0.90)';
+
+                fCtx.fillRect(wx, wy, cell + 1, cell + 1);
+            }
+        }
+
+        // Добиваем полную непрозрачность неразведанного без blur
+        for (let cy = startCy; cy <= endCy; cy++) {
+            for (let cx = startCx; cx <= endCx; cx++) {
+                const idx = cy * this.fogCols + cx;
+                const explored = this.fogExplored[idx] === 1;
+                const visible = this.fogVisible[idx] === 1;
+                if (visible || explored) continue;
+
+                const wx = cx * cell - (this.lastFogCam.x - margin);
+                const wy = cy * cell - (this.lastFogCam.y - margin);
+                fCtx.fillStyle = 'rgba(0,0,0,1)';
+                fCtx.fillRect(wx, wy, cell + 1, cell + 1);
+            }
+        }
+
+        fCtx.restore();
+    },
+
+    drawFog(ctx) {
+        if (!this.fogEnabled) return;
+        const dist = Math.hypot(this.camera.x - this.lastFogCam.x, this.camera.y - this.lastFogCam.y);
+        const needUpdate = (this.frameCount - this.lastFogTime > 30) || (dist > 140);
+        if (needUpdate) this.renderFogCache();
+
+        if (this.fogCanvas) {
+            const margin = 80;
+            const dx = (this.lastFogCam.x - margin);
+            const dy = (this.lastFogCam.y - margin);
+            ctx.drawImage(this.fogCanvas, dx, dy);
+        }
+    },
     
 toggleSandboxSide() {
         if (this.sandboxSide === 'player') {
@@ -2496,22 +2683,54 @@ zoom: 1,
 
     toggleTerritoryMode() {
         this.territoryMode++;
-        // Теперь у нас 5 режимов (от 0 до 4)
-        if (this.territoryMode > 4) this.territoryMode = 0;
-        const modes = ["ВЫКЛ", "БЛОКИ", "ЛИНИИ", "ПОЛИТИКА", "ТОЧНАЯ (3px)"];
+        // Теперь у нас 6 режимов (от 0 до 5)
+        if (this.territoryMode > 5) this.territoryMode = 0;
+        const modes = ["ВЫКЛ", "БЛОКИ", "ЛИНИИ", "ПОЛИТИКА", "ЗАЩИТА", "ВОЙНА"]; 
         this.showError(`РЕЖИМ КАРТЫ: ${modes[this.territoryMode]}`);
+    },
+    
+    
+    getWarUnitCounts() {
+        const counts = {};
+        const sides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
+        
+        sides.forEach(side => {
+            counts[side] = {
+                infantry: 0,
+                snipers: 0,
+                tanks: 0
+            };
+            
+            this.units.forEach(u => {
+                if (u.side === side && u.hp > 0) {
+                    if (u.type === 'SOLDIER') {
+                        counts[side].infantry++;
+                    } else if (u.type === 'SNIPER') {
+                        counts[side].snipers++;
+                    } else if (u.type === 'TANK') {
+                        counts[side].tanks++;
+                    }
+                }
+            });
+        });
+        
+        return counts;
     },
 
 setFilter(type) {
-        // 1. Снимаем желтую подсветку со всех кнопок фильтров
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-
-        // 2. Включаем или выключаем фильтр
-        if (this.selectionFilter === type) {
-            // Если нажали на уже активный фильтр - выключаем его
-            this.selectionFilter = null; 
-            this.showError("ФИЛЬТР: ВЫКЛ (ВСЕ)");
-        } else {
+            // Если нажали на тот же фильтр - выключаем его
+            if (this.selectionFilter === type) {
+                this.selectionFilter = null;
+                this.showError("ФИЛЬТР: ВЫКЛ");
+                
+                // Сбрасываем подсветку всех кнопок фильтров
+                ['btn-filt-build', 'btn-filt-army', 'btn-filt-house', 'btn-filt-fact', 'btn-filt-boat'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('active');
+                });
+                return;
+            }
+            
             // Если нажали на новый фильтр - включаем его
             this.selectionFilter = type; 
             
@@ -2524,7 +2743,13 @@ setFilter(type) {
             
             this.showError(`ФИЛЬТР: ТОЛЬКО ${name}`);
             
-            // 3. Подсвечиваем только что нажатую кнопку
+            // Сбрасываем подсветку всех кнопок фильтров
+            ['btn-filt-build', 'btn-filt-army', 'btn-filt-house', 'btn-filt-fact', 'btn-filt-boat'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+            
+            // Подсвечиваем только что нажатую кнопку
             let btnId = '';
             if (type === 'BUILDER') btnId = 'btn-filt-build';
             else if (type === 'ARMY') btnId = 'btn-filt-army';
@@ -2536,19 +2761,7 @@ setFilter(type) {
                 const btn = document.getElementById(btnId);
                 if (btn) btn.classList.add('active');
             }
-        }
     },
-
-    getPlayerResLimit() {
-        const baseLimit = 100; // База без складов
-        const bonusPerWarehouse = 25; // Бонус за каждый склад
-        
-        // Считаем живые склады игрока
-        const count = this.units.filter(u => u.side === this.myRole && u.type === 'WAREHOUSE').length;
-        
-        return baseLimit + (count * bonusPerWarehouse);
-    },
-
    loadedImages: {}, // Сюда мы сохраним загруженные картинки
 
   preloadAssets() {
@@ -2582,10 +2795,9 @@ setFilter(type) {
   },
 
     // 2. Хранилище узоров (ВЫНЕСЕНО ОТДЕЛЬНО)
-    patterns: {}, 
+    patterns: {},
 
- updateTerritoryCache() {;
-        
+ updateTerritoryCache() {
         const margin = 100; 
         const w = canvas.width + margin * 2;
         const h = canvas.height + margin * 2;
@@ -2601,18 +2813,118 @@ setFilter(type) {
         tCtx.clearRect(0, 0, w, h);
 
         this.lastTerritoryCam = { x: this.camera.x, y: this.camera.y };
-this.lastTerritoryTime = this.frameCount;
+        this.lastTerritoryTime = this.frameCount;
 
         // Выбираем шаг сетки
         let step = 12; 
         if (this.territoryMode === 1) step = 15;
         else if (this.territoryMode === 2) step = 8;
         else if (this.territoryMode === 3) step = 12;
-        else if (this.territoryMode === 4) step = 6; // СВЕРХТОЧНЫЙ РЕЖИМ
+        else if (this.territoryMode === 4) step = 12; // ЗАЩИТА
+        else if (this.territoryMode === 5) step = 15; // ВОЙНА
         
         const cols = Math.ceil(w / step);
         const rows = Math.ceil(h / step);
+
+        // --- РЕЖИМ 4: КЭШ ЗАЩИТЫ (тепловая карта) ---
+        // --- РЕЖИМ 5: КЭШ ВОЙНЫ (оккупированные территории) ---
+        let defense = null;
+        let maxDefense = 0;
         
+        if (this.territoryMode === 4) {
+            defense = new Float32Array(cols * rows);
+        } 
+        
+        const camX = this.camera.x - margin;
+        const camY = this.camera.y - margin;
+
+        // --- ЛОГИКА ДЛЯ 4 РЕЖИМА (ЗАЩИТА) ---
+        if (this.territoryMode === 4) {
+            const getDefWeight = (u) => {
+                if (!u || u.hp <= 0 || u.visualOnly) return 0;
+                if (u.isBuilder || u.isProducer) return 0;
+                if (u.type === 'TREE' || u.type === 'ROAD' || u.type === 'ASPHALT') return 0;
+
+                switch (u.type) {
+                    case 'SOLDIER': return 1;
+                    case 'SNIPER': return 3;
+                    case 'TANK': return 10;
+                    case 'GRAD': return 9;
+                    case 'HIMARS': return 11;
+                    case 'HELICOPTER': return 8;
+                    case 'FPV': return 2;
+                    case 'SENTINEL': return 8;
+                    case 'AA_DEFENSE': return 6;
+                    case 'SILO': return 6;
+                    case 'WALL': return 0.5;
+                    default:
+                        if (u.isFlying) return 6;
+                        return 2;
+                }
+            };
+
+            const getDefRadius = (u) => {
+                const info = UNITS[u.type];
+                let r = (info && typeof info.range === 'number') ? info.range : 0;
+                if (r <= 0 && (u.type === 'AA_DEFENSE' || u.type === 'SENTINEL' || u.type === 'SILO')) r = 350;
+                if (r <= 0) r = 180;
+                return Math.min(r, 1400);
+            };
+
+            const stamp = (ix, iy, v, radiusCells) => {
+                const r2 = radiusCells * radiusCells;
+                for (let dy = -radiusCells; dy <= radiusCells; dy++) {
+                    const y = iy + dy;
+                    if (y < 0 || y >= rows) continue;
+                    for (let dx = -radiusCells; dx <= radiusCells; dx++) {
+                        const x = ix + dx;
+                        if (x < 0 || x >= cols) continue;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 > r2) continue;
+
+                        const d = Math.sqrt(d2);
+                        const k = 1 - (d / (radiusCells + 0.0001));
+                        defense[y * cols + x] += v * (0.25 + 0.75 * k);
+                    }
+                }
+            };
+
+            for (let i = 0; i < this.units.length; i++) {
+                const u = this.units[i];
+                const v = getDefWeight(u);
+                if (v <= 0) continue;
+                const ix = Math.floor((u.x - camX) / step);
+                const iy = Math.floor((u.y - camY) / step);
+                if (ix < 0 || iy < 0 || ix >= cols || iy >= rows) continue;
+
+                const radius = getDefRadius(u);
+                const radiusCells = Math.max(2, Math.min(22, Math.ceil(radius / step)));
+                stamp(ix, iy, v, radiusCells);
+            }
+
+            for (let i = 0; i < defense.length; i++) {
+                if (defense[i] > maxDefense) maxDefense = defense[i];
+            }
+            if (maxDefense < 1) maxDefense = 1;
+
+            // Рисуем по всей области кэша и выходим
+            for (let iy = 0; iy < rows; iy++) {
+                for (let ix = 0; ix < cols; ix++) {
+                    const idx = iy * cols + ix;
+                    const v = defense ? defense[idx] : 0;
+                    const t = Math.min(1, Math.log1p(v) / Math.log1p(maxDefense));
+                    const hue = 120 * (1 - t);
+                    const light = 52 - t * 34;
+                    tCtx.fillStyle = `hsl(${hue}, 95%, ${light}%)`;
+                    tCtx.globalAlpha = 0.85;
+                    tCtx.fillRect(ix * step, iy * step, step + 1, step + 1);
+                }
+            }
+            tCtx.globalAlpha = 1.0;
+            return; // Завершаем выполнение функции для 4 режима
+        }
+        
+        // --- ЛОГИКА ДЛЯ ОСТАЛЬНЫХ РЕЖИМОВ (ТЕРРИТОРИИ) ---
         const grid = new Array(rows * cols).fill(null);
 
         const GAP_POWER = 0.4;
@@ -2620,9 +2932,9 @@ this.lastTerritoryTime = this.frameCount;
         const RADIUS_PX = 200; 
         const RADIUS_CELLS = Math.ceil(RADIUS_PX / step); 
 
-const searchMargin = RADIUS_PX + 50;
+        const searchMargin = RADIUS_PX + 50;
         const activeUnits = this.units.filter(u => 
-            !u.isFlying && u.type !== 'MINE' && u.type !== 'TREE' && // <-- ИСПРАВЛЕНИЕ: Деревья игнорируются здесь!
+            !u.isFlying && u.type !== 'MINE' && u.type !== 'TREE' && 
             u.x > this.lastTerritoryCam.x - margin - searchMargin && 
             u.x < this.lastTerritoryCam.x - margin + w + searchMargin &&
             u.y > this.lastTerritoryCam.y - margin - searchMargin && 
@@ -2646,9 +2958,12 @@ const searchMargin = RADIUS_PX + 50;
                     const dx = cellPxX - localX;
                     const dy = cellPxY - localY;
                     const d2 = dx*dx + dy*dy;
+                    
                     if (d2 > RADIUS_PX * RADIUS_PX) continue;
+                    
                     const force = INFLUENCE_COEF / (d2 + 1500);
                     const idx = iy * cols + ix;
+                    
                     if (!grid[idx]) grid[idx] = {};
                     if (!grid[idx][u.side]) grid[idx][u.side] = 0;
                     grid[idx][u.side] += force;
@@ -2674,19 +2989,21 @@ const searchMargin = RADIUS_PX + 50;
 
         const LINE_W = 4;
         const FILL_OPACITY = 0.2;
-        const factionsData = {}; // Для политического режима (собираем центры империй)
+        const factionsData = {}; 
+        const warUnitCounts = {}; 
 
+        // --- ГЛАВНЫЙ ЦИКЛ ОТРИСОВКИ ТЕРРИТОРИЙ ---
         for (let iy = 0; iy < rows; iy++) {
             for (let ix = 0; ix < cols; ix++) {
                 const idx = iy * cols + ix;
                 const owner = getCellOwner(idx);
                 if (!owner) continue;
+
                 const x = ix * step;
                 const y = iy * step;
                 const color = FACTIONS[owner] ? FACTIONS[owner].color : '#fff';
 
-                // Сбор данных для текста в политическом режиме
-                if (this.territoryMode === 3) {
+                if (this.territoryMode === 3 || this.territoryMode === 5) {
                     if (!factionsData[owner]) factionsData[owner] = { sumX: 0, sumY: 0, count: 0, minX: x, maxX: x, minY: y, maxY: y };
                     factionsData[owner].sumX += x;
                     factionsData[owner].sumY += y;
@@ -2697,75 +3014,129 @@ const searchMargin = RADIUS_PX + 50;
                     if (y > factionsData[owner].maxY) factionsData[owner].maxY = y;
                 }
 
-                if (this.territoryMode === 1) { 
+                if (this.territoryMode === 1) {
                     tCtx.fillStyle = color;
                     tCtx.globalAlpha = FILL_OPACITY;
                     tCtx.fillRect(x, y, step + 1, step + 1);
                 }
-                else if (this.territoryMode === 2) { 
+                else if (this.territoryMode === 2) {
                     tCtx.fillStyle = color;
                     tCtx.globalAlpha = 1.0;
-                    if (iy > 0 && getCellOwner((iy - 1) * cols + ix) !== owner) tCtx.fillRect(x, y, step, LINE_W); 
+                    if (iy > 0 && getCellOwner((iy - 1) * cols + ix) !== owner) tCtx.fillRect(x, y, step, LINE_W);
                     if (iy < rows - 1 && getCellOwner((iy + 1) * cols + ix) !== owner) tCtx.fillRect(x, y + step - LINE_W, step, LINE_W);
                     if (ix > 0 && getCellOwner(iy * cols + (ix - 1)) !== owner) tCtx.fillRect(x, y, LINE_W, step);
                     if (ix < cols - 1 && getCellOwner(iy * cols + (ix + 1)) !== owner) tCtx.fillRect(x + step - LINE_W, y, LINE_W, step);
                 }
                 else if (this.territoryMode === 3) {
-                    // --- ПОЛИТИЧЕСКИЙ РЕЖИМ (HOI4 Style) ---
                     tCtx.fillStyle = color;
-                    tCtx.globalAlpha = 0.55; // Более плотная и насыщенная заливка
-                    tCtx.fillRect(x, y, step + 1, step + 1);
-                }
-                    
-                // --- ДОБАВЬ ВОТ ЭТОТ БЛОК ---
-                else if (this.territoryMode === 4) {
-                    // --- ТОЧНЫЙ РЕЖИМ (6px) ---
-                    tCtx.fillStyle = color;
-                    tCtx.globalAlpha = 0.4;
+                    tCtx.globalAlpha = 0.55; 
                     tCtx.fillRect(x, y, step + 1, step + 1);
                 }
             }
-        }
+        } // Конец цикла по Y
 
-                            
-        // --- ОТРИСОВКА НАЗВАНИЙ ГОСУДАРСТВ ---
-        if (this.territoryMode === 3) {
+        // --- ЛОГИКА ДЛЯ 5 РЕЖИМА (ВОЙНА) ---
+        if (this.territoryMode === 5) {
+            // Сначала рисуем территории как в режиме 3
+            for (let iy = 0; iy < rows; iy++) {
+                for (let ix = 0; ix < cols; ix++) {
+                    const idx = iy * cols + ix;
+                    const owner = getCellOwner(idx);
+                    if (!owner) continue;
+
+                    const x = ix * step;
+                    const y = iy * step;
+                    const color = FACTIONS[owner] ? FACTIONS[owner].color : '#fff';
+
+                    tCtx.fillStyle = color;
+                    tCtx.globalAlpha = 0.55; 
+                    tCtx.fillRect(x, y, step + 1, step + 1);
+                }
+            }
+
+            // Считаем юнитов для каждой фракции
+            const unitCounts = {};
+            this.units.forEach(u => {
+                if (u.hp > 0 && !u.isFlying && u.type !== 'MINE' && u.type !== 'TREE') {
+                    if (!unitCounts[u.side]) unitCounts[u.side] = { infantry: 0, snipers: 0, tanks: 0, total: 0 };
+                    
+                    if (u.type === 'SOLDIER') unitCounts[u.side].infantry++;
+                    else if (u.type === 'SNIPER') unitCounts[u.side].snipers++;
+                    else if (u.type === 'TANK') unitCounts[u.side].tanks++;
+                    unitCounts[u.side].total++;
+                }
+            });
+
+            // Отображаем количество юнитов вместо названий
             for (let owner in factionsData) {
                 const data = factionsData[owner];
-                // Рисуем текст, только если фракция захватила достаточно большую территорию (>25 клеток)
                 if (data.count > 25) {
-                    const cx = data.sumX / data.count; // Вычисляем идеальный "центр массы"
+                    const cx = data.sumX / data.count; 
                     const cy = data.sumY / data.count;
-                    const factionName = FACTIONS[owner] ? FACTIONS[owner].name : owner;
-                    
-                    // Расширенное написание (например: С И Н И Е)
-                    const spacedName = factionName.toUpperCase().split('').join(' ');
                     const width = data.maxX - data.minX;
                     
                     tCtx.save();
                     tCtx.translate(cx, cy);
-                    tCtx.rotate(-Math.PI / 10); // Классический диагональный наклон
+                    tCtx.rotate(-Math.PI / 10); 
                     
-                    // Размер шрифта динамически подстраивается под ширину территории (от 15px до 80px)
                     let fontSize = Math.max(15, Math.min(80, width / 6));
                     
                     tCtx.font = `bold ${fontSize}px "Exo 2", sans-serif`;
                     tCtx.textAlign = 'center';
                     tCtx.textBaseline = 'middle';
                     
-                    // Глубокая тень-обводка, чтобы белый текст читался даже на белом/светлом фоне
                     tCtx.shadowColor = 'rgba(0,0,0,0.9)';
                     tCtx.shadowBlur = Math.max(4, fontSize / 5);
                     tCtx.shadowOffsetX = 3;
                     tCtx.shadowOffsetY = 3;
                     
-                    tCtx.fillStyle = 'rgba(255, 255, 255, 0.85)'; // Матовый белый
-                    tCtx.fillText(spacedName, 0, 0);
+                    // Отображаем количество юнитов
+                    const counts = unitCounts[owner] || { infantry: 0, snipers: 0, tanks: 0 };
+                    const totalUnits = counts.infantry + counts.snipers + counts.tanks;
+                    
+                    tCtx.fillStyle = '#fff'; 
+                    tCtx.fillText(`${totalUnits}`, 0, 0);
+                    
                     tCtx.restore();
                 }
             }
         }
-        tCtx.globalAlpha = 1.0; // Сбрасываем альфу, чтобы не сломать другие рендеры
+
+        // --- ОТРИСОВКА НАЗВАНИЙ ГОСУДАРСТВ ---
+        if (this.territoryMode === 3) {
+            for (let owner in factionsData) {
+                const data = factionsData[owner];
+                if (data.count > 25) {
+                    const cx = data.sumX / data.count; 
+                    const cy = data.sumY / data.count;
+                    const factionName = FACTIONS[owner] ? FACTIONS[owner].name : owner;
+                    const width = data.maxX - data.minX;
+                    
+                    tCtx.save();
+                    tCtx.translate(cx, cy);
+                    tCtx.rotate(-Math.PI / 10); 
+                    
+                    let fontSize = Math.max(15, Math.min(80, width / 6));
+                    
+                    tCtx.font = `bold ${fontSize}px "Exo 2", sans-serif`;
+                    tCtx.textAlign = 'center';
+                    tCtx.textBaseline = 'middle';
+                    
+                    tCtx.shadowColor = 'rgba(0,0,0,0.9)';
+                    tCtx.shadowBlur = Math.max(4, fontSize / 5);
+                    tCtx.shadowOffsetX = 3;
+                    tCtx.shadowOffsetY = 3;
+                    
+                    // Отображаем только название (без юнитов для стабильности)
+                    tCtx.fillStyle = 'rgba(255, 255, 255, 0.85)'; 
+                    tCtx.fillText(`${factionName.toUpperCase()}`, 0, 0);
+                    
+                    tCtx.restore();
+                }
+            }
+        }
+        
+        tCtx.globalAlpha = 1.0; 
     },
 
     camera: { x: 0, y: 0 },
@@ -2793,7 +3164,7 @@ const searchMargin = RADIUS_PX + 50;
     myRole: 'player', 
     territoryMode: 1,
 
-updatePowerLinesForSide(side) {
+    updatePowerLinesForSide(side) {
         // Очищаем старые провода ТОЛЬКО для переданной фракции
         this.powerLinesCache = this.powerLinesCache.filter(line => line.side !== side);
 
@@ -2822,9 +3193,10 @@ updatePowerLinesForSide(side) {
         });
     },
 
-// Добавь эти свойства и методы в начало объекта Game:
-autoReload: false,
-toggleAutoReload() {
+    // Добавь эти свойства и методы в начало объекта Game:
+    autoReload: false,
+
+    toggleAutoReload() {
     this.autoReload = !this.autoReload;
     const btn = document.getElementById('auto-reload-btn');
     const status = document.getElementById('auto-reload-status');
@@ -2840,13 +3212,13 @@ toggleAutoReload() {
 },
 
 checkPopulation(type) {
-    const u = UNITS[type];
-    // Если это пехота или строитель, проверяем есть ли свободные люди
-    if (u && (u.isInfantry || u.isBuilder)) {
-        if (this.population <= 0) return false;
-    }
-    return true;
-},
+        const u = UNITS[type];
+        // Если это пехота или строитель, проверяем есть ли свободные люди
+        if (u && (u.isInfantry || u.isBuilder)) {
+            if (this.population <= 0) return false;
+        }
+        return true;
+    },
 
     // --- ЛОГИКА РЕСУРСОВ (ВСТАВКА) ---
     checkCost(type) {
@@ -2904,18 +3276,18 @@ checkPopulation(type) {
     },
     
 hasSpaceForCraft(craftType) {
-        const product = UNITS[craftType].producedRes;
-        if (!product) return true;
-        
-        // Ракеты хранятся безлимитно, не забивая обычные склады!
-        if (product.rockets || product.heavies || product.nukes) return true;
+            const product = UNITS[craftType].producedRes;
+            if (!product) return true;
+            
+            // Ракеты хранятся безлимитно, не забивая обычные склады!
+            if (product.rockets || product.heavies || product.nukes) return true;
 
-        const currentLimit = this.getPlayerResLimit(); 
-        if (product.iron && this.resources.iron + product.iron > currentLimit) return false;
-        if (product.chem && this.resources.chem + product.chem > currentLimit) return false;
-        if (product.chips && this.resources.chips + product.chips > currentLimit) return false;
-        return true;
-    },
+            const currentLimit = this.getPlayerResLimit(); 
+            if (product.iron && this.resources.iron + product.iron > currentLimit) return false;
+            if (product.chem && this.resources.chem + product.chem > currentLimit) return false;
+            if (product.chips && this.resources.chips + product.chips > currentLimit) return false;
+            return true;
+        },
     
     openWarehouseMenu(wh) {
         const menu = document.getElementById('build-menu');
@@ -2946,6 +3318,7 @@ hasSpaceForCraft(craftType) {
     },
 
 waterOffset: 0,
+
     transition(callback) {
         const layer = document.getElementById('transition-layer');
         layer.classList.add('transition-active');
@@ -2957,7 +3330,8 @@ waterOffset: 0,
     transitToLevel(l) { this.transition(() => this.loadLevel(l)); },
     transitToAdvanced() { this.transition(() => this.loadAdvancedMode()); },
     transitToSpectator() { this.transition(() => this.startSpectator()); },
- backToMenu() {
+
+    backToMenu() {
         this.transition(() => {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('menu-screen').classList.remove('hidden');
@@ -2979,15 +3353,48 @@ waterOffset: 0,
         this.generateRoadTexture();
         this.resize();
         window.addEventListener('resize', () => this.resize());
+
+        // Tooltip для денег (расходы/доходы)
+        this.moneyTip = document.getElementById('money-tooltip');
+        if (!this.moneyTip) {
+            this.moneyTip = document.createElement('div');
+            this.moneyTip.id = 'money-tooltip';
+            this.moneyTip.style.position = 'fixed';
+            this.moneyTip.style.zIndex = '9999';
+            this.moneyTip.style.pointerEvents = 'none';
+            this.moneyTip.style.display = 'none';
+            this.moneyTip.style.background = 'rgba(10,10,10,0.92)';
+            this.moneyTip.style.border = '1px solid rgba(255,255,255,0.15)';
+            this.moneyTip.style.borderRadius = '8px';
+            this.moneyTip.style.padding = '8px 10px';
+            this.moneyTip.style.font = '12px Arial';
+            this.moneyTip.style.color = '#fff';
+            this.moneyTip.style.maxWidth = '320px';
+            document.body.appendChild(this.moneyTip);
+        }
+
+        const moneyGroup = document.getElementById('money-group');
+        if (moneyGroup) {
+            moneyGroup.addEventListener('mouseenter', e => {
+                this.showMoneyTooltip(e);
+            });
+            moneyGroup.addEventListener('mousemove', e => {
+                this.moveMoneyTooltip(e);
+            });
+            moneyGroup.addEventListener('mouseleave', () => {
+                this.hideMoneyTooltip();
+            });
+        }
+
         // СТАЛО:
-window.addEventListener('keydown', e => {
-    if (document.activeElement === document.getElementById('chat-input')) return;
-    this.keys[e.code] = true;
-});
-window.addEventListener('keyup', e => {
-    if (document.activeElement === document.getElementById('chat-input')) return;
-    this.keys[e.code] = false;
-});
+        window.addEventListener('keydown', e => {
+            if (document.activeElement === document.getElementById('chat-input')) return;
+            this.keys[e.code] = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (document.activeElement === document.getElementById('chat-input')) return;
+            this.keys[e.code] = false;
+        });
         canvas.addEventListener('mousedown', e => this.onDown(e));
         window.addEventListener('mousemove', e => this.onMove(e));
         window.addEventListener('mouseup', e => this.onUp(e));
@@ -2995,6 +3402,197 @@ window.addEventListener('keyup', e => {
         Tutorial.init();
         this.startWorkerHeartbeat(); 
         this.renderLoop();           
+    },
+
+    calcMoneyBreakdown() {
+        let income = 0;
+        const incomeBy = {};
+
+        let autoProdPerSec = 0;
+        let autoProdFactories = 0;
+
+        for (let i = 0; i < this.units.length; i++) {
+            const u = this.units[i];
+            if (u.side !== this.myRole) continue;
+            if (u.hp <= 0) continue;
+
+            let inc = 0;
+            let label = null;
+
+            if (u.type === 'HOUSE') {
+                const lvl = u.level || 0;
+                const stats = HOUSE_UPGRADES[lvl] || HOUSE_UPGRADES[0];
+                if (stats) {
+                    if (lvl === 0) inc = Math.max(0, (stats.income || 0) - (u.spawnedCount || 0));
+                    else if (lvl === 6) { if (u.isPowered) inc = (stats.income || 0); }
+                    else inc = (stats.income || 0);
+                    label = stats.name || 'Дома';
+                }
+            } else {
+                const def = UNITS[u.type];
+                if (def && def.income && u.isPowered) {
+                    inc = def.income;
+                    label = def.name || u.type;
+                }
+            }
+
+            // Оценка среднего расхода от авто-производства заводов
+            if (u.type === 'FACTORY' && u.side === this.myRole && u.isPowered && u.autoTarget) {
+                const t = u.autoTarget;
+                const def = UNITS[t];
+                if (def && def.cost) {
+                    const bt = (def.buildTime || 5);
+                    if (bt > 0) {
+                        autoProdPerSec += (def.cost / bt);
+                        autoProdFactories += 1;
+                    }
+                }
+            }
+
+            if (inc > 0) {
+                if (u.buffIncomeMult) inc *= u.buffIncomeMult;
+                income += inc;
+                incomeBy[label] = (incomeBy[label] || 0) + inc;
+            }
+        }
+
+        let militaryCount = 0;
+        for (let i = 0; i < this.units.length; i++) {
+            const u = this.units[i];
+            if (u.side !== this.myRole) continue;
+            if (u.isProducer || u.isBuilder) continue;
+            if (['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL','HOUSE','SHOP','MALL','OFFICE','HOTEL','APARTMENT','BANK','TREE'].includes(u.type)) continue;
+            militaryCount++;
+        }
+
+        const armyCostPer50s = militaryCount * 100;
+        const armyUpkeepPerSec = armyCostPer50s / 50;
+
+        const totalUpkeepPerSec = armyUpkeepPerSec + autoProdPerSec;
+        const netPerSec = income - totalUpkeepPerSec;
+
+        return {
+            income,
+            incomeBy,
+            militaryCount,
+            armyCostPer50s,
+            armyUpkeepPerSec,
+            autoProdFactories,
+            autoProdPerSec,
+            totalUpkeepPerSec,
+            netPerSec
+        };
+    },
+
+    showMoneyTooltip(e) {
+        try {
+            if (!this.moneyTip) return;
+            const b = this.calcMoneyBreakdown();
+            const money = Math.floor(this.money);
+
+            let html = '';
+            html += `<div style="font-weight:bold; margin-bottom:6px;">Баланс</div>`;
+            html += `<div>💵 Сейчас: <span style="color:#fff;">${money}</span></div>`;
+            html += `<div>Доход: <span style="color:#66ff66;">+${Math.round(b.income)}/s</span></div>`;
+
+        const entries = Object.entries(b.incomeBy || {}).sort((a,b) => b[1]-a[1]);
+        if (entries.length > 0) {
+            html += `<div style="margin-top:6px; opacity:0.9;">Источники дохода:</div>`;
+            for (let i = 0; i < Math.min(6, entries.length); i++) {
+                const name = entries[i][0];
+                const val = entries[i][1];
+                html += `<div style="color:#aaffaa;">- ${name}: +${Math.round(val)}/s</div>`;
+            }
+        }
+
+            html += `<div style="margin-top:6px; color:#ff5555;">Расходы:</div>`;
+            html += `<div style="color:#ff5555;">- Армия (${b.militaryCount} юнитов): -${b.armyCostPer50s} за 50 сек</div>`;
+            if (b.autoProdPerSec > 0) {
+                html += `<div style="color:#ff7777;">- Авто-производство (${b.autoProdFactories} заводов): ~-${Math.round(b.autoProdPerSec)}/s</div>`;
+            }
+
+        const netColor = (b.netPerSec >= 0) ? '#66ff66' : '#ff5555';
+        const sign = (b.netPerSec >= 0) ? '+' : '';
+        html += `<div style="margin-top:6px;">Итого: <span style="color:${netColor};">${sign}${Math.round(b.netPerSec)}/s</span></div>`;
+
+        if (b.netPerSec < 0) {
+            const secLeft = Math.floor((this.money) / (-b.netPerSec));
+            if (isFinite(secLeft) && secLeft >= 0) {
+                html += `<div style="color:#ff5555;">Хватит примерно на: ${secLeft} сек</div>`;
+            }
+        }
+
+            this.moneyTip.innerHTML = html;
+            this.moneyTip.style.display = 'block';
+            this.moveMoneyTooltip(e);
+        } catch (err) {
+            // Не даем ошибкам tooltip ломать остальной UI/логику
+            if (this.moneyTip) this.moneyTip.style.display = 'none';
+        }
+    },
+
+    moveMoneyTooltip(e) {
+        if (!this.moneyTip || this.moneyTip.style.display === 'none') return;
+        const pad = 14;
+        let x = e.clientX + pad;
+        let y = e.clientY + pad;
+        const rect = this.moneyTip.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth - 6) x = window.innerWidth - rect.width - 6;
+        if (y + rect.height > window.innerHeight - 6) y = window.innerHeight - rect.height - 6;
+        this.moneyTip.style.left = x + 'px';
+        this.moneyTip.style.top = y + 'px';
+    },
+
+    hideMoneyTooltip() {
+        if (!this.moneyTip) return;
+        this.moneyTip.style.display = 'none';
+    },
+
+    updateEnergyUI() {
+        try {
+            let gen = 0;
+            let use = 0;
+            const myUnits = this.units.filter(u => u.side === this.myRole);
+
+            myUnits.forEach(u => {
+                const def = UNITS[u.type];
+                if (def && def.energyGen) {
+                    let g = def.energyGen;
+                    if (u.buffEnergyMult) g *= u.buffEnergyMult;
+                    gen += g;
+                }
+
+                let useVal = 0;
+                if (u.type === 'HOUSE') {
+                    const st = HOUSE_UPGRADES[u.level || 0] || HOUSE_UPGRADES[0];
+                    useVal = (st && st.energy) ? st.energy : 0;
+                }
+                else if (u.isProducer && u.spawnCooldown > 0 && def && def.energyUse) {
+                    useVal = def.energyUse;
+                }
+                else if (['HOSPITAL', 'AA_DEFENSE', 'SENTINEL', 'SILO', 'WAREHOUSE'].includes(u.type) && def && def.energyUse) {
+                    useVal = def.energyUse;
+                }
+                use += useVal;
+            });
+
+            this.energy = gen;
+            this.energyUse = use;
+            if (use === 0) this.energyFactor = 100;
+            else this.energyFactor = gen / use;
+            if (this.energyFactor < 0.1) this.energyFactor = 0.1;
+
+            const enDisplay = document.getElementById('energy-val');
+            const enContainer = document.getElementById('energy-container');
+            if (enDisplay) {
+                enDisplay.innerText = `${gen} / -${use}`;
+            }
+            if (enContainer) {
+                enContainer.className = 'energy-stat ' + (use > gen ? 'energy-bad' : (use > gen * 0.8 ? 'energy-low' : 'energy-ok'));
+            }
+        } catch (err) {
+            // Не ломаем игру из-за HUD
+        }
     },
     resize() {
         canvas.width = window.innerWidth;
@@ -3227,6 +3825,13 @@ loadPvpLevel(settings) {
         }
     },
 
+    transitToFog() {
+        this.transition(() => {
+            document.getElementById('menu-screen').classList.add('hidden');
+            this.loadFogMode();
+        });
+    },
+
 transitToEarth() {
         this.transition(async () => {
             document.getElementById('menu-screen').classList.add('hidden');
@@ -3274,48 +3879,35 @@ transitToEarth() {
         });
     },
 
-   loadEarthMode() {
+   loadFogMode() {
         this.isMultiplayer = false;
-        this.isIslandMode = false;
-        this.isEarthMode = true; 
+        this.isIslandMode = true;
+        this.isEarthMode = false;
         this.isSpectator = false;
         this.myRole = 'player';
         this.state = 'BATTLE';
         this.money = 4000;
-        
-        // ДЕЛАЕМ МИР ГИГАНТСКИМ
-        MAP_W = 20000; 
-        MAP_H = 10000;
-        
-        this.resetGameData(); 
 
-        const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
-        
-        const getEarthSpawn = () => {
-            const ew = Game.earthW || 2000;
-            const eh = Game.earthH || 1000;
-            for(let attempts=0; attempts<10000; attempts++) {
-                let px = Math.floor(Math.random() * ew);
-                let py = Math.floor(Math.random() * eh);
-                if (Game.earthCollisionMap[py * ew + px] === 1) {
-                    let gx = px * (MAP_W/ew);
-                    let gy = py * (MAP_H/eh);
-                    
-                    // ИСПРАВЛЕНИЕ: Ищем пересечения ТОЛЬКО С БАЗАМИ (HOUSE), а не с деревьями!
-                    // Дистанцию увеличили до 2500, так как карта теперь огромная
-                    let tooClose = this.units.some(u => u.type === 'HOUSE' && Math.hypot(u.x-gx, u.y-gy) < 2500);
-                    
-                    if (!tooClose) return { x: gx, y: gy };
-                }
-            }
-            return { x: Math.random()*MAP_W, y: Math.random()*MAP_H }; 
-        };
+        MAP_W = 6500;
+        MAP_H = 6500;
 
-        factions.forEach((side) => {
-            const sp = getEarthSpawn();
+        MapUtils.init();
+        this.resetGameData();
+
+        this.isFogMode = true;
+        this.fogEnabled = true;
+
+        this.initFog();
+
+        const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5'];
+        const spawns = MapUtils.spawnPoints;
+        
+        factions.forEach((side, index) => {
+            const sp = spawns[index % spawns.length];
+            if (!sp) return;
             this.units.push(new Unit('HOUSE', sp.x, sp.y, side));
             this.units.push(new Unit('BUILDER', sp.x + 20, sp.y + 20, side));
-            
+
             if (side !== 'player') {
                 this.bots.push(new BotAI(side));
             } else {
@@ -3323,10 +3915,12 @@ transitToEarth() {
                 this.camera.y = sp.y - canvas.height/2;
             }
         });
-        
+
+        this.updateFog();
+
         MapUtils.renderBackground();
         this.generateBuffs();
-        this.startGameUI("ГЛОБАЛЬНЫЙ КОНФЛИКТ");
+        this.startGameUI("ТУМАН ВОЙНЫ");
         document.getElementById('start-btn').classList.add('hidden');
         document.getElementById('speed-controls').style.display = 'flex';
         this.updateUI(Object.keys(UNITS));
@@ -3438,6 +4032,14 @@ Diplomacy.init();
         this.energy = 0; this.energyUse = 0; this.energyFactor = 1;
         this.speed = 1;
         this.clickDelay = 0;
+        this.isFogMode = false;
+        this.fogEnabled = false;
+        this.fogExplored = null;
+        this.fogVisible = null;
+        this.fogCanvas = null;
+        this.fogCtx = null;
+        this.lastFogCam = { x: 0, y: 0 };
+        this.lastFogTime = -100;
         this.resources = { iron: 0, chem: 0, chips: 0, rockets: 0, heavies: 0, nukes: 0 }; 
         this.casualties = 0; // Потери населения
         this.population = 0; // Текущее население
@@ -3517,7 +4119,7 @@ Diplomacy.init();
 reloadGrads() {
         this.clickDelay = 20;
         const mySelection = this.selection.filter(u => u.side === this.myRole);
-        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
+        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'BOAT_BOMBER' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
 
         if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
         
@@ -3527,7 +4129,7 @@ reloadGrads() {
             const neededAmmo = u.maxAmmo - u.ammo;
             
             // АРТИЛЛЕРИЯ ЗАРЯЖАЕТСЯ РАКЕТАМИ (1 заряд = 2 ракеты)
-            if (u.type === 'GRAD' || u.type === 'HIMARS') {
+            if (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'BOAT_BOMBER') {
                 const affordable = Math.floor(this.resources.rockets / 2);
                 const toReload = Math.min(neededAmmo, affordable);
                 
@@ -3827,6 +4429,11 @@ update() {
         this.frameCount++;
         const speed = 15;
 
+        // Энергия обновляется независимо от остального UI
+        if (this.state === 'BATTLE' && this.frameCount % 60 === 0) {
+            this.updateEnergyUI();
+        }
+
     // --- ОПТИМИЗИРОВАННЫЙ РАСЧЕТ ПРОВОДОВ ---
         if (this.frameCount % 100 === 0) {
             if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
@@ -3972,6 +4579,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         });
         
         this.money += income;
+        this.lastIncomePerSec = income;
         document.getElementById('income-display').innerText = `(+${income}/s)`;
         document.getElementById('money').innerText = Math.floor(this.money);
 
@@ -3989,16 +4597,16 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
             }
         });
         
-        // Правое число: Лимит от домов МИНУС погибшие навсегда
+        // Правое число: ВСЁ население (из домов), минус погибшие навсегда
         this.maxPopulation = Math.max(0, baseMaxPop - (this.casualties || 0));
-        
-        // Левое число: Свободные люди (максимум минус живые солдаты)
+
+        // Левое число: СКОЛЬКО ЕЩЕ МОЖНО ПРИЗВАТЬ
         this.population = Math.max(0, this.maxPopulation - usedPop);
-        
+
         const popEl = document.getElementById('pop-val');
         if (popEl) popEl.innerText = `${this.population}/${this.maxPopulation}`;
 
-// ТУТ ЖЕ добавляем логику Авто-перезарядки (каждые 60 кадров):
+        // ТУТ ЖЕ добавляем логику Авто-перезарядки (каждые 60 кадров):
         if (this.autoReload) {
             const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0);
             
@@ -4030,51 +4638,17 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         document.getElementById('res-rockets').innerText = Math.floor(this.resources.rockets || 0);
         document.getElementById('res-heavies').innerText = Math.floor(this.resources.heavies || 0);
         document.getElementById('res-nukes').innerText = Math.floor(this.resources.nukes || 0);
-  const currentLimit = this.getPlayerResLimit(); // Получаем текущий лимит
+        const currentLimit = this.getPlayerResLimit(); // Получаем текущий лимит
         ['iron', 'chem', 'chips'].forEach(r => {
             const el = document.getElementById(`res-${r}`);
             // Сравниваем с динамическим лимитом
             if (this.resources[r] >= currentLimit) el.classList.add('res-full'); else el.classList.remove('res-full');
         });
 
-        // 2. РАСЧЕТ ЭНЕРГИИ
-        let gen = 0;
-        let use = 0;
-        const myUnits = this.units.filter(u => u.side === this.myRole);
-        
-        myUnits.forEach(u => {
-            if (UNITS[u.type].energyGen) {
-                let g = UNITS[u.type].energyGen;
-                if (u.buffEnergyMult) g *= u.buffEnergyMult;
-                gen += g;
-            }
-
-            let useVal = 0;
-            if (u.type === 'HOUSE') {
-                useVal = HOUSE_UPGRADES[u.level || 0].energy;
-            } 
-            else if (u.isProducer && u.spawnCooldown > 0 && UNITS[u.type].energyUse) {
-                useVal = UNITS[u.type].energyUse;
-            } 
-            else if (['HOSPITAL', 'AA_DEFENSE', 'SENTINEL', 'SILO', 'WAREHOUSE'].includes(u.type) && UNITS[u.type].energyUse) {
-                useVal = UNITS[u.type].energyUse;
-            }
-            use += useVal;
-        });
-
-        this.energy = gen;
-        this.energyUse = use;
-        this.energyFactor = (use > gen) ? (gen / use) : 1;
-        if (this.energyFactor < 0.1) this.energyFactor = 0.1; 
-
-        const enDisplay = document.getElementById('energy-val');
-        const enContainer = document.getElementById('energy-container');
-        enDisplay.innerText = `${gen} / -${use}`;
-        enContainer.className = 'energy-stat ' + (use > gen ? 'energy-bad' : (use > gen * 0.8 ? 'energy-low' : 'energy-ok'));
-        
-        if (use > gen) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
+        // Энергия считается в updateEnergyUI()
+        if (this.energyUse > this.energy) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
     }
-}
+ }
             this.units.forEach(u => u.update());
             
      // --- СЧИТАЕМ ПОТЕРИ И РИСУЕМ ВЗРЫВЫ ПЕРЕД УДАЛЕНИЕМ ---
@@ -4197,12 +4771,21 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
 if (!this.isSpectator) {
                 const mySelection = this.selection.filter(u => u.side === this.myRole);
-                const grads = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.hp > 0);
+                const grads = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'BOAT_BOMBER') && u.hp > 0);
                 document.getElementById('arty-btn').style.display = grads.length > 0 ? 'flex' : 'none';
                 if (grads.length === 0 && this.artyMode) { this.artyMode = false; document.body.style.cursor = 'default'; }
+
+                // Меняем подпись кнопки под выбранный тип
+                const artyBtn = document.getElementById('arty-btn');
+                if (artyBtn) {
+                    const labelSpan = artyBtn.querySelectorAll('span')[1];
+                    if (labelSpan) {
+                        labelSpan.textContent = mySelection.some(u => u.type === 'BOAT_BOMBER') ? 'ЗАЛП' : 'ARTY';
+                    }
+                }
                 
                 // Проверяем, есть ли среди выделенных юниты с боезапасом
-                const reloadableSelected = mySelection.some(u => u.type==='GRAD' || u.type==='HIMARS' || u.type==='HELICOPTER' || u.type==='SENTINEL');
+                const reloadableSelected = mySelection.some(u => u.type==='GRAD' || u.type==='HIMARS' || u.type==='BOAT_BOMBER' || u.type==='HELICOPTER' || u.type==='SENTINEL');
                 
                 // Обычная кнопка (только если патроны не полные)
                 document.getElementById('reload-btn').style.display = reloadableSelected && mySelection.some(u => u.ammo < u.maxAmmo) ? 'flex' : 'none';
@@ -4378,7 +4961,7 @@ onDown(e) {
                 }
 
                 const isWater = MapUtils.checkWater(spawnX, spawnY);
-                const isBoat = this.buildType === 'BOAT';
+                const isBoat = (this.buildType === 'BOAT' || this.buildType === 'BOAT_BOMBER');
                 if (isWater && !isBoat && !UNITS[this.buildType].isFlying) { this.showError("ЭТО ВОДА!"); return; }
                 
                 const u = new Unit(this.buildType, spawnX, spawnY, this.sandboxSide);
@@ -4491,7 +5074,7 @@ let targetOwner = this.getTerritoryOwner(m.x, m.y);
                     return;
                 }
                 if (this.money >= ARTY_COST) {
-                    const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0 && u.side === this.myRole);
+                    const capable = this.selection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || (u.type === 'BOAT_BOMBER' && u.ammo >= 4)) && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
                         this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
@@ -4532,18 +5115,20 @@ menuAction(type) {
     // === ЛОГИКА ПОСАДКИ И ВЫСАДКИ В ЛОДКУ ===
         if (type === 'BOAT_LOAD' || type === 'BOAT_UNLOAD') {
             const boat = this.selection[0];
-            if (!boat || boat.type !== 'BOAT') return;
+            if (!boat || (boat.type !== 'BOAT' && boat.type !== 'BOAT_BOMBER')) return;
             if (!boat.passengers) boat.passengers = [];
+
+            const capacity = (UNITS[boat.type] && UNITS[boat.type].capacity) ? UNITS[boat.type].capacity : 4;
 
             if (type === 'BOAT_LOAD') {
                 let loadRadius = 120; // Радиус погрузки вокруг лодки
                 let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'GRAD', 'HIMARS'].includes(p.type) ? 4 : 1), 0);
                 
-                if (currentWeight >= 4) { this.showError("ЛОДКА ПОЛНАЯ!"); return; }
+                if (currentWeight >= capacity) { this.showError("ЛОДКА ПОЛНАЯ!"); return; }
 
                 // Ищем своих юнитов вокруг лодки
                 let nearby = this.units.filter(u => 
-                    u.side === this.myRole && u.hp > 0 && u !== boat && !u.isFlying && u.type !== 'BOAT' && !u.isProducer && 
+                    u.side === this.myRole && u.hp > 0 && u !== boat && !u.isFlying && (u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER') && !u.isProducer && 
                     !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type) &&
                     Math.hypot(u.x - boat.x, u.y - boat.y) <= loadRadius
                 );
@@ -4553,30 +5138,26 @@ menuAction(type) {
                 let loadedCount = 0; let killedIds = [];
                 let removedUnits = []; // <-- НОВЫЙ МАССИВ ДЛЯ ТИХОГО УДАЛЕНИЯ
 
-                // 1. Пробуем посадить ТЕХНИКУ (если есть все 4 свободных места)
-                if (currentWeight === 0) {
-                    let vehicle = nearby.find(u => ['TANK', 'GRAD', 'HIMARS'].includes(u.type));
-                    if (vehicle) {
-                        boat.passengers.push({ type: vehicle.type, hp: vehicle.hp, level: vehicle.level });
-                        removedUnits.push(vehicle); // Просто помечаем на удаление
-                        killedIds.push(vehicle.id);
-                        loadedCount++; currentWeight += 4;
-                    }
+                // 1. Сначала грузим технику, пока есть место (техника = 4 места)
+                const vehicles = nearby.filter(u => ['TANK', 'GRAD', 'HIMARS'].includes(u.type));
+                for (let i = 0; i < vehicles.length; i++) {
+                    if (currentWeight + 4 > capacity) break;
+                    const vehicle = vehicles[i];
+                    boat.passengers.push({ type: vehicle.type, hp: vehicle.hp, level: vehicle.level });
+                    removedUnits.push(vehicle);
+                    killedIds.push(vehicle.id);
+                    loadedCount++; currentWeight += 4;
                 }
 
-                // 2. Если технику не посадили, забиваем места ПЕХОТОЙ
-                if (loadedCount === 0) {
-                    for (let i = 0; i < nearby.length; i++) {
-                        let u = nearby[i];
-                        if (!['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
-                            if (currentWeight + 1 <= 4) {
-                                boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
-                                removedUnits.push(u); // Просто помечаем на удаление
-                                killedIds.push(u.id);
-                                loadedCount++; currentWeight += 1;
-                            }
-                        }
-                    }
+                // 2. Потом забиваем оставшиеся места пехотой
+                for (let i = 0; i < nearby.length; i++) {
+                    let u = nearby[i];
+                    if (['TANK', 'GRAD', 'HIMARS'].includes(u.type)) continue;
+                    if (currentWeight + 1 > capacity) break;
+                    boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
+                    removedUnits.push(u);
+                    killedIds.push(u.id);
+                    loadedCount++; currentWeight += 1;
                 }
 
                 if (loadedCount > 0) {
@@ -4591,7 +5172,7 @@ menuAction(type) {
                     if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });
                     
                     let menuItems = ['BOAT_LOAD', 'BOAT_UNLOAD'];
-                    this.updateUI(menuItems, true, `ЛОДКА (Мест: ${4 - currentWeight}/4)`);
+                    this.updateUI(menuItems, true, `ЛОДКА (Мест: ${capacity - currentWeight}/${capacity})`);
                 } else {
                     this.showError("ТЕХНИКА ЗАНИМАЕТ 4 МЕСТА!");
                 }
@@ -4607,7 +5188,7 @@ menuAction(type) {
                 });
                 boat.passengers = [];
                 Game.effects.push({x: boat.x, y: boat.y - 30, char: '📤', life: 40});
-                this.updateUI(['BOAT_LOAD'], true, `ЛОДКА (Мест: 4/4)`);
+                this.updateUI(['BOAT_LOAD'], true, `ЛОДКА (Мест: ${capacity}/${capacity})`);
             }
             return;
         }
@@ -5048,7 +5629,7 @@ if (this.roadDragStart) {
                         else if (this.selectionFilter === 'ARMY') newSelection = candidates.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'BOAT' && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type));
                         else if (this.selectionFilter === 'HOUSE') newSelection = candidates.filter(u => u.type === 'HOUSE');
                         else if (this.selectionFilter === 'FACTORY') newSelection = candidates.filter(u => u.type === 'FACTORY');
-                        else if (this.selectionFilter === 'BOAT') newSelection = candidates.filter(u => u.type === 'BOAT');
+                        else if (this.selectionFilter === 'BOAT') newSelection = candidates.filter(u => u.type === 'BOAT' || u.type === 'BOAT_BOMBER');
                     } else {
                         // Умная рамка: если есть армия, здания не выделяем
                         const mobile = candidates.filter(u => !u.isProducer && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL', 'HOUSE', 'FACTORY'].includes(u.type));
@@ -5093,7 +5674,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
                     }
                     // === НОВОЕ: МЕНЮ ДЛЯ ЛОДКИ ===
-                    else if (this.selection.length === 1 && s0.type === 'BOAT') {
+                    else if (this.selection.length === 1 && (s0.type === 'BOAT' || s0.type === 'BOAT_BOMBER')) {
                         let menuItems = ['BOAT_LOAD'];
                         if (s0.passengers && s0.passengers.length > 0) menuItems.push('BOAT_UNLOAD');
                         
@@ -5102,7 +5683,8 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         if (s0.passengers) {
                             s0.passengers.forEach(p => { weight += (['TANK', 'GRAD', 'HIMARS'].includes(p.type)) ? 4 : 1; });
                         }
-                        this.updateUI(menuItems, true, `ЛОДКА (Мест: ${4 - weight}/4)`);
+                        const cap = (UNITS[s0.type] && UNITS[s0.type].capacity) ? UNITS[s0.type].capacity : 4;
+                        this.updateUI(menuItems, true, `ЛОДКА (Мест: ${cap - weight}/${cap})`);
                     }
                     // ==============================
                     // --- НОВАЯ ЛОГИКА ДЛЯ МАССОВОГО ВЫДЕЛЕНИЯ ДОМОВ И ЗАВОДОВ ---
@@ -5226,7 +5808,7 @@ onRight(e) {
         if (this.isMultiplayer) this.selection = this.selection.filter(u => u.side === this.myRole);
 
         // Ищем интерактивные объекты под курсором
-        const clickedBoat = this.units.find(u => u.type === 'BOAT' && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
+        const clickedBoat = this.units.find(u => (u.type === 'BOAT' || u.type === 'BOAT_BOMBER') && u.side === this.myRole && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
         const clickedTree = this.units.find(u => u.type === 'TREE' && Math.hypot(u.x - m.x, u.y - m.y) <= u.radius + 15);
 
       
@@ -5427,7 +6009,8 @@ draw() {
         if (this.territoryMode !== 0) {
             const margin = 100;
             const dist = Math.hypot(this.camera.x - this.lastTerritoryCam.x, this.camera.y - this.lastTerritoryCam.y);
-            const needUpdate = (this.frameCount - this.lastTerritoryTime > 10) || (dist > 50);
+            const cooldown = (this.territoryMode === 4) ? 35 : 10;
+            const needUpdate = (this.frameCount - this.lastTerritoryTime > cooldown) || (dist > 50);
             if (needUpdate) this.updateTerritoryCache();
             
             // РЕЖИМЫ 1 и 2: Рисуем ПОД базой (на земле)
@@ -5485,7 +6068,10 @@ draw() {
         // 1. Здания
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) u.draw(ctx);
+            if(UNITS[u.type].spawnList || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) {
+                if (this.fogEnabled && u.side !== this.myRole && !this.isWorldVisible(u.x, u.y)) continue;
+                u.draw(ctx);
+            }
         }
         // 2. Лодки
         for(let i=0; i<this.units.length; i++) {
@@ -5495,16 +6081,24 @@ draw() {
         // 3. Наземная техника
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) u.draw(ctx);
+            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) {
+                if (this.fogEnabled && u.side !== this.myRole && !this.isWorldVisible(u.x, u.y)) continue;
+                u.draw(ctx);
+            }
         }
         // 4. Летуны
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(u.isFlying) u.draw(ctx);
+            if(u.isFlying) {
+                if (this.fogEnabled && u.side !== this.myRole && !this.isWorldVisible(u.x, u.y)) continue;
+                u.draw(ctx);
+            }
         }
     // 5. ПУЛИ И РАКЕТЫ (Вот эта строчка у нас пропала!)
         for(let i=0; i<this.bullets.length; i++) {
-            this.bullets[i].draw(ctx);
+            const b = this.bullets[i];
+            if (this.fogEnabled && b && b.side !== this.myRole && !this.isWorldVisible(b.x, b.y)) continue;
+            b.draw(ctx);
         }
 
         // --- РЕЖИМ 3 (ПОЛИТИКА): Рисуем ПОВЕРХ армии и зданий ---
@@ -5514,6 +6108,8 @@ draw() {
             const dy = (this.lastTerritoryCam.y - margin);
             ctx.drawImage(this.territoryCanvas, dx, dy);
         }
+
+        this.updateFog();
 
 for (let i = 0; i < this.effects.length; i++) {
     const e = this.effects[i];
@@ -5632,7 +6228,6 @@ for (let i = 0; i < this.effects.length; i++) {
                 e.vy += 0.35; // Гравитация
                 e.life--;
             }
-                
 
 // --- ЯДЕРНЫЕ ЭФФЕКТЫ ---
             else if (e.type === 'nuke_flash') {
@@ -5686,6 +6281,8 @@ for (let i = 0; i < this.effects.length; i++) {
             
             if (e.life <= 0) this.effects.splice(i, 1);
         }
+
+        this.drawFog(ctx);
 
         if (window.mousePos) {
              const m = window.mousePos;
@@ -6073,14 +6670,35 @@ checkPower() {
     }
 
 fireArty(tx, ty, force = false) {
-        if (this.ammo <= 0 && !force) return;
-        if (this.ammo > 0) this.ammo -= 1; 
+        if (this.type === 'BOAT_BOMBER') {
+            if (this.ammo < 4 && !force) return;
+            if (this.ammo >= 4) this.ammo -= 4;
+        } else {
+            if (this.ammo <= 0 && !force) return;
+            if (this.ammo > 0) this.ammo -= 1;
+        }
         let d = Math.hypot(tx - this.x, ty - this.y);
-        if (d > UNITS.GRAD.range) { let angle = Math.atan2(ty - this.y, tx - this.x); tx = this.x + Math.cos(angle) * UNITS.GRAD.range; ty = this.y + Math.sin(angle) * UNITS.GRAD.range; }
+        if (d > this.range) { let angle = Math.atan2(ty - this.y, tx - this.x); tx = this.x + Math.cos(angle) * this.range; ty = this.y + Math.sin(angle) * this.range; }
         
         let dmg = this.damage;
         let splash = UNITS.GRAD.splash || 100;
         let bulletSpeed = 4;
+        let shots = 2;
+
+        // Лодка-бомбардировщик: 2 пушки -> 4 ракеты, но по ОДНОЙ каждые 0.3 сек
+        if (this.type === 'BOAT_BOMBER') {
+            this.bomberSalvo = {
+                left: 4,
+                tx,
+                ty,
+                dmg,
+                splash,
+                speed: 8,
+                spread: 35,
+                nextFrame: Game.frameCount + 18
+            };
+            return;
+        }
         
         // Если заряжен БОМБЕР (HEAVY)
         if (this.ammoType === 'HEAVY') {
@@ -6089,8 +6707,9 @@ fireArty(tx, ty, force = false) {
             bulletSpeed = 3; // Летят медленнее
         }
         
-        for(let i=0; i<2; i++) {
-            let b = new Bullet(this.x, this.y, tx+Math.random()*60-30, ty+Math.random()*60-30, dmg, this.side, true, null, this, splash);
+        for(let i=0; i<shots; i++) {
+            let spread = (this.type === 'BOAT_BOMBER') ? 35 : 60;
+            let b = new Bullet(this.x, this.y, tx+Math.random()*spread-spread/2, ty+Math.random()*spread-spread/2, dmg, this.side, true, null, this, splash);
             b.speed = bulletSpeed;
             if (this.ammoType === 'HEAVY') b.splashRadius = 250; 
             Game.bullets.push(b);
@@ -6117,8 +6736,10 @@ resolveCollision() {
 
 // --- ДОБАВЛЯЕМ ЭТИ ДВЕ СТРОКИ ДЛЯ ЛОДКИ ---
             // Лодка не толкает своих пассажиров, а пассажиры не толкают лодку
-            if (this.type === 'BOAT' && u.side === this.side && !u.isFlying && u.type !== 'BOAT') return;
-            if (u.type === 'BOAT' && this.side === u.side && !this.isFlying && this.type !== 'BOAT') return;
+            const isBoatA = (this.type === 'BOAT' || this.type === 'BOAT_BOMBER');
+            const isBoatB = (u.type === 'BOAT' || u.type === 'BOAT_BOMBER');
+            if (isBoatA && u.side === this.side && !u.isFlying && !isBoatB) return;
+            if (isBoatB && this.side === u.side && !this.isFlying && !isBoatA) return;
         if (this.type === 'TANK' && u.type === 'TREE') return;
 
         // Быстрая проверка через квадрат расстояния (без корня)
@@ -6327,8 +6948,32 @@ attemptAutoProduction() {
             return;
         }
 
+        // Лодка-бомбардировщик: продолжаем залп по таймеру даже после окончания подготовки
+        if (this.type === 'BOAT_BOMBER' && this.bomberSalvo) {
+            if (Game.frameCount >= this.bomberSalvo.nextFrame) {
+                const idx = 4 - this.bomberSalvo.left;
+                const gunSide = (idx % 2 === 0) ? -1 : 1;
+                const ang = this.angle || 0;
+
+                const sx = this.x + Math.cos(ang + Math.PI/2) * gunSide * 10;
+                const sy = this.y + Math.sin(ang + Math.PI/2) * gunSide * 10;
+
+                const spread = this.bomberSalvo.spread || 35;
+                const tx = this.bomberSalvo.tx + Math.random() * spread - spread/2;
+                const ty = this.bomberSalvo.ty + Math.random() * spread - spread/2;
+
+                let b = new Bullet(sx, sy, tx, ty, this.bomberSalvo.dmg, this.side, true, null, this, this.bomberSalvo.splash);
+                b.speed = this.bomberSalvo.speed;
+                Game.bullets.push(b);
+
+                this.bomberSalvo.left -= 1;
+                if (this.bomberSalvo.left <= 0) this.bomberSalvo = null;
+                else this.bomberSalvo.nextFrame = Game.frameCount + 18;
+            }
+        }
+
 // --- ЛОГИКА АРТИЛЛЕРИИ (ПОДГОТОВКА И ЗАЛП) ---
-        if ((this.type === 'GRAD' || this.type === 'HIMARS') && this.gradSeq > 0) {
+        if ((this.type === 'GRAD' || this.type === 'HIMARS' || this.type === 'BOAT_BOMBER') && this.gradSeq > 0) {
             this.gradSeq--;
             
             // Дым во время подготовки (наведения и поднятия ракетницы)
@@ -6339,6 +6984,7 @@ attemptAutoProduction() {
             else if (this.gradSeq === 10 && this.gradTarget) {
                 this.fireArty(this.gradTarget.x, this.gradTarget.y);
             }
+
             return; // Установка стоит на месте во время прицеливания и залпа
         }
 
@@ -6909,7 +7555,7 @@ _movePhysics() {
         const ground = this.currentGround;
             
             // Лодки
-            if (this.type === 'BOAT') {
+            if (this.type === 'BOAT' || this.type === 'BOAT_BOMBER') {
                 if (terrain === 'LAND') { currentSpeed *= 0.1; onWater = false; } 
                 else { currentSpeed *= 1.5; onWater = true; }
             } 
@@ -6966,9 +7612,53 @@ _movePhysics() {
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
             
-            let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT') ? 0.3 : 0.05;
+            let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT' || this.type === 'BOAT_BOMBER') ? 0.3 : 0.05;
             this.angle += diff * turnSpeed;
             
+            // --- КОЛЮЧАЯ ПРОВОЛОКА (WALL): замедление + урон + техника ломает за 2 секунды ---
+            if (this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER') {
+                const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+                const isVehicle = ['TANK', 'GRAD', 'HIMARS'].includes(this.type);
+                let onWire = false;
+
+                for (let obj of neighbors) {
+                    if (!obj || obj.hp <= 0 || obj.type !== 'WALL') continue;
+                    const distToWire = Math.hypot(this.x - obj.x, this.y - obj.y);
+                    if (distToWire > (this.radius + obj.radius + 6)) continue;
+
+                    onWire = true;
+
+                    // Сильное замедление
+                    currentSpeed *= isVehicle ? 0.25 : 0.15;
+
+                    // Урон в секунду: пехоте в 10 раз меньше
+                    this.hp -= ((isVehicle ? 20 : 2) / 60);
+
+                    // Техника ломает проволоку, если давит 2 секунды
+                    if (isVehicle) {
+                        if (!obj.wireCrushStartTime) obj.wireCrushStartTime = Date.now();
+                        if (Date.now() - obj.wireCrushStartTime >= 2000) {
+                            obj.hp = 0;
+                            Game.effects.push({type: 'smoke', x: obj.x, y: obj.y, life: 35});
+                            obj.wireCrushStartTime = null;
+                        }
+                    }
+
+                    // Не усиливаем эффект от нескольких сегментов за один кадр
+                    break;
+                }
+
+                // Если техника перестала давить, сбрасываем таймер на ближайших проволоках рядом
+                if (!onWire && isVehicle) {
+                    for (let obj of neighbors) {
+                        if (obj && obj.type === 'WALL' && obj.wireCrushStartTime) {
+                            const distToWire = Math.hypot(this.x - obj.x, this.y - obj.y);
+                            if (distToWire < (this.radius + obj.radius + 40)) obj.wireCrushStartTime = null;
+                        }
+                    }
+                }
+            }
+
             // --- НОВОЕ: КРУТИМ АНИМАЦИЮ ХОДЬБЫ ---
             if (this.walkFrame === undefined) this.walkFrame = Math.random() * 10;
             this.walkFrame += currentSpeed * 0.4; 
@@ -6984,7 +7674,7 @@ _movePhysics() {
             while (diff > Math.PI) diff -= Math.PI * 2;
             
             // Пехота крутится быстро (0.3), Танки и Вертолеты поворачивают нос плавно (0.05)
-            let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT') ? 0.3 : 0.05;
+            let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT' || this.type === 'BOAT_BOMBER') ? 0.3 : 0.05;
             this.angle += diff * turnSpeed;
         }
 
@@ -7295,6 +7985,104 @@ if (dist < 15) {
         }
         
 // --- РЕАЛИСТИЧНЫЙ БОЕВОЙ КАТЕР (С ПЕННЫМ СЛЕДОМ) ---
+        if (this.type === 'BOAT_BOMBER') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle || 0);
+
+            const baseR = 90;
+            const scaleF = this.radius / baseR;
+            ctx.scale(scaleF, scaleF);
+            const r = baseR;
+
+            let isMoving = this.target && Math.hypot(this.target.x - this.x, this.target.y - this.y) > 5;
+
+            // Кильватер
+            if (isMoving && this.inWater) {
+                ctx.save();
+                let wakeLength = r * 3.8;
+                let wakeWidth = r * 1.6;
+                let wakeGrad = ctx.createLinearGradient(-r * 0.5, 0, -wakeLength, 0);
+                wakeGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+                wakeGrad.addColorStop(0.4, 'rgba(200, 230, 255, 0.25)');
+                wakeGrad.addColorStop(1, 'rgba(200, 230, 255, 0)');
+                ctx.beginPath();
+                ctx.moveTo(-r * 0.7, 0);
+                ctx.quadraticCurveTo(-wakeLength * 0.25, -wakeWidth * 0.35, -wakeLength, -wakeWidth);
+                ctx.lineTo(-wakeLength, wakeWidth);
+                ctx.quadraticCurveTo(-wakeLength * 0.25, wakeWidth * 0.35, -r * 0.7, 0);
+                ctx.closePath();
+                ctx.fillStyle = wakeGrad;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            const img = Game.loadedImages[this.type];
+            const maxLongSide = r * 3.6;
+            if (img && img.complete && img.naturalHeight !== 0) {
+                const iw = img.naturalWidth || 1;
+                const ih = img.naturalHeight || 1;
+                const longSide = Math.max(iw, ih);
+                const scale = maxLongSide / longSide;
+                const drawW = iw * scale;
+                const drawH = ih * scale;
+                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+            } else {
+                // Заглушка
+                const drawW = r * 3.4;
+                const drawH = r * 1.7;
+                ctx.fillStyle = '#bfc7d1';
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(drawW * 0.5, 0);
+                ctx.quadraticCurveTo(drawW * 0.15, drawH * 0.45, -drawW * 0.45, drawH * 0.3);
+                ctx.quadraticCurveTo(-drawW * 0.55, 0, -drawW * 0.45, -drawH * 0.3);
+                ctx.quadraticCurveTo(drawW * 0.15, -drawH * 0.45, drawW * 0.5, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x - 10, this.y - hpOffset, 20, 3);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 10, this.y - hpOffset, 20 * (Math.max(0, this.hp) / this.maxHp), 3);
+
+            // Боеприпасы
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = this.ammo === 0 ? 'red' : 'yellow';
+            ctx.fillText(`${this.ammo}/${this.maxAmmo}`, this.x, this.y - 25);
+
+            if (this.gradSeq > 0) {
+                ctx.fillStyle = '#f90';
+                let w = 30 * (this.gradSeq / 360);
+                ctx.fillRect(this.x - 15, this.y + 20, w, 4);
+            }
+
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 1.6, 0, Math.PI * 2);
+                ctx.stroke();
+                if (this.side === Game.myRole) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 140, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.05)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+            return;
+        }
+
         if (this.type === 'BOAT') {
             ctx.save();
             ctx.translate(this.x, this.y);
@@ -8051,7 +8839,10 @@ ctx.restore();
         if (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(this.type)) {
              ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.stroke();
         } else {
-             ctx.beginPath(); ctx.arc(this.x, this.y, 15, 0, Math.PI*2); ctx.fill();
+             // Для колючей проволоки НЕ рисуем круг-подложку, чтобы не было "кружка сзади"
+             if (this.type !== 'WALL') {
+                 ctx.beginPath(); ctx.arc(this.x, this.y, 15, 0, Math.PI*2); ctx.fill();
+             }
              if (this.isFlying && this.flyState > 0) { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(Game.frameCount * 0.5); ctx.fillStyle = '#000'; ctx.fillRect(-25, -2, 50, 4); ctx.fillRect(-2, -25, 4, 50); ctx.restore(); }
         }
         
@@ -8080,7 +8871,7 @@ ctx.restore();
                  ctx.fillStyle = '#000'; ctx.fillRect(this.x-15, this.y - 40, 30, 4); ctx.fillStyle = '#0af'; ctx.fillRect(this.x-15, this.y - 40, 30 * pct, 4);
              }
         }
-      if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL' || this.type === 'HIMARS') {
+      if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL' || this.type === 'HIMARS' || this.type === 'BOAT_BOMBER') {
              ctx.font = '12px Arial'; ctx.fillStyle = this.ammo === 0 ? 'red' : 'yellow'; ctx.fillText(`${this.ammo}/${this.maxAmmo}`, this.x, this.y - 25);
              if (this.gradSeq > 0) { ctx.fillStyle = '#f90'; let w = 30 * (this.gradSeq/360); ctx.fillRect(this.x - 15, this.y + 20, w, 4); }
         }
@@ -8092,6 +8883,12 @@ ctx.restore();
         ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
         ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
         
+        if (Game.selection.includes(this) && this.type === 'BOAT_BOMBER' && this.side === Game.myRole) {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 2.2, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.05)'; ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)'; ctx.lineWidth = 2; ctx.setLineDash([10, 5]); ctx.stroke(); ctx.setLineDash([]);
+        }
+
         if (CAPTURABLE_BUILDINGS.includes(this.type)) {
             ctx.fillStyle = '#550022'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 4);
             ctx.fillStyle = '#ff69b4'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.loyalty)/this.maxLoyalty), 4);

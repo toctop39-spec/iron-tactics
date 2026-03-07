@@ -9321,22 +9321,23 @@ const MobileControls = {
 
 canvas.addEventListener('touchend', (e) => {
     if (!this.active) return;
-    e.preventDefault();
-
-    const touch = e.changedTouches[0];
-    if (!touch) return;
 
     const currentTime = Date.now();
     const tapLength = currentTime - this.touchStartTime;
 
-    // === ДОЛГИЙ ТАП = ПРАВЫЙ КЛИК ===
-    if (tapLength > 350) {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
 
-        Game.onRight({
+    // === ДОЛГИЙ ТАП = ПРАВЫЙ КЛИК ===
+    if (tapLength > 350 && e.changedTouches.length === 1) {
+
+        const fakeEvent = {
             clientX: touch.clientX,
             clientY: touch.clientY,
-            preventDefault(){ }
-        });
+            preventDefault: () => {}
+        };
+
+        Game.onRight(fakeEvent);
 
         Game.effects.push({
             x: touch.clientX + Game.camera.x,
@@ -9350,16 +9351,18 @@ canvas.addEventListener('touchend', (e) => {
     }
 
     // === БЫСТРЫЙ ТАП ===
-    if (tapLength < 200) {
+    if (tapLength < 200 && e.changedTouches.length === 1) {
 
-        // двойной тап
-        if (currentTime - this.lastTapTime < 400) {
+        if (currentTime - this.lastTapTime < 600) {
 
-            Game.onRight({
+            // === ДВОЙНОЙ ТАП (ПРАВЫЙ КЛИК) ===
+            const fakeEvent = {
                 clientX: touch.clientX,
                 clientY: touch.clientY,
-                preventDefault(){ }
-            });
+                preventDefault: () => {}
+            };
+
+            Game.onRight(fakeEvent);
 
             Game.effects.push({
                 x: touch.clientX + Game.camera.x,
@@ -9372,20 +9375,26 @@ canvas.addEventListener('touchend', (e) => {
 
         } else {
 
-            // одиночный
-            Game.onUp({
+            // === ОДИНАРНЫЙ ТАП (ЛЕВЫЙ КЛИК) ===
+            const mouseEvent = new MouseEvent('mouseup', {
                 clientX: touch.clientX,
-                clientY: touch.clientY
+                clientY: touch.clientY,
+                button: 0
             });
+
+            Game.onUp(mouseEvent);
 
             this.lastTapTime = currentTime;
         }
 
     } else {
 
+        // === ЕСЛИ ЭТО БЫЛ ДРАГ ===
+        const t = e.changedTouches[0];
+
         Game.onUp({
-            clientX: touch.clientX,
-            clientY: touch.clientY
+            clientX: t.clientX,
+            clientY: t.clientY
         });
     }
 });

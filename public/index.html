@@ -9291,23 +9291,7 @@ const MobileControls = {
         // Обработка тапов по самому канвасу (Эмуляция мыши)
         const canvas = document.getElementById('gameCanvas');
         
-        canvas.addEventListener('touchstart', (e) => {
-            if (!this.active) return;
-            // e.preventDefault(); // Не блокируем, чтобы работал мультитач зум (если будет)
-            if (e.touches.length === 1) {
-                this.touchStartTime = Date.now();
-                // Эмулируем onDown
-                const touch = e.touches[0];
-                const mouseEvent = new MouseEvent('mousedown', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    button: 0 // Левая кнопка
-                });
-                Game.onDown(mouseEvent);
-            }
-        });
-
-        canvas.addEventListener('touchstart', (e) => {
+  canvas.addEventListener('touchstart', (e) => {
     if (!this.active) return;
 
     const t = e.touches[0];
@@ -9317,139 +9301,123 @@ const MobileControls = {
         clientX: t.clientX,
         clientY: t.clientY
     });
-});
+}); // ← ВОТ ЭТОГО НЕ ХВАТАЛО
 
 canvas.addEventListener('touchend', (e) => {
-    if (!this.active) return;
-
-    const currentTime = Date.now();
-    const tapLength = currentTime - this.touchStartTime;
-
-    if (e.changedTouches.length === 1) {
-        const touch = e.changedTouches[0];
-
-        // === ДОЛГИЙ ТАП = ПРАВЫЙ КЛИК ===
-        if (tapLength > 350) {
-            const fakeEvent = { 
-                clientX: touch.clientX, 
-                clientY: touch.clientY,
-                preventDefault: () => {} 
-            };
-
-            Game.onRight(fakeEvent);
-
-            Game.effects.push({
-                x: touch.clientX + Game.camera.x,
-                y: touch.clientY + Game.camera.y,
-                char: '🎯',
-                life: 20
-            });
-
-            this.lastTapTime = 0;
-            return;
-        }
-
-        // === БЫСТРЫЙ ТАП ===
-        if (tapLength < 200) {
-
-            if (currentTime - this.lastTapTime < 600) {
-
-                // === ДВОЙНОЙ ТАП (ПРАВЫЙ КЛИК) ===
-                const fakeEvent = { 
-                    clientX: touch.clientX, 
-                    clientY: touch.clientY,
-                    preventDefault: () => {} 
-                };
-
-                Game.onRight(fakeEvent);
-
-                Game.effects.push({
-                    x: touch.clientX + Game.camera.x,
-                    y: touch.clientY + Game.camera.y,
-                    char: '🎯',
-                    life: 20
-                });
-
-                this.lastTapTime = 0;
-
+            if (!this.active) return;
+            // Логика Двойного тапа = Правый клик + Долгий тап = Правый клик
+            const currentTime = Date.now();
+            const tapLength = currentTime - this.touchStartTime;
+            
+            if (e.changedTouches.length === 1) {
+                const touch = e.changedTouches[0];
+                
+                // === ДОЛГИЙ ТАП = ПРАВЫЙ КЛИК ===
+                if (tapLength > 350) {
+                    const fakeEvent = { 
+                        clientX: touch.clientX, 
+                        clientY: touch.clientY,
+                        preventDefault: () => {} 
+                    };
+                    Game.onRight(fakeEvent);
+                    
+                    // Эффект нажатия
+                    Game.effects.push({x: touch.clientX + Game.camera.x, y: touch.clientY + Game.camera.y, char: '🎯', life: 20});
+                    this.lastTapTime = 0;
+                    return;
+                }
+                
+                if (tapLength < 200) { // Это был быстрый тап
+                    if (currentTime - this.lastTapTime < 600) {
+                        // === ДВОЙНОЙ ТАП (ПРАВЫЙ КЛИК) ===
+                        // Вызываем onRight вручную
+                        const fakeEvent = { 
+                            clientX: touch.clientX, 
+                            clientY: touch.clientY,
+                            preventDefault: () => {} 
+                        };
+                        Game.onRight(fakeEvent);
+                        
+                        // Эффект нажатия
+                        Game.effects.push({x: touch.clientX + Game.camera.x, y: touch.clientY + Game.camera.y, char: '🎯', life: 20});
+                    } else {
+                        // === ОДИНАРНЫЙ ТАП (ЛЕВЫЙ КЛИК / ВЫБОР) ===
+                        // В Game.onUp уже есть логика для клика
+                        const mouseEvent = new MouseEvent('mouseup', {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            button: 0
+                        });
+                        Game.onUp(mouseEvent);
+                    }
+                    this.lastTapTime = currentTime;
+                } else {
+                    // Если это был драг - просто отпускаем левую кнопку
+                    Game.onUp({ clientX: touch.clientX, clientY: touch.clientY });
+                }
             } else {
-
-                // === ОДИНАРНЫЙ ТАП (ЛЕВЫЙ КЛИК / ВЫБОР) ===
-                const mouseEvent = new MouseEvent('mouseup', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY,
-                    button: 0
-                });
-
-                Game.onUp(mouseEvent);
-
-                this.lastTapTime = currentTime;
+                // Если это был драг или долгое нажатие - просто отпускаем левую кнопку
+                if (e.changedTouches.length > 0) {
+                    const t = e.changedTouches[0];
+                    Game.onUp({ clientX: t.clientX, clientY: t.clientY });
+                }
             }
+        });
 
-            return;
+        canvas.addEventListener('touchmove', (e) => {
+            if (!this.active) return;
+            if (e.touches.length === 1) {
+                const t = e.touches[0];
+                Game.onMove({ clientX: t.clientX, clientY: t.clientY });
+            }
+        });
+    },
+
+    handleJoystick(e, zone, stick) {
+        const touch = e.touches[0];
+        const rect = zone.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        
+        const dist = Math.hypot(dx, dy);
+        const maxDist = rect.width / 2; // Радиус зоны
+        
+        // Ограничиваем движение стика кругом
+        if (dist > maxDist) {
+            dx = (dx / dist) * maxDist;
+            dy = (dy / dist) * maxDist;
+        }
+        
+        // Двигаем стик визуально
+        stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        // Нормализуем данные для камеры (-1 ... 1)
+        this.joystickData = {
+            x: dx / maxDist,
+            y: dy / maxDist
+        };
+    },
+
+    toggle(forceState) {
+        this.active = (forceState !== undefined) ? forceState : !this.active;
+        const panel = document.getElementById('mobile-controls');
+        const btn = document.getElementById('mobile-toggle-btn');
+        
+        if (this.active) {
+            panel.style.display = 'block';
+            btn.style.background = '#0f0';
+            btn.style.color = '#000';
+            Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВКЛ");
+        } else {
+            panel.style.display = 'none';
+            btn.style.background = '#333';
+            btn.style.color = '#fff';
+            Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВЫКЛ");
         }
     }
-
-    // === ДРАГ ===
-    if (e.changedTouches.length > 0) {
-        const t = e.changedTouches[0];
-        Game.onUp({ clientX: t.clientX, clientY: t.clientY });
-    }
-});
-
-canvas.addEventListener('touchmove', (e) => {
-    if (!this.active) return;
-    if (e.touches.length === 1) {
-        const t = e.touches[0];
-        Game.onMove({ clientX: t.clientX, clientY: t.clientY });
-    }
-});
-
-handleJoystick(e, zone, stick) {
-    const touch = e.touches[0];
-    const rect = zone.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    let dx = touch.clientX - centerX;
-    let dy = touch.clientY - centerY;
-    
-    const dist = Math.hypot(dx, dy);
-    const maxDist = rect.width / 2; // Радиус зоны
-    
-    // Ограничиваем движение стика кругом
-    if (dist > maxDist) {
-        dx = (dx / dist) * maxDist;
-        dy = (dy / dist) * maxDist;
-    }
-    
-    // Двигаем стик визуально
-    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    
-    // Нормализуем данные для камеры (-1 ... 1)
-    this.joystickData = {
-        x: dx / maxDist,
-        y: dy / maxDist
-    };
-},
-
-toggle(forceState) {
-    this.active = (forceState !== undefined) ? forceState : !this.active;
-    const panel = document.getElementById('mobile-controls');
-    const btn = document.getElementById('mobile-toggle-btn');
-    
-    if (this.active) {
-        panel.style.display = 'block';
-        btn.style.background = '#0f0';
-        btn.style.color = '#000';
-        Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВКЛ");
-    } else {
-        panel.style.display = 'none';
-        btn.style.background = '#333';
-        btn.style.color = '#fff';
-        Game.showError("МОБИЛЬНЫЙ РЕЖИМ ВЫКЛ");
-    }
-}
 };
 
 setTimeout(() => MobileControls.init(), 1000);
@@ -9621,7 +9589,7 @@ const ChatManager = {
 };
 
 // ВАЖНО: Запускаем СРАЗУ, не дожидаясь картинок!
-ChatManager.init();
+ChatManager.init(); 
 
 </script>
 </body>

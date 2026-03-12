@@ -3934,13 +3934,13 @@ transitToEarth() {
         this.state = 'BATTLE';
         this.money = 4000;
         
-        MAP_W = 7000;
-        MAP_H = 7000;
+        MAP_W = 5000;
+        MAP_H = 5000;
         MapUtils.init();
         
         this.resetGameData(); 
 
-const factions = ['player', 'bot1', 'bot2', 'bot3', 'bot4'];
+const factions = ['player', 'bot1', 'bot2', 'bot3'];
         const spawns = MapUtils.spawnPoints;
 
         factions.forEach((side, index) => {

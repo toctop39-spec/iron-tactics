@@ -102,9 +102,16 @@ io.on('connection', (socket) => {
         // Обновляем список (количество игроков изменилось)
         io.emit('update_room_list', getPublicRoomList());
 
-        // Если в комнате теперь 2 или более игрока - отправляем сигнал старта
-        if (room.players.length >= 2) {
-             io.to(name).emit('start_game_signal', room.settings);
+        // Игра стартует ОДИН РАЗ, когда игроков стало >= 2.
+        // Если игра уже шла (started=true), а к нам присоединился НОВЫЙ игрок -
+        // сигнал шлем ТОЛЬКО ему, чтобы не сбросить прогресс тем, кто уже играет!
+        if (!room.started) {
+            if (room.players.length >= 2) {
+                room.started = true;
+                io.to(name).emit('start_game_signal', room.settings);
+            }
+        } else {
+            socket.emit('start_game_signal', room.settings);
         }
         
         console.log(`User ${socket.id} joined room ${name} as ${myRole}`);

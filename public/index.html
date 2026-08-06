@@ -4449,6 +4449,12 @@ showError(msg) {
 
 else if (cmd.type === 'declare_war') {
             Diplomacy.setWar(cmd.attacker, cmd.defender);
+            // Включаем режим территории у ОБЕИХ сторон конфликта,
+            // чтобы оба игрока видели захват территорий и анимации войны
+            if (cmd.attacker === this.myRole || cmd.defender === this.myRole) {
+                this.setTerritoryMode(1);
+                this.setArmyFilterForced();
+            }
         }
 
         else if (cmd.type === 'peace_offer') {

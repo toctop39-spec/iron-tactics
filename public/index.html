@@ -933,11 +933,10 @@ const Diplomacy = {
     sendDeclareWar() {
         if (!this.selectedTarget || this.selectedTarget === Game.myRole) return;
         
-        // Отправляем приказ себе и всем в сети
+        // Применяем локально СЕБЕ и дополнительно рассылаем всем по сети
+        Game.executeCommand({ type: 'declare_war', attacker: Game.myRole, defender: this.selectedTarget });
         if (Game.isMultiplayer && CURRENT_ROOM) {
             Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: Game.myRole, defender: this.selectedTarget });
-        } else {
-            Game.executeCommand({ type: 'declare_war', attacker: Game.myRole, defender: this.selectedTarget });
         }
         document.getElementById('country-info-screen').classList.add('hidden');
     },
@@ -1006,7 +1005,11 @@ const Diplomacy = {
         document.getElementById('peace-accept-btn').onclick = () => {
             clearInterval(this.peaceOfferTimer);
             document.getElementById('peace-offer-screen').classList.add('hidden');
-            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'accept_peace', from: from, to: to });
+            // Применяем мир локально СЕБЕ, а не только тому, кто предложил
+            Diplomacy.makePeace(from, to);
+            if (Game.isMultiplayer && CURRENT_ROOM) {
+                Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'accept_peace', from: from, to: to });
+            }
         };
         
         document.getElementById('peace-reject-btn').onclick = () => {
@@ -2063,10 +2066,9 @@ manageCombat() {
                 // Выбираем случайную страну и нападаем!
                 let victim = aliveFactions[Math.floor(Math.random() * aliveFactions.length)];
                 
+                Game.executeCommand({ type: 'declare_war', attacker: this.side, defender: victim });
                 if (Game.isMultiplayer && CURRENT_ROOM) {
                     Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: this.side, defender: victim });
-                } else {
-                    Game.executeCommand({ type: 'declare_war', attacker: this.side, defender: victim });
                 }
                 return; // Ждем следующего тика для атаки
             }
@@ -5147,10 +5149,9 @@ onDown(e) {
             }
 
             const targetName = (typeof FACTIONS !== 'undefined' && FACTIONS[owner]?.name) || owner;
+                this.executeCommand({ type: 'declare_war', attacker: this.myRole, defender: owner });
                 if (this.isMultiplayer && CURRENT_ROOM) {
                     this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: this.myRole, defender: owner });
-                } else {
-                    this.executeCommand({ type: 'declare_war', attacker: this.myRole, defender: owner });
                 }
                 this.setTerritoryMode(1);
                 this.setArmyFilterForced();

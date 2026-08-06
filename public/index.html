@@ -5147,7 +5147,6 @@ onDown(e) {
             }
 
             const targetName = (typeof FACTIONS !== 'undefined' && FACTIONS[owner]?.name) || owner;
-            if (confirm(`Объявить войну "${targetName}"? Вы уверены?`)) {
                 if (this.isMultiplayer && CURRENT_ROOM) {
                     this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: this.myRole, defender: owner });
                 } else {
@@ -5155,7 +5154,6 @@ onDown(e) {
                 }
                 this.setTerritoryMode(1);
                 this.setArmyFilterForced();
-            }
             return;
         }
 

@@ -128,6 +128,7 @@ canvas { display: block; cursor: crosshair; }
 #right-controls { position: absolute; right: 25px; bottom: 25px; display: flex; flex-direction: column; gap: 15px; align-items: center; }
 .action-circle-btn { width: 90px; height: 90px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); color: white; font-weight: bold; cursor: pointer; display: none; flex-direction: column; align-items: center; justify-content: center; font-size: 0.85em; text-align: center; transition: 0.2s; text-shadow: 0 2px 4px #000; }
 #arty-btn { background: radial-gradient(circle at 30% 30%, #ff8800, #aa0000); box-shadow: 0 0 25px rgba(255, 60, 0, 0.6); }
+#fpv-btn { background: radial-gradient(circle at 30% 30%, #ff3300, #880000); box-shadow: 0 0 25px rgba(255, 50, 0, 0.6); }
 #reload-btn { background: radial-gradient(circle at 30% 30%, #00ccff, #004488); box-shadow: 0 0 25px rgba(0, 150, 255, 0.6); width: 75px; height: 75px; font-size: 0.7em; }
 .action-circle-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
 #start-btn { position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%); padding: 15px 70px; font-size: 1.4em; font-weight: bold; letter-spacing: 2px; background: linear-gradient(to bottom, #d32f2f, #9a0007); color: white; border: 2px solid #ff5555; border-radius: 4px; box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); cursor: pointer; transition: 0.2s; }
@@ -370,6 +371,7 @@ canvas { display: block; cursor: crosshair; }
 <button id="auto-reload-btn" class="action-circle-btn" onclick="Game.toggleAutoReload()" style="display: none; flex-direction: column; width: 75px; height: 75px; font-size: 0.7em; background: radial-gradient(circle at 30% 30%, #444, #111);"><span>🔄</span><span>AUTO</span><span id="auto-reload-status" style="color:#f00; font-size:0.9em">OFF</span></button>
         <button id="reload-btn" class="action-circle-btn" onclick="Game.reloadGrads()"><span>♻️</span><span style="font-size:0.8em">RELOAD</span><span style="color:#ff0; font-size:0.9em">1000$</span></button>
         <button id="arty-btn" class="action-circle-btn" onclick="Game.toggleArty()"><span>🚀</span><span>ARTY</span><span style="font-size:0.8em; color:#ffff00">200$</span></button>
+        <button id="fpv-btn" class="action-circle-btn" onclick="Game.toggleKamikaze()" style="display: none;"><span>🛩️</span><span>FPV</span><span style="font-size:0.8em; color:#ffaaaa">BOOM</span></button>
     </div>
 </div>
                 
@@ -615,6 +617,10 @@ const UNITS = {
     TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
                cost: 5000, resCost: { iron: 35, chem: 2 }, 
                hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 11, buildTime: 20 },
+
+    T90:     { type:'unit', name: 'Т-90',   emoji: '🛡️', 
+               cost: 10000, resCost: { iron: 70, chem: 4, chips: 1 }, 
+               hp: 1200, dmg: 240, range: 450, speed: 0.45, reload: 110, color: '#2e5c24', radius: 8, collisionRadius: 14, buildTime: 45 },
     
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
                cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
@@ -627,14 +633,14 @@ BOAT: {
     },
 
 
-HIMARS: {
-   type:'unit', name: 'HIMARS', emoji: '🚚', imageSrc: 'Himars.png',
+NASAMS: {
+   type:'unit', name: 'NASAMS', emoji: '🚚', imageSrc: 'Himars.png',
    cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
-   hp: 200, dmg: 2400, range: 1200, speed: 0.65, reload: 80,
+   hp: 200, dmg: 2400, range: 1200, speed: 0.65, reload: 180,
    color: '#004400', radius: 13, buildTime: 20,
-   maxAmmo: 10, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
+   maxAmmo: 1, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
    isArty: true,
-   isHIMARS: true
+   isNASAMS: true
 },
 
     // Кнопка для меню завода
@@ -645,6 +651,13 @@ FPV: {
         cost: 300, resCost: { iron: 20, chips: 1 }, 
         hp: 30, dmg: 400, range: 400, speed: 2.2, color: '#ff3300', 
         radius: 7, buildTime: 10, isFlying: true, isKamikaze: true, splash: 80 
+    },
+
+    SHAHED: { 
+        type:'unit', name: 'Шахед', emoji: '✈️', 
+        cost: 600, resCost: { iron: 40, chips: 2 }, 
+        hp: 60, dmg: 900, range: 600, speed: 4.0, color: '#e0e0e0', 
+        radius: 8, buildTime: 30, isFlying: true, isKamikaze: true, isShahed: true, splash: 120 
     },
     
     HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
@@ -662,7 +675,7 @@ SENTINEL: { type:'unit', name: 'Турель', emoji: '🏯', cost: 15000, dmg: 
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
              
 // Замените строчку spawnList у FACTORY на эту:
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK','GRAD','HIMARS','HELICOPTER', 'FPV', 'BOAT', 'BTN_AUTO'],
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 15 },
@@ -1412,7 +1425,7 @@ getTerrain(x, y) {
             const px = cx * step + 15, py = cy * step + 15;
             if (this.checkMountain(px, py, 12)) return true;
             const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
-            return neighbors.some(u => u.hp > 0 && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - px, u.y - py) < u.radius + 15);
+            return neighbors.some(u => u.hp > 0 && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - px, u.y - py) < u.radius + 4);
         };
         // Проход считается проходимым только там, где есть свободный квадрат минимум 2x2 клетки
         // (2 блока свободных и в ширину, и в высоту). Одиночный узкий (1 клетка) проход не считается проходом.
@@ -1782,7 +1795,7 @@ manageBase() {
         // 2. ГЛОБАЛЬНЫЙ ПЛАН ЗАСТРОЙКИ (Цель: 40 домов, 20 заводов)
         if (houseCount < 3 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE'; // Стартовый рывок
         else if (factoryCount < 1 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY'; // Первый завод
-        else if (defenseCount < (houseCount + factoryCount) / 3.5 && this.money >= UNITS.SENTINEL.cost) buildTarget = (Math.random() > 0.7) ? 'AA_DEFENSE' : 'SENTINEL';
+        else if (defenseCount < (houseCount + factoryCount) / 3.5 && this.money >= UNITS.AA_DEFENSE.cost) buildTarget = 'AA_DEFENSE';
         // Массовое расширение:
         else if (houseCount < 40 && this.money >= UNITS.HOUSE.cost && this.energyFactor > 1.2) buildTarget = 'HOUSE';
         else if (factoryCount < 20 && houseCount >= 5 && this.money >= UNITS.FACTORY.cost && this.energyFactor > 1.2) buildTarget = 'FACTORY';
@@ -1929,7 +1942,7 @@ manageIndustry() {
         const helis = army.filter(u => u.type === 'HELICOPTER').length;
         const grads = army.filter(u => u.type === 'GRAD').length;
         const fpv = army.filter(u => u.type === 'FPV').length;
-        const himars = army.filter(u => u.type === 'HIMARS').length;
+        const himars = army.filter(u => u.type === 'NASAMS').length;
         
         // Лодки для ботов пока отключены!
 
@@ -1943,7 +1956,7 @@ manageIndustry() {
             // Рой дронов (строят чаще, чтобы кошмарить базу)
             if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
             // Элитная артиллерия (Хаймарс) - копят на него активнее
-            else if (tanks >= 4 && himars < 1 && this.money > 5500) targetUnit = 'HIMARS';
+            else if (tanks >= 4 && himars < 1 && this.money > 5500) targetUnit = 'NASAMS';
             // Массовая артиллерия (Град)
             else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
             // Авиация (Вертолеты)
@@ -2015,6 +2028,7 @@ manageHouse() {
         let totalBuilders = builders + buildersInProd;
 
         let snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
+        let sentinels = Game.units.filter(u => u.side === this.side && u.type === 'SENTINEL').length;
         let army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
 
         // ФИКС ЭКОНОМИКИ: Проверяем, нужна ли нам СЭС
@@ -2037,6 +2051,11 @@ manageHouse() {
             if (snipers < 5 && this.money >= UNITS.SNIPER.cost + reserve) { 
                 this.craft(h, 'SNIPER'); 
                 snipers++;
+                return; 
+            }
+            if (sentinels < 3 && this.money >= UNITS.SENTINEL.cost + reserve) { 
+                this.craft(h, 'SENTINEL'); 
+                sentinels++;
                 return; 
             }
             if (army < 15 && this.money >= UNITS.SOLDIER.cost + reserve) { 
@@ -2088,7 +2107,8 @@ manageCombat() {
         }
 
         // АТАКА (если война идет)
-        army.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.ammo > 0).forEach(g => {
+        // GRAD: атакует здания и турели
+        army.filter(u => u.type === 'GRAD' && u.ammo > 0).forEach(g => {
             const t = enemies.find(e => (e.isProducer || e.type === 'SENTINEL') && Math.hypot(e.x-g.x, e.y-g.y) < g.range);
             if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
         });
@@ -2278,7 +2298,7 @@ const Tutorial = {
         { title: "ПРОИЗВОДСТВО", text: "Завод построен! Выделите его. Технике нужны ресурсы. Закажите на Заводе добычу 'Железо x1' (🔩).", action: "check_craft_iron" },
         { title: "АВТОМАТИЗАЦИЯ", text: "Кликать каждый раз неудобно. В меню Завода нажмите 'АВТО-ПРОИЗВ.' (🔄), а затем снова 'Железо'. Завод будет добывать его сам!", action: "check_auto_iron" },
         { title: "ЛОГИСТИКА И СКЛАДЫ", text: "У вас лимит — 100 ед. Железа, Химии и Чипов. Стройте СКЛАДЫ (🏚️), чтобы увеличить этот лимит и копить на дорогую технику!", action: "wait_click" },
-        { title: "АРТИЛЛЕРИЯ", text: "У ГРАДа и HIMARS заканчиваются ракеты. Их нужно производить на Заводе (🚀). Они не занимают место на Складах. Следите за запасами вверху!", action: "wait_click" },
+        { title: "АРТИЛЛЕРИЯ", text: "У ГРАДа и NASAMS заканчиваются ракеты. Их нужно производить на Заводе (🚀). Они не занимают место на Складах. Следите за запасами вверху!", action: "wait_click" },
         { title: "К БОЮ!", text: "Командир, вы готовы! Наладьте цепочки поставок, копите на Ядерную ракету и сотрите врагов с лица земли. Удачи!", action: "wait_click" }
     ],
 
@@ -2436,8 +2456,7 @@ const SoundManager = {
         this.sounds.tankFire = new Audio('tanksound.mp3');
         this.sounds.steps = new Audio('steps.mp3');
         this.sounds.driving = new Audio('driving.mp3');
-        this.sounds.shoot = new Audio('Shoot.mp3'); // НОВЫЙ ЗВУК СТРЕЛЬБЫ
-        
+        this.sounds.shoot = new Audio('Shoot.mp3'); // НОВЫЙ ЗВУК СТРЕЛЬБЫ   
         this.bgm = new Audio('GameMusic.mp3');
         this.bgm.loop = true;
         this.bgm.volume = 0.3; 
@@ -2819,7 +2838,7 @@ zoom: 1,
                         counts[side].infantry++;
                     } else if (u.type === 'SNIPER') {
                         counts[side].snipers++;
-                    } else if (u.type === 'TANK') {
+                    } else if (u.type === 'TANK' || u.type === 'T90') {
                         counts[side].tanks++;
                     }
                 }
@@ -3076,10 +3095,12 @@ setFilter(type) {
                     case 'SOLDIER': return 1;
                     case 'SNIPER': return 3;
                     case 'TANK': return 10;
+                    case 'T90': return 20;
                     case 'GRAD': return 9;
-                    case 'HIMARS': return 11;
+                    case 'NASAMS': return 11;
                     case 'HELICOPTER': return 8;
                     case 'FPV': return 2;
+                    case 'SHAHED': return 5;
                     case 'SENTINEL': return 8;
                     case 'AA_DEFENSE': return 6;
                     case 'SILO': return 6;
@@ -3289,7 +3310,7 @@ setFilter(type) {
                     
                     if (u.type === 'SOLDIER') unitCounts[u.side].infantry++;
                     else if (u.type === 'SNIPER') unitCounts[u.side].snipers++;
-                    else if (u.type === 'TANK') unitCounts[u.side].tanks++;
+                    else if (u.type === 'TANK' || u.type === 'T90') unitCounts[u.side].tanks++;
                     unitCounts[u.side].total++;
                 }
             });
@@ -3371,7 +3392,7 @@ setFilter(type) {
     lastTerritoryTime: -100,         
     keys: {},
     units: [], bullets: [], decor: [], effects: [], selection: [],
-    buildType: null, artyMode: false,
+    buildType: null, artyMode: false, kamikazeMode: false,
     dragStart: null, dragCurr: null,
     frameCount: 0, selectedProducer: null,
     constructions: [],
@@ -3884,7 +3905,7 @@ waterOffset: 0,
         this.units.forEach(u => {
             if (u.isFlying) return; 
             // Считаем только здания и основных юнитов для определения территории
-            if (!u.isProducer && !UNITS[u.type].isBuilding && !['TANK', 'SOLDIER', 'HELICOPTER', 'GRAD', 'HIMARS', 'FPV', 'BOAT'].includes(u.type)) return;
+            if (!u.isProducer && !UNITS[u.type].isBuilding && !['TANK', 'T90', 'SOLDIER', 'HELICOPTER', 'GRAD', 'NASAMS', 'FPV', 'SHAHED', 'BOAT'].includes(u.type)) return;
             
             let d = Math.hypot(u.x - x, u.y - y);
             if (d < min) {
@@ -4344,10 +4365,15 @@ Diplomacy.init();
         this.clickDelay = 20;
     },
 
+    toggleKamikaze() {
+        this.kamikazeMode = !this.kamikazeMode;
+        document.body.style.cursor = this.kamikazeMode ? 'crosshair' : 'default';
+        this.clickDelay = 20;
+    },
 reloadGrads() {
         this.clickDelay = 20;
         const mySelection = this.selection.filter(u => u.side === this.myRole);
-        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
+        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
 
         if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
         
@@ -4357,7 +4383,7 @@ reloadGrads() {
             const neededAmmo = u.maxAmmo - u.ammo - (u.pendingAmmo || 0);
             
             // АРТИЛЛЕРИЯ ЗАРЯЖАЕТСЯ РАКЕТАМИ (1 заряд = 2 ракеты), НЕ МГНОВЕННО - по 1 ракете за раз
-            if (u.type === 'GRAD' || u.type === 'HIMARS') {
+            if (u.type === 'GRAD' || u.type === 'NASAMS') {
                 const affordable = Math.floor(this.resources.rockets / 2);
                 const toReload = Math.min(neededAmmo, affordable);
                 
@@ -4530,7 +4556,7 @@ else if (cmd.type === 'path_move') {
                 });
             }
         }
-else if (cmd.type === 'build_start') {
+        else if (cmd.type === 'build_start') {
     // Проверяем, нет ли уже такой стройки
     if (this.constructions.some(c => c.id === cmd.id)) return;
 
@@ -4545,8 +4571,8 @@ else if (cmd.type === 'build_start') {
     if (builder) {
         builder.assignSite(site); // Пусть бежит строить визуально
     }
-}
-        else if (cmd.type === 'help_build') { 
+    }
+    else if (cmd.type === 'help_build') { 
             const builder = this.units.find(u => u.id === cmd.builderId);
             const site = this.constructions.find(s => s.id === cmd.siteId);
             
@@ -4556,9 +4582,24 @@ else if (cmd.type === 'build_start') {
                 Game.effects.push({x: site.x, y: site.y, char: '🔧', life: 20});
             }
         }
- else if (cmd.type === 'arty_shot') {
+
+        else if (cmd.type === 'fpv_target') {
+            if (cmd.ids && Array.isArray(cmd.ids)) {
+                cmd.ids.forEach(id => {
+                    const u = this.units.find(unit => unit.id === id);
+                    if (u && (u.type === 'FPV' || u.type === 'SHAHED')) {
+                        u.kamikazeTarget = {x: cmd.x, y: cmd.y};
+                        u.targetUnit = null;
+                        u.target = {x: cmd.x, y: cmd.y};
+                        u.pathQueue = [];
+                        if (u.isFlying && u.flyState === 0) u.flyState = 1;
+                    }
+                });
+            }
+        }
+        else if (cmd.type === 'arty_shot') {
             const shooter = this.units.find(u => u.id === cmd.id);
-            if (shooter) {
+            if (shooter && shooter.type !== 'NASAMS') {
                 shooter.gradSeq = 240;
                 shooter.gradTarget = {x: cmd.tx, y: cmd.ty};
                 shooter.target = null;
@@ -4858,12 +4899,12 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
         // ТУТ ЖЕ добавляем логику Авто-перезарядки (каждые 60 кадров):
         if (this.autoReload) {
-            const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'HIMARS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0 && !u.pendingAmmo);
+            const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0 && !u.pendingAmmo);
             
             targets.forEach(u => {
                 const neededAmmo = u.maxAmmo - u.ammo;
                 
-                if (u.type === 'GRAD' || u.type === 'HIMARS') {
+                if (u.type === 'GRAD' || u.type === 'NASAMS') {
                     const affordable = Math.floor(this.resources.rockets / 2);
                     const toReload = Math.min(neededAmmo, affordable);
                     if (toReload > 0) {
@@ -4934,7 +4975,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                          }
                     }
                     // 2. УНИЧТОЖЕНИЕ ТЯЖЕЛОЙ НАЗЕМНОЙ ТЕХНИКИ
-                    else if (['TANK', 'GRAD', 'HIMARS'].includes(u.type)) {
+                    else if (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type)) {
                          SoundManager.play('explosion', 90, vol);
                         Game.spawnRealisticExplosion(u.x, u.y, 1.5);
                          
@@ -5034,9 +5075,26 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
 if (!this.isSpectator) {
                 const mySelection = this.selection.filter(u => u.side === this.myRole);
-                const grads = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'HIMARS') && u.hp > 0);
+                const grads = mySelection.filter(u => u.type === 'GRAD' && u.hp > 0);
                 document.getElementById('arty-btn').style.display = grads.length > 0 ? 'flex' : 'none';
                 if (grads.length === 0 && this.artyMode) { this.artyMode = false; document.body.style.cursor = 'default'; }
+
+                const fpvs = mySelection.filter(u => u.type === 'FPV' && u.hp > 0);
+                const shaheds = mySelection.filter(u => u.type === 'SHAHED' && u.hp > 0);
+                const kamikazes = mySelection.filter(u => (u.type === 'FPV' || u.type === 'SHAHED') && u.hp > 0);
+                const fpvBtn = document.getElementById('fpv-btn');
+                document.getElementById('fpv-btn').style.display = kamikazes.length > 0 ? 'flex' : 'none';
+                if (kamikazes.length === 0 && this.kamikazeMode) { this.kamikazeMode = false; document.body.style.cursor = 'default'; }
+
+                // Меняем подпись кнопки под выбранный тип
+                if (fpvBtn) {
+                    const labelSpan = fpvBtn.querySelectorAll('span')[1];
+                    if (labelSpan) {
+                        if (shaheds.length > 0 && fpvs.length === 0) labelSpan.textContent = 'SHAHEED';
+                        else if (fpvs.length > 0 && shaheds.length === 0) labelSpan.textContent = 'FPV';
+                        else labelSpan.textContent = 'BOOM';
+                    }
+                }
 
                 // Меняем подпись кнопки под выбранный тип
                 const artyBtn = document.getElementById('arty-btn');
@@ -5048,7 +5106,7 @@ if (!this.isSpectator) {
                 }
                 
                 // Проверяем, есть ли среди выделенных юниты с боезапасом
-                const reloadableSelected = mySelection.some(u => u.type==='GRAD' || u.type==='HIMARS' || u.type==='HELICOPTER' || u.type==='SENTINEL');
+                const reloadableSelected = mySelection.some(u => u.type==='GRAD' || u.type==='NASAMS' || u.type==='HELICOPTER' || u.type==='SENTINEL');
                 
                 // Обычная кнопка (только если патроны не полные)
                 document.getElementById('reload-btn').style.display = reloadableSelected && mySelection.some(u => u.ammo < u.maxAmmo) ? 'flex' : 'none';
@@ -5058,6 +5116,7 @@ if (!this.isSpectator) {
                 
            } else {
                 document.getElementById('arty-btn').style.display = 'none';
+                document.getElementById('fpv-btn').style.display = 'none';
                 document.getElementById('reload-btn').style.display = 'none';
                 document.getElementById('auto-reload-btn').style.display = 'none';
             }
@@ -5160,7 +5219,32 @@ onDown(e) {
                     this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'declare_war', attacker: this.myRole, defender: owner });
                 }
                 this.setTerritoryMode(1);
-                this.setArmyFilterForced();
+            this.setArmyFilterForced();
+            return;
+        }
+
+        // --- РУЧНАЯ КАМИКАДЗЕ ЦЕЛЬ (FPV / SHAHED) ---
+        if (this.kamikazeMode) {
+            this.kamikazeMode = false;
+            document.body.style.cursor = 'default';
+
+            const drones = this.selection.filter(u => (u.type === 'FPV' || u.type === 'SHAHED') && u.side === this.myRole && u.hp > 0);
+            if (drones.length === 0) return;
+
+            drones.forEach(u => {
+                u.kamikazeTarget = {x: m.x, y: m.y};
+                u.targetUnit = null;
+                u.target = {x: m.x, y: m.y};
+                u.pathQueue = [];
+                if (u.isFlying && u.flyState === 0) u.flyState = 1;
+            });
+
+            this.effects.push({x: m.x, y: m.y, char: '💥', life: 20});
+            this.clickDelay = 20;
+
+            if (this.isMultiplayer && CURRENT_ROOM) {
+                this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'fpv_target', ids: drones.map(u => u.id), x: m.x, y: m.y, side: this.myRole });
+            }
             return;
         }
 
@@ -5179,7 +5263,7 @@ onDown(e) {
                 const hasRealUnits = this.units.some(u => 
                     u.side === owner && 
                     !u.isFlying && 
-                    (u.isProducer || UNITS[u.type].isBuilding || ['TANK', 'SOLDIER', 'HELICOPTER', 'GRAD', 'HIMARS', 'FPV', 'BOAT'].includes(u.type)) &&
+                    (u.isProducer || UNITS[u.type].isBuilding || ['TANK', 'T90', 'SOLDIER', 'HELICOPTER', 'GRAD', 'NASAMS', 'FPV', 'SHAHED', 'BOAT'].includes(u.type)) &&
                     Math.hypot(u.x - m.x, u.y - m.y) < 200
                 );
                 
@@ -5320,6 +5404,18 @@ onDown(e) {
                      this.showError("МЕСТО ЗАНЯТО!"); return; 
                 }
 
+                // Проверяем, что здание не перекрывает проход с обеих сторон
+                let blockedSides = 0;
+                const sideDirs = [[30,0], [-30,0], [0,30], [0,-30]];
+                for (let [sdx, sdy] of sideDirs) {
+                    const nx = snapX + sdx, ny = snapY + sdy;
+                    if (MapUtils.checkMountain(nx, ny, 8)) { blockedSides++; continue; }
+                    const blockedByUnit = this.units.some(u => u.hp > 0 && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - nx, u.y - ny) < u.radius + 8);
+                    const blockedByConst = this.constructions.some(c => Math.hypot(c.x - nx, c.y - ny) < UNITS[c.type].radius + 8);
+                    if (blockedByUnit || blockedByConst) blockedSides++;
+                }
+                if (blockedSides >= 3) { this.showError("ЗДАНИЕ БЛОКИРУЕТ ПРОХОД!"); return; }
+
                 if (this.isNearFactoryExit(snapX, snapY, bRad + 20)) {
                     this.showError("ЗДЕСЬ ВЫЕЗД С ЗАВОДА!"); return;
                 }
@@ -5347,7 +5443,7 @@ onDown(e) {
                 return;
             }
               
-    // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД/HIMARS)
+    // 4. СТРЕЛЬБА АРТИЛЛЕРИИ (ГРАД)
             if (this.artyMode) {
 let targetOwner = this.getTerritoryOwner(m.x, m.y);
                 if (targetOwner && targetOwner !== this.myRole && targetOwner !== 'neutral' && !Diplomacy.isAtWar(this.myRole, targetOwner)) {
@@ -5356,7 +5452,7 @@ let targetOwner = this.getTerritoryOwner(m.x, m.y);
                     return;
                 }
                 if (this.money >= ARTY_COST) {
-                    const capable = this.selection.filter(u => (u.type === 'GRAD' || (u.type === 'HIMARS'  && u.ammo >= 4)) && u.ammo > 0 && u.side === this.myRole);
+                    const capable = this.selection.filter(u => u.type === 'GRAD' && u.ammo > 0 && u.side === this.myRole);
                     if (capable.length > 0) {
                         this.money -= ARTY_COST; this.updateUI(); 
                         capable.forEach((g, i) => {
@@ -5404,7 +5500,7 @@ menuAction(type) {
 
             if (type === 'BOAT_LOAD') {
                 let loadRadius = 120; // Радиус погрузки вокруг лодки
-                let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'GRAD', 'HIMARS'].includes(p.type) ? 4 : 1), 0);
+                let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(p.type) ? 4 : 1), 0);
                 
                 if (currentWeight >= capacity) { this.showError("ЛОДКА ПОЛНАЯ!"); return; }
 
@@ -5421,7 +5517,7 @@ menuAction(type) {
                 let removedUnits = []; // <-- НОВЫЙ МАССИВ ДЛЯ ТИХОГО УДАЛЕНИЯ
 
                 // 1. Сначала грузим технику, пока есть место (техника = 4 места)
-                const vehicles = nearby.filter(u => ['TANK', 'GRAD', 'HIMARS'].includes(u.type));
+                const vehicles = nearby.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type));
                 for (let i = 0; i < vehicles.length; i++) {
                     if (currentWeight + 4 > capacity) break;
                     const vehicle = vehicles[i];
@@ -5434,7 +5530,7 @@ menuAction(type) {
                 // 2. Потом забиваем оставшиеся места пехотой
                 for (let i = 0; i < nearby.length; i++) {
                     let u = nearby[i];
-                    if (['TANK', 'GRAD', 'HIMARS'].includes(u.type)) continue;
+                    if (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type)) continue;
                     if (currentWeight + 1 > capacity) break;
                     boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
                     removedUnits.push(u);
@@ -5512,8 +5608,8 @@ if (type === 'RELOAD_ROCKET' || type === 'RELOAD_HEAVY') {
             const costPerShot = 2; 
 
             this.selection.forEach(u => {
-                // HIMARS заряжает только обычные
-                if ((u.type === 'GRAD' || (u.type === 'HIMARS' && !isHeavy)) && u.ammo < u.maxAmmo) {
+                // NASAMS заряжает только обычные
+                if ((u.type === 'GRAD' || (u.type === 'NASAMS' && !isHeavy)) && u.ammo < u.maxAmmo) {
                     const needed = u.maxAmmo - u.ammo - (u.pendingAmmo || 0); 
                     const affordable = Math.floor(this.resources[ammoTypeStr] / costPerShot);
                     const toReload = Math.min(needed, affordable);
@@ -5961,7 +6057,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         // Считаем вес (Техника = 4 места, Пехота = 1 место)
                         let weight = 0;
                         if (s0.passengers) {
-                            s0.passengers.forEach(p => { weight += (['TANK', 'GRAD', 'HIMARS'].includes(p.type)) ? 4 : 1; });
+                            s0.passengers.forEach(p => { weight += (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(p.type)) ? 4 : 1; });
                         }
                         const cap = (UNITS[s0.type] && UNITS[s0.type].capacity) ? UNITS[s0.type].capacity : 4;
                         this.updateUI(menuItems, true, `ЛОДКА (Мест: ${cap - weight}/${cap})`);
@@ -6073,6 +6169,7 @@ onRight(e) {
         
         // --- СБРОС СПЕЦ-РЕЖИМОВ ---
         this.artyMode = false; 
+        this.kamikazeMode = false;
         this.pendingConstruction = null; 
         this.buildType = null; 
         Game.launchMode = null;
@@ -6118,30 +6215,28 @@ onRight(e) {
         const pathData = [];
         const idsToMove = [];
 
-        // --- ПОИСК ПУТИ (обход препятствий, приоритет дорогам) ---
-        // Считаем один маршрут для всей группы (от центра юнитов до точки клика),
-        // а затем применяем его ко всем юнитам со смещением "квадратом"
-        let sharedRoute = null;
-        const groundUnits = mobileUnits.filter(u => !u.isFlying && u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER');
-        if (groundUnits.length > 0) {
-            let cx = 0, cy = 0;
-            groundUnits.forEach(u => { cx += u.x; cy += u.y; });
-            cx /= groundUnits.length; cy /= groundUnits.length;
-
-            if (Math.hypot(m.x - cx, m.y - cy) > 60) {
-                sharedRoute = MapUtils.findPath(cx, cy, m.x, m.y);
-            }
-        }
-
         mobileUnits.forEach((u, i) => {
+            // Ручная камикадзе-цель отменяется обычным приказом движения
+            if (u.type === 'FPV' || u.type === 'SHAHED') {
+                u.kamikazeTarget = null;
+                u.targetUnit = null;
+            }
+
             // Расчет позиции для построения "квадратом", чтобы юниты не толпились
             const ox = (i % cols) * 35 - (cols * 17);
             const oy = Math.floor(i / cols) * 35 - (cols * 17);
             const tx = m.x + ox;
             const ty = m.y + oy;
 
-            const canUsePath = !u.isFlying && u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER' && sharedRoute;
-            const route = canUsePath ? sharedRoute.map(p => ({ x: p.x + ox, y: p.y + oy })).concat([{x: tx, y: ty}]) : null;
+            // Каждый наземный юнит ищет свой путь к своей точке —
+            // так они не будут сначала собираться в одной точке.
+            let route = null;
+            if (!u.isFlying && u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER') {
+                if (Math.hypot(tx - u.x, ty - u.y) > 60) {
+                    const p = MapUtils.findPath(u.x, u.y, tx, ty);
+                    if (p && p.length > 0) route = p;
+                }
+            }
 
             if (isShift) {
                 // Если зажат Shift - добавляем точку(и) в очередь
@@ -6959,6 +7054,118 @@ class SpatialHash {
     }
 }
 
+// --- ВИЗУАЛЬНЫЕ МОДЕЛИ T-90 И ШАХЕДА ---
+function drawT90Model(ctx, u) {
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    ctx.rotate(u.angle);
+    const s = u.radius / 12;
+    ctx.scale(s, s);
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-38, -24, 76, 10);
+    ctx.fillRect(-38, 14, 76, 10);
+
+    ctx.fillStyle = '#333';
+    for(let i=0; i<76; i+=8) {
+        let offset = (i + (u.trackOffset || 0)) % 76;
+        if(offset < 0) offset += 76;
+        ctx.fillRect(-38 + offset, -24, 2, 10);
+        ctx.fillRect(-38 + offset, 14, 2, 10);
+    }
+
+    ctx.fillStyle = '#111';
+    for(let i = -28; i <= 28; i += 11) {
+        ctx.beginPath(); ctx.arc(i, -19, 3.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(i, 19, 3.5, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.fillStyle = '#2b3d22';
+    ctx.beginPath(); ctx.roundRect(-40, -18, 80, 36, 4); ctx.fill();
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-38, -12, 14, 24);
+    ctx.fillStyle = '#000';
+    for(let i = -10; i < 10; i+=3) { ctx.fillRect(-36, i, 10, 1); }
+
+    ctx.fillStyle = '#3a522d';
+    ctx.fillRect(-30, -20, 50, 4);
+    ctx.fillRect(-30, 16, 50, 4);
+
+    // Поворот башни относительно корпуса
+    ctx.rotate(((u.turretAngle !== undefined ? u.turretAngle : u.angle) - u.angle));
+
+    let gunGrad = ctx.createLinearGradient(0, -3, 0, 3);
+    gunGrad.addColorStop(0, '#222');
+    gunGrad.addColorStop(0.5, '#2b3d22');
+    gunGrad.addColorStop(1, '#111');
+    ctx.fillStyle = gunGrad;
+    ctx.fillRect(10, -3, 55, 6);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(35, -4, 12, 8);
+
+    ctx.fillStyle = '#3a522d';
+    ctx.beginPath();
+    ctx.moveTo(15, 0); ctx.lineTo(5, 14); ctx.lineTo(-12, 12);
+    ctx.lineTo(-18, 0); ctx.lineTo(-12, -12); ctx.lineTo(5, -14);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
+
+    ctx.fillStyle = '#4c6b3b';
+    ctx.beginPath(); ctx.moveTo(5, 14); ctx.lineTo(12, 6); ctx.lineTo(16, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, -14); ctx.lineTo(12, -6); ctx.lineTo(16, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#ff1111';
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(10, -7, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(10, 7, 2, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-5, 5, 18, 1.5);
+    ctx.fillRect(-2, 3, 4, 4);
+
+    ctx.fillStyle = '#2b3d22';
+    ctx.beginPath(); ctx.arc(-5, -6, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-5, 6, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+}
+
+function drawShahedModel(ctx, u) {
+    ctx.save();
+    ctx.translate(u.x, u.y);
+    ctx.rotate(u.angle);
+    const s = u.radius / 8;
+    ctx.scale(s, s);
+
+    ctx.save();
+    ctx.translate(15, 20);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-15, 12); ctx.lineTo(-15, -12); ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#f0f0f0';
+    ctx.beginPath();
+    ctx.moveTo(20, 0); ctx.lineTo(-15, 14); ctx.lineTo(-15, -14);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#d0d0d0'; ctx.lineWidth = 1; ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(-2, 0, 18, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(-16, 12, 6, 2);
+    ctx.fillRect(-16, -14, 6, 2);
+
+    ctx.save();
+    ctx.translate(-18, 0);
+    ctx.rotate(Game.frameCount * 0.8);
+    ctx.fillStyle = 'rgba(50,50,50,0.7)';
+    ctx.beginPath(); ctx.ellipse(0, 0, 2, 9, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.restore();
+}
+
 class Unit {
     constructor(type, x, y, side, id) {
         this.nukeTimer = 0; this.nukeTarget = null;
@@ -6970,19 +7177,24 @@ class Unit {
         this.autoTarget = null;
         this.range = p.range || 0; this.damage = p.dmg || 0; this.speed = p.speed || 0;
         this.color = FACTIONS[side] ? FACTIONS[side].color : '#999';
-        this.radius = p.radius; this.emoji = p.emoji; this.reloadMax = p.reload || 0;
+        this.radius = p.radius; this.collisionRadius = p.collisionRadius || p.radius; this.emoji = p.emoji; this.reloadMax = p.reload || 0;
         this.reload = 0; this.target = null; this.targetUnit = null; this.aggro = false;
         this.isProducer = !!p.spawnList; this.isBuilder = !!p.isBuilder;
         this.isArty = !!p.isArty; this.isFlying = !!p.isFlying;
-        this.isHIMARS = !!p.isHIMARS;
+        this.isNASAMS = !!p.isNASAMS;
         this.flyState = 0; this.flyHeight = 0; this.flyTimer = 0;
         this.isFlying = !!p.isFlying;
         this.isKamikaze = !!p.isKamikaze; // <--- НОВОЕ
+        this.isShahed = !!p.isShahed;
         this.splashRadius = p.splash || 0; // <--- НОВОЕ
         this.spawnCooldown = 0; this.spawnMax = 0; this.maxAmmo = p.maxAmmo || 0; this.ammo = this.maxAmmo;
         this.spawnAngle = Math.PI / 2; this.spawnBacklog = []; // --- НОВОЕ: точка выезда и очередь готовой техники завода ---
         this.assignedSite = null; this.constructing = false; this.gradSeq = 0;
         this.gradTarget = null; this.visualOnly = false;
+        this.gradAutoFire = null;
+        this.himarsCooldown = 0;
+        this.kamikazeTarget = null;
+        this.aaThinkTimer = 0;
         this.isPowered = true; this.aaTarget = null; this.aaCharge = 0;
         this.buffSpeedMult = 1; this.buffIncomeMult = 1; this.buffEnergyMult = 1; this.buffRangeMult = 1;
         this.nukeTimer = 0; this.spawnedCount = 0; this.level = 0; this.nukeTarget = null;
@@ -7067,7 +7279,14 @@ checkPower() {
 
     moveTo(x, y) { this.target = {x, y}; }
     assignSite(site) { this.assignedSite = site; this.target = {x: site.x, y: site.y}; this.constructing = false; }
-    startArtySequence(tx, ty) { if (this.ammo > 0) { this.gradSeq = 360; this.gradTarget = {x: tx, y: ty}; this.target = null; } }
+    startArtySequence(tx, ty) { 
+        if (this.ammo <= 0) return;
+        if (this.type === 'NASAMS' && this.himarsCooldown > Game.frameCount) return;
+        this.gradSeq = (this.type === 'NASAMS') ? 60 : 360; 
+        this.gradTarget = {x: tx, y: ty}; 
+        this.gradAutoFire = null;
+        this.target = null; 
+    }
 
   startSiloLaunch(tx, ty, type) {
         if (type === 'NUKE') {
@@ -7090,41 +7309,30 @@ fireArty(tx, ty, force = false) {
         }
         let d = Math.hypot(tx - this.x, ty - this.y);
         if (d > this.range) { let angle = Math.atan2(ty - this.y, tx - this.x); tx = this.x + Math.cos(angle) * this.range; ty = this.y + Math.sin(angle) * this.range; }
-        
+
         let dmg = this.damage;
         let splash = UNITS.GRAD.splash || 100;
-        let bulletSpeed = 4;
-        let shots = 2;
+        let bulletSpeed = (this.type === 'NASAMS') ? 8 : 4;
 
-        // Лодка-бомбардировщик: 2 пушки -> 4 ракеты, но по ОДНОЙ каждые 0.3 сек
-        if (this.type === 'BOAT_BOMBER') {
-            this.bomberSalvo = {
-                left: 4,
-                tx,
-                ty,
-                dmg,
-                splash,
-                speed: 8,
-                spread: 35,
-                nextFrame: Game.frameCount + 18
-            };
-            return;
-        }
-        
         // Если заряжен БОМБЕР (HEAVY)
         if (this.ammoType === 'HEAVY') {
             dmg *= 2.5; // Урон в 2.5 раза выше
             splash = 250; // Огромный радиус взрыва
             bulletSpeed = 3; // Летят медленнее
         }
-        
-        for(let i=0; i<shots; i++) {
-            let spread = (this.type === 'BOAT_BOMBER') ? 35 : 60;
-            let b = new Bullet(this.x, this.y, tx+Math.random()*spread-spread/2, ty+Math.random()*spread-spread/2, dmg, this.side, true, null, this, splash);
-            b.speed = bulletSpeed;
-            if (this.ammoType === 'HEAVY') b.splashRadius = 250; 
-            Game.bullets.push(b);
+
+        // ГРАД: залп по одной ракете; остальные — через 0.5 сек
+        if (this.type === 'GRAD' && this.ammo > 0 && !this.gradAutoFire) {
+            this.gradAutoFire = { tx, ty, nextFrame: Game.frameCount + 30 };
         }
+
+        let spread = (this.type === 'NASAMS') ? 5 : 60;
+        let b = new Bullet(this.x, this.y, tx+Math.random()*spread-spread/2, ty+Math.random()*spread-spread/2, dmg, this.side, true, null, this, splash);
+        b.speed = bulletSpeed;
+        if (this.ammoType === 'HEAVY') b.splashRadius = 250; 
+        Game.bullets.push(b);
+
+        if (this.type === 'NASAMS') this.himarsCooldown = Game.frameCount + 120;
     }
 
 resolveCollision() {
@@ -7151,13 +7359,13 @@ resolveCollision() {
             const isBoatB = (u.type === 'BOAT' || u.type === 'BOAT_BOMBER');
             if (isBoatA && u.side === this.side && !u.isFlying && !isBoatB) return;
             if (isBoatB && this.side === u.side && !this.isFlying && !isBoatA) return;
-        if (this.type === 'TANK' && u.type === 'TREE') return;
+        if ((this.type === 'TANK' || this.type === 'T90') && u.type === 'TREE') return;
 
         // Быстрая проверка через квадрат расстояния (без корня)
         let dx = this.x - u.x;
         let dy = this.y - u.y;
         let distSq = dx*dx + dy*dy;
-        let minDist = this.radius + u.radius;
+        let minDist = (this.collisionRadius || this.radius) + (u.collisionRadius || u.radius);
 
         if (distSq < minDist * minDist && distSq > 0.1) {
             let dist = Math.sqrt(distSq);
@@ -7213,7 +7421,7 @@ attemptAutoProduction() {
             this.checkPower();
         }
 
-        // --- НЕ МГНОВЕННАЯ ПЕРЕЗАРЯДКА ГРАД/HIMARS: 1 ракета в pendingAmmoDelay кадров (по умолчанию 2 сек) ---
+        // --- НЕ МГНОВЕННАЯ ПЕРЕЗАРЯДКА ГРАД/NASAMS: 1 ракета в pendingAmmoDelay кадров (по умолчанию 2 сек) ---
         if (this.pendingAmmo > 0) {
             this.ammoReloadTimer = (this.ammoReloadTimer || 0) + 1;
             if (this.ammoReloadTimer >= 120) {
@@ -7250,7 +7458,7 @@ attemptAutoProduction() {
 
 
        // --- ЛОГИКА ТАНКА (Отдача и поворот башни) ---
-        if (this.type === 'TANK') {
+        if (this.type === 'TANK' || this.type === 'T90') {
             // === ФИЗИКА СНОСА ДЕРЕВЬЕВ ===
             if (!this.originalSpeed) this.originalSpeed = this.speed;
             this.speed = this.originalSpeed;
@@ -7450,7 +7658,7 @@ attemptAutoProduction() {
         }
 
 // --- ЛОГИКА АРТИЛЛЕРИИ (ПОДГОТОВКА И ЗАЛП) ---
-        if ((this.type === 'GRAD' || this.type === 'HIMARS' || this.type === 'BOAT_BOMBER') && this.gradSeq > 0) {
+        if ((this.type === 'GRAD' || this.type === 'NASAMS' || this.type === 'BOAT_BOMBER') && this.gradSeq > 0) {
             this.gradSeq--;
             
             // Дым во время подготовки (наведения и поднятия ракетницы)
@@ -7463,6 +7671,16 @@ attemptAutoProduction() {
             }
 
             return; // Установка стоит на месте во время прицеливания и залпа
+        }
+
+        // --- ДОСТРЕЛ ГРАДА: по одной ракете с интервалом 0.5 сек ---
+        if (this.gradAutoFire) {
+            if (this.ammo > 0 && Game.frameCount >= this.gradAutoFire.nextFrame) {
+                this.fireArty(this.gradAutoFire.tx, this.gradAutoFire.ty);
+                this.gradAutoFire.nextFrame += 30;
+            }
+            if (this.ammo <= 0) this.gradAutoFire = null;
+            if (this.gradAutoFire) return; // стоит на месте, пока достреливает
         }
 
 // --- ЛОГИКА АВИАЦИИ (ВЗЛЕТ/ПОСАДКА) ---
@@ -7533,19 +7751,19 @@ attemptAutoProduction() {
             }
         }
 
-// --- ЛОГИКА HIMARS (ПРО + ПВО) ---
-        if (this.isHIMARS) {
+// --- ЛОГИКА NASAMS (ПРО + ПВО) ---
+        if (this.isNASAMS) {
              if (this.reload > 0) this.reload--;
              if (this.reload <= 0 && this.ammo > 0) {
                  
                  // 1. ПРИОРИТЕТ: Ищем крылатые ракеты. 
-                 let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && !b.targetedByHIMARS && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
+                 let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && !b.targetedByNASAMS && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
                  
                  if (cruise) {
                      this.ammo--;
                      this.reload = 40; 
                      this.podElev = 1; 
-                     cruise.targetedByHIMARS = true; 
+                     cruise.targetedByNASAMS = true; 
 
                      let interceptor = new Bullet(this.x, this.y, cruise.x, cruise.y, 0, this.side, false, null, this, 0, false, 1, 20);
                      interceptor.isInterceptor = true; 
@@ -7555,7 +7773,7 @@ attemptAutoProduction() {
                      interceptor.willMiss = Math.random() < 0.1; 
                      if (interceptor.willMiss) {
                          // Если эта ракета промажет, снимаем метку с цели, чтобы другой Хаймарс на базе попытался её сбить!
-                         cruise.targetedByHIMARS = false; 
+                         cruise.targetedByNASAMS = false; 
                      }
                      
                      Game.bullets.push(interceptor);
@@ -7734,7 +7952,8 @@ if (this.type === 'AA_DEFENSE') {
             }); 
             if (helis.length > 0) {
                 this.aaTarget = helis[0]; 
-                this.aaThinkTimer = 0; // Вертолеты бьем без раздумий
+                // Шахеды обнаруживаются медленно (~2.5 секунды), остальные воздушные цели — сразу
+                this.aaThinkTimer = (this.aaTarget.type === 'SHAHED') ? 150 : 0;
             }
         }
     }
@@ -7773,6 +7992,21 @@ if (this.type === 'AA_DEFENSE') {
     }
     return;
 }
+
+// --- ЛОГИКА NASAMS (ПВР - только сбивать воздушные цели) ---
+if (this.type === 'NASAMS') {
+    if (this.ammo > 0 && !this.gradSeq && (this.himarsCooldown || 0) <= Game.frameCount) {
+        const target = Game.units.find(u => {
+            if (u.side === this.side || u.hp <= 0) return false;
+            if (!u.isFlying && !(UNITS[u.type] && UNITS[u.type].isFlying)) return false;
+            if (Math.hypot(u.x - this.x, u.y - this.y) > this.range) return false;
+            if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined' && !Diplomacy.isAtWar(this.side, u.side)) return false;
+            return true;
+        });
+        if (target) this.startArtySequence(target.x, target.y);
+    }
+}
+
         // --- ОБНОВЛЕНИЕ ПЕРЕЗАРЯДКИ ---
         if (this.reload > 0) this.reload--;
 
@@ -7822,19 +8056,28 @@ if (this.type === 'AA_DEFENSE') {
 
 // --- БОЕВАЯ ЛОГИКА (ВЫБОР ЦЕЛИ И СТРЕЛЬБА) ---
         let canFight = true;
-        if (this.type === 'GRAD' || this.type === 'HIMARS' || this.type === 'SENTINEL' || this.type === 'SILO' || this.isBuilder || this.type === 'WAREHOUSE') canFight = false;
+        if (this.type === 'GRAD' || this.type === 'NASAMS' || this.type === 'SENTINEL' || this.type === 'SILO' || this.isBuilder || this.type === 'WAREHOUSE') canFight = false;
+        if (canFight && !this.isFlying && MapUtils.getTerrain(this.x, this.y) === 'DEEP') canFight = false;
         
         if (canFight) {
-            // Дистанция до текущей цели
-            let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
+            // Ручная цель камикадзе имеет приоритет над авто-наводкой
+            if (this.isKamikaze && this.kamikazeTarget) {
+                this.targetUnit = null;
+                this.target = this.kamikazeTarget;
+            } else if (this.isShahed && !this.kamikazeTarget) {
+                // Шахед без ручной цели остается на земле и не наводится сам
+                this.targetUnit = null;
+            } else {
+                // Дистанция до текущей цели
+                let distToTarget = this.targetUnit ? Math.hypot(this.targetUnit.x - this.x, this.targetUnit.y - this.y) : 9999;
 
 // 1. БЛОК ПОИСКА ЦЕЛИ
-            if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
-                this.targetUnit = null;                
-                let min = this.range + 50; 
-                let near = null;
-                
-                // "ЛЕНИВЫЕ МОЗГИ": Ищем новую цель только 3 раза в секунду (каждый 20-й кадр)
+                if (!this.targetUnit || this.targetUnit.hp <= 0 || this.targetUnit.side === this.side || distToTarget > this.range + 50) {
+                    this.targetUnit = null;                
+                    let min = this.range + 50; 
+                    let near = null;
+                    
+                    // "ЛЕНИВЫЕ МОЗГИ": Ищем новую цель только 3 раза в секунду (каждый 20-й кадр)
                 if (Game.frameCount % 20 === (this.id % 20)) {
                     let minSq = min * min; 
                     let targetsToCheck = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
@@ -7842,7 +8085,7 @@ if (this.type === 'AA_DEFENSE') {
                     for (let i = 0; i < targetsToCheck.length; i++) {
                         let u = targetsToCheck[i];
 // 1. АРТИЛЛЕРИЯ: пропускаем цель, если с ее владельцем мир
-    if (this.type === 'GRAD' || this.type === 'HIMARS') {
+    if (this.type === 'GRAD' || this.type === 'NASAMS') {
         // Проверяем через твой объект Diplomacy (игнорируем нейтралов, проверяем состояние войны)
         if (u.side !== 'neutral' && u.side !== this.side && typeof Diplomacy !== 'undefined') {
             if (!Diplomacy.isAtWar(this.side, u.side)) {
@@ -7852,7 +8095,7 @@ if (this.type === 'AA_DEFENSE') {
     }
 
     // 2. ТАНКИ: не стреляют по летающим объектам
-    if (this.type === 'TANK') {
+    if (this.type === 'TANK' || this.type === 'T90') {
         if (u.type === 'HELICOPTER' || u.isFlying || (UNITS[u.type] && UNITS[u.type].isFlying)) {
             continue; // Воздушная цель, пропускаем
         }
@@ -7918,10 +8161,21 @@ if (this.type === 'AA_DEFENSE') {
                     this.targetUnit = near;
                 }
             } // <--- ВАЖНО: ЗАКРЫВАЕМ БЛОК ПОИСКА ЗДЕСЬ!
+        }
 
             let busy = false;
             
             // 2. ЕСЛИ ЦЕЛЬ ЕСТЬ - АТАКУЕМ
+            // Ручная камикадзе-цель: взрываемся по прибытии
+            if (this.isKamikaze && this.kamikazeTarget) {
+                let d = Math.hypot(this.kamikazeTarget.x - this.x, this.kamikazeTarget.y - this.y);
+                if (d <= 20) {
+                    this.hp = 0;
+                    let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
+                    explosion.hit();
+                    return;
+                }
+            }
             if (this.targetUnit) {
                 let dx = this.targetUnit.x - this.x;
                 let dy = this.targetUnit.y - this.y;
@@ -7952,7 +8206,7 @@ if (this.type === 'AA_DEFENSE') {
                         let spawnX = this.x;
                         let spawnY = this.y;
                         
-                        if (this.type === 'TANK') {
+                        if (this.type === 'TANK' || this.type === 'T90') {
                             spawnX = this.x + Math.cos(this.turretAngle || this.angle) * this.radius * 1.6;
                             spawnY = this.y + Math.sin(this.turretAngle || this.angle) * this.radius * 1.6;
                         } else if (this.type === 'HELICOPTER') {
@@ -7976,13 +8230,13 @@ if (this.type === 'AA_DEFENSE') {
                         } 
                         // Остальные
                         else {
-                            if (this.type === 'TANK') {
+                            if (this.type === 'TANK' || this.type === 'T90') {
                                 SoundManager.play('tankFire', 100, vol);
                                 this.recoil = 12;
                             } else {
                                 SoundManager.play('shoot', 100, vol); 
                             }
-                            let splashR = (this.type === 'TANK') ? 60 : 0;
+                            let splashR = (this.type === 'TANK' || this.type === 'T90') ? 60 : 0;
                             Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
                     }
@@ -8052,7 +8306,7 @@ _movePhysics() {
     let prevX = this.x;
     let prevY = this.y;
 
-    if (this.type === 'TANK') this.trackOffset += currentSpeed * 2.5;
+    if (this.type === 'TANK' || this.type === 'T90') this.trackOffset += currentSpeed * 2.5;
 
     if (!this.isFlying) {
         // Используем закэшированные значения!
@@ -8070,7 +8324,7 @@ _movePhysics() {
                 else if (terrain === 'DEEP') { currentSpeed *= 0.25; onWater = true; }
                 else {
                     // Мы на суше. Проверяем грунт!
-                    let isVehicle = ['TANK', 'GRAD', 'HIMARS'].includes(this.type);
+                    let isVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(this.type);
                     
                     if (ground === 'ROAD') {
                         currentSpeed *= 1.5; // На дороге все быстрее на 50%
@@ -8121,7 +8375,7 @@ _movePhysics() {
             // --- КОЛЮЧАЯ ПРОВОЛОКА (WALL): замедление + урон + техника ломает за 2 секунды ---
             if (this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER') {
                 const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
-                const isVehicle = ['TANK', 'GRAD', 'HIMARS'].includes(this.type);
+                const isVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(this.type);
                 let onWire = false;
 
                 for (let obj of neighbors) {
@@ -8230,7 +8484,7 @@ if (dist < 15) {
             if (this.side === mySide) {
                 if (UNITS[this.type] && UNITS[this.type].isInfantry || this.isBuilder) {
                     SoundManager.play('steps', 400, 0.15); 
-                } else if (this.type === 'TANK' || this.type === 'GRAD' || this.type === 'HIMARS') {
+                } else if (this.type === 'TANK' || this.type === 'T90' || this.type === 'GRAD' || this.type === 'NASAMS') {
                     SoundManager.play('driving', 600, 0.2);
                 }
             }
@@ -8964,8 +9218,8 @@ if (dist < 15) {
 
         
 
-// --- КРАСИВАЯ МОДЕЛЬ ГРАДА И HIMARS (С 3D-АНИМАЦИЕЙ ПОДЪЕМА) ---
-        if (this.type === 'GRAD' || this.type === 'HIMARS') {
+// --- КРАСИВАЯ МОДЕЛЬ ГРАДА И NASAMS (С 3D-АНИМАЦИЕЙ ПОДЪЕМА) ---
+        if (this.type === 'GRAD' || this.type === 'NASAMS') {
             ctx.save();
             ctx.translate(this.x, this.y);
             
@@ -8983,7 +9237,7 @@ if (dist < 15) {
             ctx.save();
             ctx.rotate(this.angle || 0);
             
-            let isHimars = this.type === 'HIMARS';
+            let isHimars = this.type === 'NASAMS';
             let cW = r * 2.8; let cH = r * 1.2;
             
             ctx.fillStyle = '#0f0f0f';
@@ -9297,6 +9551,38 @@ if (dist < 15) {
             return; // Обязательный return, чтобы игра не пыталась рисовать поверх старую картинку
         }
 
+        // --- МОДЕЛЬ Т-90 ---
+        if (this.type === 'T90') {
+            drawT90Model(ctx, this);
+            const hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
+        }
+
+        // --- МОДЕЛЬ ШАХЕДА ---
+        if (this.type === 'SHAHED') {
+            drawShahedModel(ctx, this);
+            const hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
+        }
+
 // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ ---
         // Добавили SHOP, MALL, OFFICE, HOTEL, BANK
         if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL', 'HOUSE', 'SHOP', 'MALL', 'OFFICE', 'HOTEL', 'BANK'].includes(this.type)) {
@@ -9533,7 +9819,7 @@ ctx.restore();
                  ctx.fillStyle = '#000'; ctx.fillRect(this.x-15, this.y - 40, 30, 4); ctx.fillStyle = '#0af'; ctx.fillRect(this.x-15, this.y - 40, 30 * pct, 4);
              }
         }
-      if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL' || this.type === 'HIMARS' || this.type === 'BOAT_BOMBER') {
+      if (this.type === 'GRAD' || this.type === 'HELICOPTER' || this.type === 'SENTINEL' || this.type === 'NASAMS' || this.type === 'BOAT_BOMBER') {
              ctx.font = '12px Arial'; ctx.fillStyle = this.ammo === 0 ? 'red' : 'yellow'; ctx.fillText(`${this.ammo}/${this.maxAmmo}`, this.x, this.y - 25);
              if (this.gradSeq > 0) { ctx.fillStyle = '#f90'; let w = 30 * (this.gradSeq/360); ctx.fillRect(this.x - 15, this.y + 20, w, 4); }
         }
@@ -9663,9 +9949,9 @@ class Bullet {
         let yOffset = 0;
         if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; }
         this.visX = this.x; this.visY = this.y - yOffset;
-        // Если это артиллерия ИЛИ если снаряд выпустил HIMARS - рисуем дымный след
-        if ((this.arty || (this.owner && this.owner.isHIMARS)) && Game.frameCount % 15 === 0) { 
-            Game.effects.push({type: 'smoke', x: this.visX, y: this.visY, life: 20}); 
+        // Если это артиллерия ИЛИ если снаряд выпустил NASAMS - рисуем дымный след
+        if ((this.arty || (this.owner && this.owner.isNASAMS)) && Game.frameCount % 4 === 0) { 
+            Game.effects.push({type: 'smoke', x: this.visX + (Math.random()-0.5)*8, y: this.visY + (Math.random()-0.5)*8, life: 120}); 
         }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }
     }
@@ -9863,7 +10149,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
             return; 
         }
 
-        let isHIMARS = this.owner && this.owner.isHIMARS;
+        let isNASAMS = this.owner && this.owner.isNASAMS;
 
         ctx.save();
         ctx.translate(this.visX, this.visY);
@@ -9875,7 +10161,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
         let angle = Math.atan2(vy, vx);
         ctx.rotate(angle);
 
-        if (this.arty || isHIMARS) {
+        if (this.arty || isNASAMS) {
             // ==========================================
             // КРАСИВАЯ МОДЕЛЬ РАКЕТЫ (Град, Хаймарс, Бункер)
             // ==========================================
@@ -9924,7 +10210,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
         ctx.restore();
 
         // Рисуем тень на земле (только для ракет)
-        if (this.arty || isHIMARS) {
+        if (this.arty || isNASAMS) {
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.isNuke ? 10 : 5, 0, Math.PI*2);

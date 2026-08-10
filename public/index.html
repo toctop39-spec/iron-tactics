@@ -123,6 +123,7 @@ canvas { display: block; cursor: crosshair; }
 .unit-card.active { border-color: #0f0; background: #002200; box-shadow: 0 0 10px #0f0; }
 .unit-card * { pointer-events: none; }
 .card-price { font-size: 0.7em; color: #ffd700; line-height: 1.1; margin-top: 5px; font-weight: bold; }
+.card-name { font-size: 0.65em; color: #fff; line-height: 1.1; margin-top: 3px; font-weight: bold; font-family: 'Exo 2', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
 
 /* --- БОЕВЫЕ КНОПКИ СПРАВА --- */
 #right-controls { position: absolute; right: 25px; bottom: 25px; display: flex; flex-direction: column; gap: 15px; align-items: center; }
@@ -597,10 +598,25 @@ const RES_LIMIT = 100;
 const MAX_MONEY_POCKET = 999999;
 const WAREHOUSE_SLOTS = 8;
 const SLOT_COST = 5000;
+const WAREHOUSE_VEHICLE_TYPES = ['TANK', 'T90', 'GRAD', 'NASAMS', 'TRUCK'];
+const WAREHOUSE_SLOT_CAPACITY = 5;
+const WAREHOUSE_IRON_CAP_BONUS = 25;
+const WAREHOUSE_HEAL_PER_TICK = 4;
+
+// Функция форматирования суммы денег: 1K, 2.5M, 614K, 1.2B и т.д.
+const formatMoneyShort = (n) => {
+    n = Math.floor(n);
+    const sign = n < 0 ? '-' : '';
+    n = Math.abs(n);
+    if (n >= 1e9) return sign + (Math.round(n / 1e8) / 10) + 'B';
+    if (n >= 1e6) return sign + (Math.round(n / 1e5) / 10) + 'M';
+    if (n >= 1e3) return sign + (Math.round(n / 1e2) / 10) + 'K';
+    return sign + n;
+};
 
 // Функция форматирования цены для меню
 const formatCost = (u) => {
-    let s = `$${u.cost}`;
+    let s = `$${formatMoneyShort(u.cost)}`;
     if(u.resCost) {
         if(u.resCost.iron) s += ` | 🔩${u.resCost.iron}`;
         if(u.resCost.chem) s += ` | 🧪${u.resCost.chem}`;
@@ -610,24 +626,32 @@ const formatCost = (u) => {
 };
 
 const UNITS = {
-    SOLDIER: { type:'unit', name: 'Пех.', emoji: '🪖', cost: 500, hp: 125, dmg: 15, range: 200, speed: 0.35, reload: 40, color: '#44aaff', radius: 4, buildTime: 5, isInfantry: true },
-    SNIPER:  { type:'unit', name: 'Снайп.', emoji: '🏹', cost: 1000, hp: 40, dmg: 50, range: 500, speed: 0.6, reload: 100, color: '#ffffff', radius: 5, buildTime: 5, isInfantry: true },
+    SOLDIER: { type:'unit', name: 'Штурмовик', emoji: '🪖', cost: 5000, hp: 125, dmg: 10, range: 350, speed: 0.25, reload: 40, color: '#44aaff', radius: 4, buildTime: 5, isInfantry: true },
+    SNIPER:  { type:'unit', name: 'Снайпер', emoji: '🏹', cost: 10000, hp: 40, dmg: 125, range: 500, speed: 1, reload: 100, color: '#ffffff', radius: 5, buildTime: 5, isInfantry: true },
     
 // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
     TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
-               cost: 5000, resCost: { iron: 35, chem: 2 }, 
+               cost: 2000000, resCost: { iron: 35, chem: 2 }, 
                hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 11, buildTime: 20 },
 
     T90:     { type:'unit', name: 'Т-90',   emoji: '🛡️', 
-               cost: 10000, resCost: { iron: 70, chem: 4, chips: 1 }, 
+               cost: 4000000, resCost: { iron: 70, chem: 4, chips: 1 }, 
                hp: 1200, dmg: 240, range: 450, speed: 0.45, reload: 110, color: '#2e5c24', radius: 8, collisionRadius: 14, buildTime: 45 },
     
     GRAD:    { type:'unit', name: 'ГРАД',   emoji: '🚚', imageSrc: 'https://www.pngarts.com/files/1/Artillery-PNG-Image.png', 
-               cost: 8000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
+               cost: 500000, resCost: { iron: 50, chips: 2, chem: 3 }, // <--- НОВАЯ ЦЕНА
                hp: 150, dmg: 200, range: 1200, speed: 0.7, reload: 300, color: '#aa00ff', isArty: true, radius: 13, buildTime: 15, maxAmmo: 4, splash: 100 },
 
+    TRUCK:   { type:'unit', name: 'Грузовик', emoji: '🚛',
+               cost: 50000, resCost: { iron: 15 },
+               hp: 350, dmg: 0, range: 0, speed: 0.8, color: '#4a554a', radius: 13, buildTime: 12, capacity: 8 },
+
+    AMMO_CRATE: { type:'unit', name: 'Боеприпасы', emoji: '📦',
+               cost: 400, resCost: { iron: 10, chem: 5 },
+               hp: 30, dmg: 0, range: 0, speed: 0, color: '#8a6d3b', radius: 11, buildTime: 8, supplyRadius: 180 },
+
 BOAT: { 
-        type:'unit', name: 'Лодка', cost: 1500, imageSrc: 'https://static.vecteezy.com/system/resources/previews/024/554/198/original/gray-boat-on-the-sea-png.png', resCost: { iron: 25, chem: 5 }, 
+        type:'unit', name: 'Лодка', cost: 20000, imageSrc: 'https://static.vecteezy.com/system/resources/previews/024/554/198/original/gray-boat-on-the-sea-png.png', resCost: { iron: 25, chem: 5 }, 
         hp: 800, dmg: 0, range: 0, speed: 1.2, color: '#666', radius: 20, buildTime: 12,
         capacity: 12
     },
@@ -635,7 +659,7 @@ BOAT: {
 
 NASAMS: {
    type:'unit', name: 'NASAMS', emoji: '🚚', imageSrc: 'Himars.png',
-   cost: 5500, resCost: { iron: 20, chips: 2, chem: 1 },
+   cost: 20000000, resCost: { iron: 20, chips: 2, chem: 1 },
    hp: 200, dmg: 2400, range: 1200, speed: 0.65, reload: 180,
    color: '#004400', radius: 13, buildTime: 20,
    maxAmmo: 1, // <--- УБЕДИСЬ, ЧТО ЭТО ЕСТЬ
@@ -648,47 +672,47 @@ NASAMS: {
 
 FPV: { 
         type:'unit', name: 'FPV Дрон', emoji: '🛩️', imageSrc: 'FPV.png', 
-        cost: 300, resCost: { iron: 20, chips: 1 }, 
+        cost: 500, resCost: { iron: 20, chips: 1 }, 
         hp: 30, dmg: 400, range: 400, speed: 2.2, color: '#ff3300', 
         radius: 7, buildTime: 10, isFlying: true, isKamikaze: true, splash: 80 
     },
 
     SHAHED: { 
         type:'unit', name: 'Шахед', emoji: '✈️', 
-        cost: 600, resCost: { iron: 40, chips: 2 }, 
+        cost: 75000, resCost: { iron: 40, chips: 2 }, 
         hp: 60, dmg: 900, range: 600, speed: 4.0, color: '#e0e0e0', 
         radius: 8, buildTime: 30, isFlying: true, isKamikaze: true, isShahed: true, splash: 120 
     },
     
-    HELICOPTER: { type:'unit', name: 'Верт.', emoji: '🚁', cost: 12000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
+    HELICOPTER: { type:'unit', name: 'Вертолет', emoji: '🚁', cost: 10000000, imageSrc: 'https://wallpapers.com/images/hd/army-helicopter-png-05212024-ct9s7ag8er5suj3x.png', 
                   resCost: { iron: 80, chips: 4, chem: 8 }, 
                   hp: 500, dmg: 60, range: 300, speed: 1.3, reload: 15, color: '#4a148c', radius: 11, buildTime: 25, isFlying: true, maxAmmo: 30 },
     
-    BUILDER: { type:'unit', name: 'Строит.', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 4, buildTime: 5, isBuilder: true, isInfantry: true },
+    BUILDER: { type:'unit', name: 'Строитель', emoji: '👷', cost: 1500, hp: 80, dmg: 0, range: 0, speed: 0.4, color: '#e6c200', radius: 4, buildTime: 5, isBuilder: true, isInfantry: true },
     
-    POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 1600, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 150 },
-NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 8000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 800 },
-SENTINEL: { type:'unit', name: 'Турель', emoji: '🏯', cost: 15000, dmg: 60, hp: 500, range: 500, reload: 100, color: '#556677', radius: 8, buildTime: 10, speed: 0.2, maxAmmo: 3, isInfantry: true },
-    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 100000, resCost: { iron: 18, chips: 5 }, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
+    POWER_PLANT: { type:'bldg', name: 'СЭС', emoji: '⚡', cost: 500000, hp: 150, income: 0, radius: 33, color: '#ffd700', constructTime: 10, energyGen: 150 },
+NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 10000000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 1500 },
+SENTINEL: { type:'unit', name: 'Минометчик', emoji: '🏯', cost: 15000, dmg: 100, hp: 125, range: 500, reload: 100, color: '#556677', radius: 8, buildTime: 10, speed: 0.2, maxAmmo: 3, isInfantry: true },
+    SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 40000000, resCost: { iron: 18, chips: 5 }, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
    HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER', 'SENTINEL'] },
     
-FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 1500, hp: 600, income: 2, radius: 50, color: '#607d8b', 
+FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 2000000, hp: 600, income: 2, radius: 50, color: '#607d8b', 
              
 // Замените строчку spawnList у FACTORY на эту:
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'TRUCK', 'AMMO_CRATE', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
-    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 1250, hp: 350, range: 600, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 15 },
-    HOSPITAL: { type:'bldg', name: 'Госп.', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 5 },
+    AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 20000000, hp: 350, range: 800, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 50 },
+    HOSPITAL: { type:'bldg', name: 'Госпиталь', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 10 },
     
     // --- НОВОЕ ЗДАНИЕ: СКЛАД ---
     WAREHOUSE: { 
         type: 'bldg', name: 'Склад', emoji: '🏚️', 
-        cost: 2000, resCost: { iron: 25 }, 
+        cost: 200000, resCost: { iron: 25 }, 
         hp: 800, radius: 45, constructTime: 15, energyUse: 5, color: '#8d6e63' 
     },
 
-    WALL: { type: 'bldg', name: 'Колючая проволока', emoji: '🪤', imageSrc: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2264%22%20height%3D%2264%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22none%22/%3E%3Cline%20x1%3D%2212%22%20y1%3D%2218%22%20x2%3D%2212%22%20y2%3D%2248%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%3Cline%20x1%3D%2252%22%20y1%3D%2218%22%20x2%3D%2252%22%20y2%3D%2248%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2026%20C20%2016%2044%2016%2054%2026%22%20fill%3D%22none%22%20stroke%3D%22%23d1d5db%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2032%20C20%2022%2044%2022%2054%2032%22%20fill%3D%22none%22%20stroke%3D%22%23e5e7eb%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M10%2038%20C20%2028%2044%2028%2054%2038%22%20fill%3D%22none%22%20stroke%3D%22%23d1d5db%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22/%3E%3Cg%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%3E%3Cline%20x1%3D%2220%22%20y1%3D%2224%22%20x2%3D%2224%22%20y2%3D%2228%22/%3E%3Cline%20x1%3D%2224%22%20y1%3D%2224%22%20x2%3D%2220%22%20y2%3D%2228%22/%3E%3Cline%20x1%3D%2238%22%20y1%3D%2230%22%20x2%3D%2242%22%20y2%3D%2234%22/%3E%3Cline%20x1%3D%2242%22%20y1%3D%2230%22%20x2%3D%2238%22%20y2%3D%2234%22/%3E%3Cline%20x1%3D%2230%22%20y1%3D%2236%22%20x2%3D%2234%22%20y2%3D%2240%22/%3E%3Cline%20x1%3D%2234%22%20y1%3D%2236%22%20x2%3D%2230%22%20y2%3D%2240%22/%3E%3C/g%3E%3C/svg%3E', cost: 100, hp: 1000, radius: 18, constructTime: 5, energyUse: 0, color: '#555555' },
+    WALL: { type: 'bldg', name: 'Деревянный забор', emoji: '🪵', imageSrc: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2264%22%20height%3D%2264%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22none%22/%3E%3Crect%20x%3D%224%22%20y%3D%2218%22%20width%3D%2256%22%20height%3D%226%22%20fill%3D%22%236b4226%22%20stroke%3D%22%234a2e18%22%20stroke-width%3D%221.5%22/%3E%3Crect%20x%3D%224%22%20y%3D%2238%22%20width%3D%2256%22%20height%3D%226%22%20fill%3D%22%236b4226%22%20stroke%3D%22%234a2e18%22%20stroke-width%3D%221.5%22/%3E%3Crect%20x%3D%226%22%20y%3D%228%22%20width%3D%228%22%20height%3D%2248%22%20rx%3D%222%22%20fill%3D%22%239c6b3e%22%20stroke%3D%22%235c3a1e%22%20stroke-width%3D%222%22/%3E%3Crect%20x%3D%2218%22%20y%3D%2210%22%20width%3D%228%22%20height%3D%2246%22%20rx%3D%222%22%20fill%3D%22%238b5a2b%22%20stroke%3D%22%235c3a1e%22%20stroke-width%3D%222%22/%3E%3Crect%20x%3D%2230%22%20y%3D%228%22%20width%3D%228%22%20height%3D%2248%22%20rx%3D%222%22%20fill%3D%22%239c6b3e%22%20stroke%3D%22%235c3a1e%22%20stroke-width%3D%222%22/%3E%3Crect%20x%3D%2242%22%20y%3D%2210%22%20width%3D%228%22%20height%3D%2246%22%20rx%3D%222%22%20fill%3D%22%238b5a2b%22%20stroke%3D%22%235c3a1e%22%20stroke-width%3D%222%22/%3E%3Crect%20x%3D%2252%22%20y%3D%228%22%20width%3D%228%22%20height%3D%2248%22%20rx%3D%222%22%20fill%3D%22%239c6b3e%22%20stroke%3D%22%235c3a1e%22%20stroke-width%3D%222%22/%3E%3C/svg%3E', cost: 100, hp: 1000, radius: 18, constructTime: 5, energyUse: 0, color: '#8b5a2b' },
     ROAD: { type: 'bldg', name: 'Тропинка', emoji: '🟤', imageSrc: 'RoadBlock.png', cost: 200, hp: 100, radius: 15, constructTime: 1, color: '#555' },
 
     TREE: { type: 'bldg', name: 'Дерево', hp: 80, radius: 12, color: '#2d4c1e', isInvulnerable: false },
@@ -701,10 +725,10 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
     CRAFT_CHIP: { type: 'action', name: 'Чип x1', emoji: '💾', cost: 1000, resCost: { iron: 15, chem: 1 }, producedRes: { chips: 1 }, buildTime: 10 },
    
    // --- ПРОИЗВОДСТВО БОЕПРИПАСОВ ---
-    CRAFT_ROCKET: { type: 'action', name: 'Ракета', emoji: '🚀', imageSrc: 'Rocket.png', cost: 500, resCost: { iron: 20, chips: 1 }, producedRes: { rockets: 1 }, buildTime: 5 },
-    CRAFT_HEAVY:  { type: 'action', name: 'Бомбер', emoji: '☄️', imageSrc: 'Bomber.png', cost: 2500, resCost: { iron: 25, chips: 2 }, producedRes: { heavies: 1 }, buildTime: 8 },
-    CRAFT_CRUISE: { type: 'action', name: 'Крылатая', emoji: '🛩️', imageSrc: 'WingRocket.png', cost: 40000, resCost: { iron: 40, chem: 10, chips: 5 }, producedRes: { cruises: 1 }, buildTime: 20 },
-    CRAFT_NUKE:   { type: 'action', name: 'Ядерка', emoji: '☢️', imageSrc: 'NuclearRocket.png', cost: 12000, resCost: { iron: 50, chem: 20, chips: 3 }, producedRes: { nukes: 1 }, buildTime: 25 },
+    CRAFT_ROCKET: { type: 'action', name: 'Ракета', emoji: '🚀', imageSrc: 'Rocket.png', cost: 1000000, resCost: { iron: 20, chips: 1 }, producedRes: { rockets: 1 }, buildTime: 5 },
+    CRAFT_HEAVY:  { type: 'action', name: 'Бомбер', emoji: '☄️', imageSrc: 'Bomber.png', cost: 2000000, resCost: { iron: 25, chips: 2 }, producedRes: { heavies: 1 }, buildTime: 8 },
+    CRAFT_CRUISE: { type: 'action', name: 'Крылатая', emoji: '🛩️', imageSrc: 'WingRocket.png', cost: 1000000, resCost: { iron: 40, chem: 10, chips: 5 }, producedRes: { cruises: 1 }, buildTime: 20 },
+    CRAFT_NUKE:   { type: 'action', name: 'Ядерка', emoji: '☢️', imageSrc: 'NuclearRocket.png', cost: 50000000, resCost: { iron: 50, chem: 20, chips: 3 }, producedRes: { nukes: 1 }, buildTime: 25 },
     
 // --- ВИРТУАЛЬНЫЕ КНОПКИ СКЛАДА ---
     WH_BUY_SLOT: { type: 'action', name: 'КУПИТЬ СЛОТ', emoji: '🔓', cost: 5000 },
@@ -721,21 +745,21 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
 
 const HOUSE_UPGRADES = [
     { type: 'HOUSE', name: 'Жилой Дом', emoji: '🏠', cost: 300, energy: 10, income: 5, maxSpawn: 4 },
-    { type: 'SHOP', name: 'Магазин', emoji: '🏪', cost: 1000, energy: 10, income: 15, maxSpawn: 8 },
-    { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 4000, energy: 25, income: 40, maxSpawn: 15 },
-    { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 15000, energy: 35, income: 80, maxSpawn: 25 },
-    { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 25000, energy: 40, income: 150, maxSpawn: 40 },
-    { type: 'APARTMENT', name: '5-Этажка', emoji: '🏨', cost: 45000, energy: 40, income: 300, maxSpawn: 60 },
-    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 100000, energy: 50, income: 600, maxSpawn: 20 },
-    { type: 'APARTMENT', name: '5-Этажка', emoji: '🏨', cost: 45000, energy: 60, income: 300, maxSpawn: 60 }
+    { type: 'SHOP', name: 'Магазин', emoji: '🏪', cost: 1000, energy: 10, income: 150, maxSpawn: 8 },
+    { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 40000, energy: 30, income: 400, maxSpawn: 15 },
+    { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 150000, energy: 60, income: 800, maxSpawn: 25 },
+    { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 250000, energy: 40, income: 1500, maxSpawn: 40 },
+    { type: 'APARTMENT', name: '5-Этажка', emoji: '🏨', cost: 450000, energy: 40, income: 3000, maxSpawn: 60 },
+    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 10000000, energy: 50, income: 6000, maxSpawn: 20 },
+    { type: 'SKYSCRAPER', name: 'Небоскреб', emoji: '🏙️', cost: 20000000, energy: 80, income: 18000, maxSpawn: 30 },
 ];
     
 const SILO_AMMO = {
-    ROCKET: { name: 'Ракета',  emoji: '🚀', imageSrc: 'Rocket.png', cost: 1000, reqRes: 'rockets', damage: 300,  speed: 6,   radius: 60,  hp: 500 },
-    HEAVY:  { name: 'Бомбер',  emoji: '☄️', imageSrc: 'Bomber.png', cost: 5000, reqRes: 'heavies', damage: 600,  speed: 3,   radius: 300, hp: 3000 },
+    ROCKET: { name: 'Ракета',  emoji: '🚀', imageSrc: 'Rocket.png', cost: 50000, reqRes: 'rockets', damage: 300,  speed: 6,   radius: 60,  hp: 500 },
+    HEAVY:  { name: 'Бомбер',  emoji: '☄️', imageSrc: 'Bomber.png', cost: 150000, reqRes: 'heavies', damage: 600,  speed: 3,   radius: 300, hp: 3000 },
     // --- КРЫЛАТАЯ РАКЕТА: теперь производится на заводе, как и остальные боеприпасы ---
-    CRUISE: { name: 'Крылатая', emoji: '🛩️', imageSrc: 'WingRocket.png', cost: 75000, reqRes: 'cruises', damage: 1500, speed: 12, radius: 150, hp: 800, prep: 3 },
-    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '🖍️', imageSrc: 'NuclearRocket.png', cost: 20000, reqRes: 'nukes',   damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
+    CRUISE: { name: 'Крылатая', emoji: '🛩️', imageSrc: 'WingRocket.png', cost: 100000, reqRes: 'cruises', damage: 1500, speed: 12, radius: 150, hp: 800, prep: 3 },
+    NUKE:   { name: 'ЯДЕРНАЯ', emoji: '🖍️', imageSrc: 'NuclearRocket.png', cost: 1000000, reqRes: 'nukes',   damage: 9999, speed: 2, radius: 2000, hp: 5000, prep: 10 }
 };
 
 const LEVELS = [
@@ -1411,62 +1435,120 @@ getTerrain(x, y) {
         const step = 30; // Синхронизировано с сеткой СТРОИТЕЛЬСТВА (та же, что показывает недоступные клетки при постройке)
         const margin = 6;
 
+        // --- БЮДЖЕТ ПОИСКА ПУТИ: не больше N полноценных A* за кадр, иначе массовые приказы вешают игру ---
+        if (this._pathBudget === undefined) this._pathBudget = 0;
+        if (this._pathBudget <= 0) return null; // Кадр уже перегружен - юнит поедет напрямую, путь доищем в другом кадре
+        this._pathBudget--;
+
         const sx = Math.round(startX / step), sy = Math.round(startY / step);
         const ex = Math.round(endX / step), ey = Math.round(endY / step);
 
         // Если цель совсем рядом или путь прямой не встречает препятствий - не тратим время на A*
-        if (sx === ex && sy === ey) return null;
+        if (sx === ex && sy === ey) { this._pathBudget++; return null; }
 
         const minX = Math.min(sx, ex) - margin, maxX = Math.max(sx, ex) + margin;
         const minY = Math.min(sy, ey) - margin, maxY = Math.max(sy, ey) + margin;
 
+        // Кэши на время ОДНОГО вызова findPath - клетки постоянно пересекаются между hasClearance/соседями
+        const blockedCache = new Map();
+        const clearanceCache = new Map();
+        const costCache = new Map();
+
         // Та же логика, что и в сетке строительства: клетка занята горой ИЛИ зданием
         const rawBlocked = (cx, cy) => {
+            const k = cx + ',' + cy;
+            const cached = blockedCache.get(k);
+            if (cached !== undefined) return cached;
             const px = cx * step + 15, py = cy * step + 15;
-            if (this.checkMountain(px, py, 12)) return true;
-            const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
-            return neighbors.some(u => u.hp > 0 && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - px, u.y - py) < u.radius + 4);
+            let result = false;
+            if (this.checkMountain(px, py, 12)) result = true;
+            else {
+                const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
+                result = neighbors.some(u => u.hp > 0 && u.type !== 'TREE' && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - px, u.y - py) < u.radius + 4);
+            }
+            blockedCache.set(k, result);
+            return result;
         };
         // Проход считается проходимым только там, где есть свободный квадрат минимум 2x2 клетки
         // (2 блока свободных и в ширину, и в высоту). Одиночный узкий (1 клетка) проход не считается проходом.
         const hasClearance = (cx, cy) => {
+            const k = cx + ',' + cy;
+            const cached = clearanceCache.get(k);
+            if (cached !== undefined) return cached;
             const squares = [
                 [[cx, cy], [cx + 1, cy], [cx, cy + 1], [cx + 1, cy + 1]],
                 [[cx - 1, cy], [cx, cy], [cx - 1, cy + 1], [cx, cy + 1]],
                 [[cx, cy - 1], [cx + 1, cy - 1], [cx, cy], [cx + 1, cy]],
                 [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]],
             ];
-            return squares.some(sq => sq.every(([x, y]) => !rawBlocked(x, y)));
+            const result = squares.some(sq => sq.every(([x, y]) => !rawBlocked(x, y)));
+            clearanceCache.set(k, result);
+            return result;
         };
         // В отличие от сетки строительства (где дорога = недоступно), для движения дорога наоборот ВЫГОДНА
         const cellCost = (cx, cy) => {
+            const k = cx + ',' + cy;
+            const cached = costCache.get(k);
+            if (cached !== undefined) return cached;
             const px = cx * step + 15, py = cy * step + 15;
-            if (this.checkRoad(px, py)) return 0.3;  // Дороги в приоритете - юниты предпочтут их
-            if (this.isWater(px, py)) return 4;      // Воду по возможности обходим
-            return 1;
+            let result = 1;
+            if (this.checkRoad(px, py)) result = 0.3;  // Дороги в приоритете - юниты предпочтут их
+            else if (this.isWater(px, py)) result = 4; // Воду по возможности обходим
+            costCache.set(k, result);
+            return result;
         };
 
         const hash = (x, y) => x + ',' + y;
+
+        // --- БИНАРНАЯ КУЧА вместо open.sort() на каждой итерации (было O(n² log n), стало O(n log n)) ---
+        const heapPush = (heap, node) => {
+            heap.push(node);
+            let i = heap.length - 1;
+            while (i > 0) {
+                const parent = (i - 1) >> 1;
+                if (heap[parent].f <= heap[i].f) break;
+                const tmp = heap[parent]; heap[parent] = heap[i]; heap[i] = tmp;
+                i = parent;
+            }
+        };
+        const heapPop = (heap) => {
+            const top = heap[0];
+            const last = heap.pop();
+            if (heap.length > 0) {
+                heap[0] = last;
+                let i = 0;
+                for (;;) {
+                    const l = i * 2 + 1, r = l + 1;
+                    let smallest = i;
+                    if (l < heap.length && heap[l].f < heap[smallest].f) smallest = l;
+                    if (r < heap.length && heap[r].f < heap[smallest].f) smallest = r;
+                    if (smallest === i) break;
+                    const tmp = heap[smallest]; heap[smallest] = heap[i]; heap[i] = tmp;
+                    i = smallest;
+                }
+            }
+            return top;
+        };
 
         // ВАЖНО: сначала пробуем найти путь строго со 2x2 клиренсом (удобно для колонн техники).
         // Если такого пути нет (например, узкий проезд между зданиями шириной в 1 клетку),
         // делаем ВТОРУЮ попытку без требования клиренса - иначе юнит вместо объезда
         // просто попрёт напролом через здание по прямой линии.
         const runAStar = (isBlocked) => {
-            let open = [{ x: sx, y: sy }];
+            let open = [];
+            const h0 = Math.hypot(ex - sx, ey - sy);
+            heapPush(open, { x: sx, y: sy, f: h0 });
             let cameFrom = new Map();
             let gScore = new Map([[hash(sx, sy), 0]]);
-            let fScore = new Map([[hash(sx, sy), Math.hypot(ex - sx, ey - sy)]]);
             let closed = new Set();
 
             const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
             let attempts = 0;
-            const maxAttempts = 2500;
+            const maxAttempts = 1200;
 
             while (open.length > 0 && attempts < maxAttempts) {
                 attempts++;
-                open.sort((a, b) => (fScore.get(hash(a.x,a.y)) || Infinity) - (fScore.get(hash(b.x,b.y)) || Infinity));
-                const current = open.shift();
+                const current = heapPop(open);
                 const ck = hash(current.x, current.y);
                 if (closed.has(ck)) continue;
                 closed.add(ck);
@@ -1482,6 +1564,7 @@ getTerrain(x, y) {
                     return path;
                 }
 
+                const gCur = gScore.get(ck) || 0;
                 for (const d of dirs) {
                     const nx = current.x + d[0], ny = current.y + d[1];
                     if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
@@ -1489,14 +1572,13 @@ getTerrain(x, y) {
                     const nk = hash(nx, ny);
                     if (closed.has(nk)) continue;
 
-                    const moveCost = Math.hypot(d[0], d[1]) * cellCost(nx, ny);
-                    const tentative = (gScore.get(ck) || 0) + moveCost;
+                    const moveCost = (d[0] !== 0 && d[1] !== 0 ? 1.41421 : 1) * cellCost(nx, ny);
+                    const tentative = gCur + moveCost;
 
                     if (tentative < (gScore.get(nk) || Infinity)) {
                         cameFrom.set(nk, current);
                         gScore.set(nk, tentative);
-                        fScore.set(nk, tentative + Math.hypot(ex - nx, ey - ny));
-                        open.push({ x: nx, y: ny });
+                        heapPush(open, { x: nx, y: ny, f: tentative + Math.hypot(ex - nx, ey - ny) });
                     }
                 }
             }
@@ -1685,11 +1767,11 @@ const ACTIONS = {
 class BotAI {
     constructor(side) {
         this.side = side;
-        this.money = 8000; 
+        this.money = 5000000; 
         this.energyFactor = 1;
         this.color = FACTIONS[side] ? FACTIONS[side].color : '#ff0000';
-        this.timer = 0;
-        this.resources = { iron: 0, chem: 0, chips: 0 };
+        this.timer = Math.floor(Math.random() * 60); // Сдвиг фазы: боты не думают все в один кадр
+        this.resources = { iron: 0, chem: 0, chips: 0, rockets: 0, heavies: 0, cruises: 0, nukes: 0 };
     }
 
     update() {
@@ -1709,6 +1791,9 @@ class BotAI {
 
         // 4. ВОЙНА
         if (this.timer % 15 === 0) this.manageCombat();
+
+        // 5. ЛОГИСТИКА (грузовики возят боеприпасы к технике на фронте)
+        if (this.timer % 20 === 0) this.manageLogistics();
     }
 
     calcEconomy() {
@@ -1747,14 +1832,14 @@ manageBase() {
 
         // --- ЗАПЛАТКА ДЛЯ НАКОПЛЕНИЯ ---
         // Копим на танки, только если уже выполнили план по застройке (или хотя бы начали его)
-        if (factoryCount > 0 && this.money < 5000 && this.energyFactor > 1 && factoryCount >= 20 && houseCount >= 40) {
+        if (factoryCount > 0 && this.money < UNITS.TANK.cost && this.energyFactor > 1 && factoryCount >= 20 && houseCount >= 40) {
              return; 
         }
         
         // --- АПГРЕЙДЫ ---
         // Бот начнет активно улучшать дома только если у него уже есть база (от 10 домов) 
         // ИЛИ если он сказочно богат.
-        if (this.energyFactor > 1.3 && (houseCount >= 10 || this.money > 5000)) {
+        if (this.energyFactor > 1.3 && (houseCount >= 10 || this.money > UNITS.FACTORY.cost)) {
             const houses = myUnits.filter(u => u.type === 'HOUSE' && (u.level || 0) < 6);
             houses.sort((a, b) => (a.level||0) - (b.level||0));
             if (houses.length > 0) {
@@ -1801,7 +1886,7 @@ manageBase() {
         else if (factoryCount < 20 && houseCount >= 5 && this.money >= UNITS.FACTORY.cost && this.energyFactor > 1.2) buildTarget = 'FACTORY';
         // Логистика и лейтгейм:
         else if (whCount < Math.ceil(factoryCount / 3) && this.money >= UNITS.WAREHOUSE.cost) buildTarget = 'WAREHOUSE';
-        else if (this.money > 15000 && !myUnits.some(u => u.type === 'SILO')) buildTarget = 'SILO';
+        else if (this.money > UNITS.SILO.cost * 3 && !myUnits.some(u => u.type === 'SILO')) buildTarget = 'SILO';
 
         if (buildTarget) {
             this.placeBuildingGeneral(builder, buildTarget);
@@ -1828,7 +1913,7 @@ placePowerPlantSmart(builder) {
             const anchor = anchors[k];
 
             // ФИКС: Ищем точки ровно за границей зданий (Радиус Дома + Радиус СЭС + 20px зазор)
-            const distFromAnchor = anchor.radius + bRad + 20; 
+            const distFromAnchor = anchor.radius + bRad + 80; 
 
             for (let i = 0; i < 8; i++) {
                 const angle = (Math.PI * 2 / 8) * i;
@@ -1840,8 +1925,8 @@ placePowerPlantSmart(builder) {
                 if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRad)) continue;
 
                 // ФИКС: ПРАВИЛЬНАЯ проверка на занятость с учетом всех радиусов
-                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRad + 15) || 
-                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRad + 15);
+                const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRad + 75) || 
+                             Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRad + 75);
                 if (busy) continue;
 
                 // --- СЧИТАЕМ ОЧКИ ПОЛЕЗНОСТИ ЭТОГО МЕСТА ---
@@ -1909,7 +1994,7 @@ placePowerPlantSmart(builder) {
             }
             
             // Ищем дальше от центра базы! От 80 до 400 пикселей
-            const dist = anchor.radius + bRadius + 20 + Math.random() * 380; 
+            const dist = anchor.radius + bRadius + 80 + Math.random() * 380; 
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
 
@@ -1919,8 +2004,8 @@ placePowerPlantSmart(builder) {
             // Проверка: не лезем ли в воду или на горы
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRadius)) continue;
 
-         const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 30) || 
-                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 30);
+         const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 90) || 
+                         Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 90);
 
             // Если место свободно — строим!
             if (!busy) {
@@ -1943,26 +2028,53 @@ manageIndustry() {
         const grads = army.filter(u => u.type === 'GRAD').length;
         const fpv = army.filter(u => u.type === 'FPV').length;
         const himars = army.filter(u => u.type === 'NASAMS').length;
-        
-        // Лодки для ботов пока отключены!
+        const shaheds = army.filter(u => u.type === 'SHAHED').length;
+        // Лодки для ботов отключены - ИИ десанта не справляется, боты просто не строят BOAT
+        const mySilo = Game.units.find(u => u.side === this.side && u.type === 'SILO' && u.hp > 0);
+
+        // --- БОЕПРИПАСЫ: техника спавнится пустой, боту нужно уметь её снабжать ---
+        const ammoCrates = army.filter(u => u.type === 'AMMO_CRATE' && u.hp > 0).length;
+        const trucks = army.filter(u => u.type === 'TRUCK' && u.hp > 0).length;
+        const vehicleCount = army.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type)).length;
+        const vehiclesNeedingSupply = army.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type) && u.hasSupply && u.supply <= u.maxSupply * 0.4).length;
 
         factories.forEach(f => {
             // 1. УМНЫЙ ВЫБОР ЦЕЛИ
             let targetUnit = 'TANK'; // Танк — это "хлеб", строим его по умолчанию
-            
-            // ВРЕМЕННО ОТКЛЮЧЕНО:
-            // if (Game.isIslandMode && boats < Math.ceil(army.length / 8)) targetUnit = 'BOAT';
 
+            // Приоритет №0: сразу после техники завод обязан сделать ящик боеприпасов на той же точке выезда,
+            // чтобы новая техника выезжала уже снабженной (и так по кругу)
+            if (f._needsAmmoFollowup) targetUnit = 'AMMO_CRATE';
+            // Критично: если технике нечем ехать/стрелять - сперва нужен грузовик, который довезет ящик до фронта
+            else if (vehiclesNeedingSupply > 0 && trucks < 1) targetUnit = 'TRUCK';
+            // Затем сами ящики со снабжением, которые грузовик повезет к технике
+            else if (vehiclesNeedingSupply > 0 && ammoCrates < Math.max(1, Math.ceil(vehicleCount / 5))) targetUnit = 'AMMO_CRATE';
             // Рой дронов (строят чаще, чтобы кошмарить базу)
-            if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
+            else if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
+            // Шахеды - дальнобойные камикадзе по вражеской базе
+            else if (tanks >= 3 && shaheds < 3 && this.money > UNITS.SHAHED.cost * 2) targetUnit = 'SHAHED';
             // Элитная артиллерия (Хаймарс) - копят на него активнее
-            else if (tanks >= 4 && himars < 1 && this.money > 5500) targetUnit = 'NASAMS';
+            else if (tanks >= 4 && himars < 1 && this.money > UNITS.NASAMS.cost * 1.1) targetUnit = 'NASAMS';
             // Массовая артиллерия (Град)
             else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
             // Авиация (Вертолеты)
-            else if (tanks >= 10 && helis < 3) targetUnit = 'HELICOPTER';
+            else if (tanks >= 10 && helis < 3 && this.money > UNITS.HELICOPTER.cost * 1.1) targetUnit = 'HELICOPTER';
+            // Бункер построен - копим боеприпасы для ядерного удара, если очень богаты
+            else if (mySilo && this.resources.nukes < 1 && this.money > UNITS.CRAFT_NUKE.cost * 1.5) targetUnit = 'CRAFT_NUKE';
+            else if (mySilo && this.resources.rockets < 2 && this.money > UNITS.CRAFT_ROCKET.cost * 1.5) targetUnit = 'CRAFT_ROCKET';
 
             const uInfo = UNITS[targetUnit];
+
+            // Ветка прямого крафта боеприпасов для СИЛО (не требует ресурсов на входе кроме денег/материалов)
+            if (targetUnit.startsWith('CRAFT_')) {
+                const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
+                const hasChem = this.resources.chem >= (uInfo.resCost.chem || 0);
+                const hasChips = this.resources.chips >= (uInfo.resCost.chips || 0);
+                if (hasIron && hasChem && hasChips && this.money >= uInfo.cost) {
+                    this.craft(f, targetUnit);
+                }
+                return;
+            }
 
             // Проверяем, хватает ли ресурсов (не денег, а именно материалов)
             const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
@@ -2036,8 +2148,8 @@ manageHouse() {
         let needPower = this.energyFactor < 1.2 || Game.units.some(u => u.side === this.side && !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
 
         let reserve = 0;
-        if (needPower) reserve = 1600; // Копим 1600 на электростанцию
-        else if (factoryCount < 2) reserve = 1500; // Копим на заводы в начале игры
+        if (needPower) reserve = UNITS.POWER_PLANT.cost * 1.05; // Копим на электростанцию
+        else if (factoryCount < 2) reserve = UNITS.FACTORY.cost * 1.05; // Копим на заводы в начале игры
 
         houses.forEach(h => {
             // Исключение: Если строителей НОЛЬ, тратим деньги игнорируя резерв (чтобы было кому строить СЭС)
@@ -2069,7 +2181,6 @@ manageHouse() {
 manageCombat() {
         const myUnits = Game.units.filter(u => u.side === this.side);
         const army = myUnits.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'SILO' && u.type !== 'BOAT');
-        const boats = myUnits.filter(u => u.type === 'BOAT');
         
         // Ищем только тех врагов, с кем МЫ УЖЕ В СОСТОЯНИИ ВОЙНЫ
         const enemies = Game.units.filter(u => u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE' && Diplomacy.isAtWar(this.side, u.side));
@@ -2098,7 +2209,7 @@ manageCombat() {
             let myBaseCenter = myUnits.find(u => u.type === 'FACTORY' || u.type === 'HOUSE');
             if (myBaseCenter) {
                 army.forEach(u => {
-                    if (!u.target && u.type !== 'SENTINEL') {
+                    if (!u.target && u.type !== 'SENTINEL' && u.type !== 'TRUCK' && u.type !== 'AMMO_CRATE') {
                         u.moveCmd(myBaseCenter.x + (Math.random()-0.5)*600, myBaseCenter.y + (Math.random()-0.5)*600);
                     }
                 });
@@ -2113,30 +2224,120 @@ manageCombat() {
             if (t && !g.gradSeq) g.startArtySequence(t.x, t.y);
         });
 
-        const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0);
+        // ШАХЕД: дальний камикадзе-удар по вражеским зданиям/защите
+        army.filter(u => u.type === 'SHAHED' && !u.kamikazeTarget).forEach(s => {
+            const t = enemies.find(e => e.isProducer || e.type === 'HOUSE' || e.type === 'SENTINEL' || e.type === 'AA_DEFENSE');
+            if (t) s.kamikazeTarget = { x: t.x, y: t.y };
+        });
+
+        // СИЛО: пуск ядерной/обычной ракеты по вражеской базе
+        const mySilos = myUnits.filter(u => u.type === 'SILO' && u.hp > 0);
+        mySilos.forEach(silo => {
+            if (silo.nukeTimer > 0 || silo.cruiseTimer > 0) return;
+            const target = enemies.find(e => e.type === 'FACTORY' || e.type === 'HOUSE') || enemies[0];
+            if (!target) return;
+            if ((this.resources.nukes || 0) >= 1) {
+                this.resources.nukes -= 1;
+                silo.startSiloLaunch(target.x, target.y, 'NUKE');
+            } else if ((this.resources.rockets || 0) >= 1) {
+                this.resources.rockets -= 1;
+                silo.startSiloLaunch(target.x, target.y, 'ROCKET');
+            }
+        });
+
+        const emptyUnits = army.filter(u => u.ammo <= 0 && u.maxAmmo > 0 && !(u.hasSupply && u.supply <= 0));
         emptyUnits.forEach(u => {
-            if (this.money >= 1000) { this.money -= 1000; u.ammo = u.maxAmmo; Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); }
+            if (this.money >= RELOAD_COST) { this.money -= RELOAD_COST; u.ammo = u.maxAmmo; Game.effects.push({x: u.x, y: u.y, char: '♻️', life: 30}); }
         });
 
         if (army.length > attackThreshold) {
             let bestTarget = enemies.find(e => e.type === 'FACTORY' || e.type === 'HOUSE') || enemies[0];
             army.forEach(u => { 
-                if (u.type === 'SENTINEL' || u.target) return;
+                if (u.type === 'SENTINEL' || u.type === 'SHAHED' || u.type === 'TRUCK' || u.type === 'AMMO_CRATE' || u.target) return;
                 u.moveCmd(bestTarget.x + (Math.random()-0.5)*250, bestTarget.y + (Math.random()-0.5)*250); 
             });
           }
-        }
+    }
 
+    // --- ЛОГИСТИКА: грузовик забирает ящик боеприпасов на базе и везет его к технике, у которой <=40% снабжения ---
+    manageLogistics() {
+        const myUnits = Game.units.filter(u => u.side === this.side && u.hp > 0);
+        const trucks = myUnits.filter(u => u.type === 'TRUCK');
+        if (trucks.length === 0) return;
+
+        trucks.forEach(truck => {
+            if (!truck.passengers) truck.passengers = [];
+
+            if (truck.passengers.length > 0) {
+                // Уже везет ящик - если доехал до нуждающейся техники (или она уже погибла/сама заправилась), выгружаем
+                if (!truck._deliveryTarget || truck._deliveryTarget.hp <= 0 || (truck._deliveryTarget.hasSupply && truck._deliveryTarget.supply > truck._deliveryTarget.maxSupply * 0.4)) {
+                    const newCrate = new Unit('AMMO_CRATE', truck.x, truck.y, this.side);
+                    Game.units.push(newCrate);
+                    truck.passengers = [];
+                    truck._deliveryTarget = null;
+                    truck.target = null;
+                    Game.effects.push({x: truck.x, y: truck.y - 20, char: '📦', life: 30});
+                    return;
+                }
+                const d = truck._deliveryTarget;
+                if (Math.hypot(truck.x - d.x, truck.y - d.y) < 120) {
+                    const newCrate = new Unit('AMMO_CRATE', truck.x, truck.y, this.side);
+                    Game.units.push(newCrate);
+                    truck.passengers = [];
+                    truck._deliveryTarget = null;
+                    truck.target = null;
+                    Game.effects.push({x: truck.x, y: truck.y - 20, char: '📦', life: 30});
+                } else if (!truck.target) {
+                    // Цель могла сдвинуться или команда была сброшена патрулём - подтверждаем маршрут
+                    truck.moveCmd(d.x, d.y);
+                }
+                return;
+            }
+
+            // Пустой грузовик - сначала проверяем, есть ли вообще кого снабжать (<=40% запаса)
+            const needy = myUnits.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type) && u.hasSupply && u.supply <= u.maxSupply * 0.4);
+            if (needy.length === 0) return;
+
+            // Ищем ближайший свободный ящик боеприпасов рядом с базой
+            if (!truck._pickupTarget || truck._pickupTarget.hp <= 0 || truck._pickupTarget.type !== 'AMMO_CRATE') {
+                const crate = myUnits.find(u => u.type === 'AMMO_CRATE' && !u._claimedByTruck);
+                if (crate) { crate._claimedByTruck = true; truck._pickupTarget = crate; }
+            }
+
+            if (truck._pickupTarget && truck._pickupTarget.hp > 0) {
+                const c = truck._pickupTarget;
+                if (Math.hypot(truck.x - c.x, truck.y - c.y) < 60) {
+                    // Погрузка: тихо убираем ящик с карты и кладем его в кузов
+                    const idx = Game.units.indexOf(c);
+                    if (idx !== -1) Game.units.splice(idx, 1);
+                    truck.passengers.push({ type: 'AMMO_CRATE', hp: c.hp });
+                    truck._pickupTarget = null;
+
+                    // Приоритет - ближайшая к грузовику самая нуждающаяся техника (наименьший % запаса)
+                    needy.sort((a, b) => (a.supply / a.maxSupply) - (b.supply / b.maxSupply) || Math.hypot(a.x - truck.x, a.y - truck.y) - Math.hypot(b.x - truck.x, b.y - truck.y));
+                    const target = needy[0];
+                    truck._deliveryTarget = target;
+                    truck.moveCmd(target.x, target.y);
+                } else if (!truck.target) {
+                    truck.moveCmd(c.x, c.y);
+                }
+            }
+        });
+    }
 
     craft(b, type) {
         if (type.startsWith('CRAFT_')) {
             const i = UNITS[type]; this.money -= i.cost;
             if (i.resCost) { if(i.resCost.iron) this.resources.iron -= i.resCost.iron; if(i.resCost.chem) this.resources.chem -= i.resCost.chem; }
             if (i.producedRes) { if(i.producedRes.iron) this.resources.iron += i.producedRes.iron; if(i.producedRes.chem) this.resources.chem += i.producedRes.chem; if(i.producedRes.chips) this.resources.chips += i.producedRes.chips; }
+            // rockets/heavies/cruises/nukes начисляются боту в момент завершения производства (см. Unit spawnCooldown<=0)
             b.startProduction(type, true);
         } else {
             this.money -= UNITS[type].cost;
             b.startProduction(type);
+            // Сразу после техники - в очередь ставим ящик боеприпасов, чтобы она выехала уже снабженной
+            if (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(type)) b._needsAmmoFollowup = true;
+            else if (type === 'AMMO_CRATE') b._needsAmmoFollowup = false;
         }
     }
     checkRes(u) { if(!u.resCost) return true; if((u.resCost.iron||0)>this.resources.iron) return false; if((u.resCost.chem||0)>this.resources.chem) return false; if((u.resCost.chips||0)>this.resources.chips) return false; return true; }
@@ -2529,8 +2730,9 @@ isSandbox: false, sandboxSide: 'player', // <--- Добавляем флаги
     lastFogTime: -100,
 
     getPlayerResLimit() {
-        // Используем существующую константу RES_LIMIT
-        return RES_LIMIT;
+        // Базовый лимит + бонус за каждый построенный склад (склады больше не хранят ресурсы, а увеличивают общий лимит)
+        const whCount = this.units.filter(u => u.side === this.myRole && u.type === 'WAREHOUSE' && u.hp > 0).length;
+        return RES_LIMIT + whCount * WAREHOUSE_IRON_CAP_BONUS;
     },
     
     fogCtx: null,
@@ -2752,6 +2954,7 @@ startSandbox() {
     selectionFilter: null,
     powerLinesCache: [],  // Кэш проводов
     powerGridDirty: true, // Флаг: нужно ли пересчитать провода?
+    powerGridByPlant: new Map(), // id электростанции -> { gen, use } - локальная сеть именно этой станции
 
 
 zoom: 1,
@@ -3024,6 +3227,7 @@ setFilter(type) {
         this.loadedImages['HOTEL'] = new Image(); this.loadedImages['HOTEL'].src = 'Hotel.png';
         this.loadedImages['APARTMENT'] = new Image(); this.loadedImages['APARTMENT'].src = 'Apartment.png';
         this.loadedImages['BANK'] = new Image(); this.loadedImages['BANK'].src = 'Bank.png';
+        this.loadedImages['SKYSCRAPER'] = new Image(); this.loadedImages['SKYSCRAPER'].src = 'Skyscraper.png';
 
         // --- ТЕКСТУРЫ ТРОПИНКИ (АВТО-ТАЙЛИНГ) ---
         this.roadImages = {
@@ -3428,16 +3632,11 @@ setFilter(type) {
             (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT')
         );
 
-        // 3. Соединяем
-        powerPlants.forEach(u => {
-            let range = (u.type === 'NUCLEAR_PLANT') ? 800 : 300;
-            
-            // Теперь мы перебираем не ВСЕХ юнитов, а только небольшую горстку зданий!
-            powerConsumers.forEach(n => {
-                if (n !== u && Math.hypot(n.x - u.x, n.y - u.y) < range) {
-                    this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
-                }
-            });
+        // 3. Соединяем ТОЛЬКО с той станцией, к которой здание реально подключено (ближайшая в радиусе)
+        powerConsumers.forEach(n => {
+            if (!n._connectedPlantId) return;
+            const u = powerPlants.find(p => p.id === n._connectedPlantId);
+            if (u) this.powerLinesCache.push({ x1: u.x, y1: u.y, x2: n.x, y2: n.y, side: u.side, source: u });
         });
     },
 
@@ -3491,36 +3690,13 @@ checkPopulation(type) {
     },
 
     getTotalResources() {
-        let total = { ...this.resources };
-        this.units.forEach(u => {
-            if (u.side === this.myRole && u.type === 'WAREHOUSE' && u.storage) {
-                u.storage.forEach(slot => {
-                    if (!slot.locked && slot.type !== 'empty' && slot.type !== 'money') {
-                        total[slot.type] = (total[slot.type] || 0) + slot.count;
-                    }
-                });
-            }
-        });
-        return total;
+        // Склад больше не хранит ресурсы (он теперь хранит технику и увеличивает лимит) - просто возвращаем карман игрока
+        return { ...this.resources };
     },
 
     spendResource(type, amount) {
         if (amount <= 0) return;
-        if (this.resources[type] >= amount) { this.resources[type] -= amount; return; }
-        else { amount -= this.resources[type]; this.resources[type] = 0; }
-        
-        for (let u of this.units) {
-            if (u.side === this.myRole && u.type === 'WAREHOUSE' && u.storage) {
-                for (let slot of u.storage) {
-                    if (!slot.locked && slot.type === type && slot.count > 0) {
-                        let take = Math.min(amount, slot.count);
-                        slot.count -= take; amount -= take;
-                        if (slot.count === 0) slot.type = 'empty';
-                        if (amount <= 0) return;
-                    }
-                }
-            }
-        }
+        this.resources[type] = Math.max(0, this.resources[type] - amount);
     },
     
 hasSpaceForCraft(craftType) {
@@ -3541,7 +3717,7 @@ hasSpaceForCraft(craftType) {
         const menu = document.getElementById('build-menu');
         menu.innerHTML = ''; menu.style.display = 'flex';
         document.getElementById('menu-title').style.display = 'block';
-        document.getElementById('menu-title').innerText = 'СКЛАД (8 СЛОТОВ)';
+        document.getElementById('menu-title').innerText = 'СКЛАД-ГАРАЖ (8 СЛОТОВ, ДО 5 ЕД. ТЕХНИКИ)';
         wh.storage.forEach((slot, idx) => {
             const div = document.createElement('div'); div.className = 'unit-card'; div.style.width = '90px';
             if (slot.locked) {
@@ -3549,16 +3725,17 @@ hasSpaceForCraft(craftType) {
                 div.innerHTML = `<div>🔒</div><div style="font-size:0.7em">КУПИТЬ</div><div class="card-price">5000$</div>`;
                 div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_BUY_SLOT'); };
             } else {
-                if (slot.type === 'empty') {
-                    div.innerHTML = `<div>📦</div><div style="font-size:0.7em">ПУСТО</div><div style="color:#aaa; font-size:0.6em">Положить</div>`;
+                if (slot.type === 'empty' || !slot.units || slot.units.length === 0) {
+                    div.innerHTML = `<div>🚧</div><div style="font-size:0.7em">ПУСТО</div><div style="color:#aaa; font-size:0.6em">Загрузить технику</div>`;
                     div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_DEPOSIT'); };
                 } else {
-                    let icon = '';
-                    if (slot.type === 'iron') icon = '🔩'; if (slot.type === 'chem') icon = '🧪';
-                    if (slot.type === 'chips') icon = '💾'; if (slot.type === 'money') icon = '💵';
+                    const icon = (UNITS[slot.type] && UNITS[slot.type].emoji) ? UNITS[slot.type].emoji : '🚚';
+                    const name = (UNITS[slot.type] && UNITS[slot.type].name) ? UNITS[slot.type].name : slot.type;
                     div.style.background = '#003300';
-                    div.innerHTML = `<div>${icon}</div><div style="font-size:1.2em; font-weight:bold">${slot.count}</div><div style="color:#4f4; font-size:0.6em">Забрать</div>`;
-                    div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_WITHDRAW'); };
+                    div.title = `${name} - ремонтируется на складе\nЛКМ - загрузить ещё\nПКМ - выгрузить`;
+                    div.innerHTML = `<div>${icon}</div><div style="font-size:1.2em; font-weight:bold">${slot.units.length}/${WAREHOUSE_SLOT_CAPACITY}</div><div style="color:#4f4; font-size:0.55em">ЛКМ-загрузить ПКМ-выгрузить</div>`;
+                    div.onclick = () => { this.selectedSlot = idx; this.menuAction('WH_DEPOSIT'); };
+                    div.oncontextmenu = (e) => { e.preventDefault(); this.selectedSlot = idx; this.menuAction('WH_WITHDRAW'); };
                 }
             }
             menu.appendChild(div);
@@ -3739,8 +3916,8 @@ waterOffset: 0,
 
             let html = '';
             html += `<div style="font-weight:bold; margin-bottom:6px;">Баланс</div>`;
-            html += `<div>💵 Сейчас: <span style="color:#fff;">${money}</span></div>`;
-            html += `<div>Доход: <span style="color:#66ff66;">+${Math.round(b.income)}/s</span></div>`;
+            html += `<div>💵 Сейчас: <span style="color:#fff;">${formatMoneyShort(money)}</span></div>`;
+            html += `<div>Доход: <span style="color:#66ff66;">+${formatMoneyShort(b.income)}/s</span></div>`;
 
         const entries = Object.entries(b.incomeBy || {}).sort((a,b) => b[1]-a[1]);
         if (entries.length > 0) {
@@ -3748,19 +3925,19 @@ waterOffset: 0,
             for (let i = 0; i < Math.min(6, entries.length); i++) {
                 const name = entries[i][0];
                 const val = entries[i][1];
-                html += `<div style="color:#aaffaa;">- ${name}: +${Math.round(val)}/s</div>`;
+                html += `<div style="color:#aaffaa;">- ${name}: +${formatMoneyShort(val)}/s</div>`;
             }
         }
 
             html += `<div style="margin-top:6px; color:#ff5555;">Расходы:</div>`;
-            html += `<div style="color:#ff5555;">- Армия (${b.militaryCount} юнитов): -${b.armyCostPer50s} за 50 сек</div>`;
+            html += `<div style="color:#ff5555;">- Армия (${b.militaryCount} юнитов): -${formatMoneyShort(b.armyCostPer50s)} за 50 сек</div>`;
             if (b.autoProdPerSec > 0) {
-                html += `<div style="color:#ff7777;">- Авто-производство (${b.autoProdFactories} заводов): ~-${Math.round(b.autoProdPerSec)}/s</div>`;
+                html += `<div style="color:#ff7777;">- Авто-производство (${b.autoProdFactories} заводов): ~-${formatMoneyShort(b.autoProdPerSec)}/s</div>`;
             }
 
         const netColor = (b.netPerSec >= 0) ? '#66ff66' : '#ff5555';
         const sign = (b.netPerSec >= 0) ? '+' : '';
-        html += `<div style="margin-top:6px;">Итого: <span style="color:${netColor};">${sign}${Math.round(b.netPerSec)}/s</span></div>`;
+        html += `<div style="margin-top:6px;">Итого: <span style="color:${netColor};">${sign}${formatMoneyShort(b.netPerSec)}/s</span></div>`;
 
         if (b.netPerSec < 0) {
             const secLeft = Math.floor((this.money) / (-b.netPerSec));
@@ -3795,11 +3972,61 @@ waterOffset: 0,
         this.moneyTip.style.display = 'none';
     },
 
+    // --- ЛОКАЛЬНАЯ СЕТЬ ЭЛЕКТРОПИТАНИЯ ---
+    // Каждое здание питается от СВОЕЙ ближайшей электростанции (в радиусе действия),
+    // а не от общего суммарного баланса энергии по всей базе.
+    recalcPowerGrid() {
+        this.powerGridByPlant.clear();
+
+        const plants = this.units.filter(u => u.hp > 0 && (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT'));
+        plants.forEach(p => {
+            let g = UNITS[p.type].energyGen || 0;
+            if (p.buffEnergyMult) g *= p.buffEnergyMult;
+            this.powerGridByPlant.set(p.id, { gen: g, use: 0 });
+        });
+
+        this.units.forEach(u => {
+            u._connectedPlantId = null;
+            if (u.hp <= 0) return;
+            const def = UNITS[u.type];
+            // Может ли это здание вообще потреблять энергию (независимо от того, тратит ли оно её ПРЯМО СЕЙЧАС)
+            const isConsumer = (u.type === 'HOUSE') || (def && def.energyUse);
+            if (!isConsumer) return;
+
+            // Подключаем к ближайшей станции своей фракции в радиусе, даже если сейчас простаивает -
+            // иначе здание никогда не "включится" обратно, когда ему снова понадобится энергия
+            let best = null, bestDist = Infinity;
+            plants.forEach(p => {
+                if (p.side !== u.side) return;
+                const range = (p.type === 'NUCLEAR_PLANT') ? 800 : 300;
+                const d = Math.hypot(u.x - p.x, u.y - p.y);
+                if (d <= range && d < bestDist) { best = p; bestDist = d; }
+            });
+            if (!best) return;
+            u._connectedPlantId = best.id;
+
+            // В нагрузку сети идёт только РЕАЛЬНОЕ текущее потребление
+            let useVal = 0;
+            if (u.type === 'HOUSE') {
+                const st = HOUSE_UPGRADES[u.level || 0] || HOUSE_UPGRADES[0];
+                useVal = (st && st.energy) ? st.energy : 0;
+            } else if (u.isProducer && u.spawnCooldown > 0 && def && def.energyUse) {
+                useVal = def.energyUse;
+            } else if (['HOSPITAL', 'AA_DEFENSE', 'SENTINEL', 'SILO', 'WAREHOUSE'].includes(u.type) && def && def.energyUse) {
+                useVal = def.energyUse;
+            }
+            const rec = this.powerGridByPlant.get(best.id);
+            if (rec) rec.use += useVal;
+        });
+    },
+
     updateEnergyUI() {
         try {
             // Оптимизация: пересчитываем энергию только когда powerGridDirty true
             if (!this.powerGridDirty) return;
             this.powerGridDirty = false;
+
+            this.recalcPowerGrid();
 
             let gen = 0;
             let use = 0;
@@ -3980,7 +4207,7 @@ loadPvpLevel(settings) {
         this.isIslandMode = cfg.isIsland;
         this.isSpectator = false;
         this.state = 'BATTLE'; 
-        this.money = 5000;
+        this.money = 5000000;
         
         MAP_W = cfg.mapSize;
         MAP_H = cfg.mapSize;
@@ -4128,7 +4355,7 @@ transitToEarth() {
         this.isSpectator = false;
         this.myRole = 'player';
         this.state = 'BATTLE';
-        this.money = 4000;
+        this.money = 5000000;
 
         MAP_W = 6500;
         MAP_H = 6500;
@@ -4174,7 +4401,7 @@ transitToEarth() {
         this.isIslandMode = true; this.isSpectator = false;
         this.myRole = 'player';
         this.state = 'BATTLE';
-        this.money = 4000;
+        this.money = 5000000;
         
         MAP_W = 5000;
         MAP_H = 5000;
@@ -4373,9 +4600,13 @@ Diplomacy.init();
 reloadGrads() {
         this.clickDelay = 20;
         const mySelection = this.selection.filter(u => u.side === this.myRole);
-        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo);
+        const targets = mySelection.filter(u => (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo < u.maxAmmo && !(u.hasSupply && u.supply <= 0));
 
-        if (targets.length === 0) { this.showError("НЕТ ЦЕЛЕЙ"); return; }
+        if (targets.length === 0) {
+            const outOfSupply = mySelection.some(u => (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.hasSupply && u.supply <= 0);
+            this.showError(outOfSupply ? "НЕТ СНАБЖЕНИЯ (нужен ящик с боеприпасами)!" : "НЕТ ЦЕЛЕЙ");
+            return;
+        }
         
         let reloadedAnything = false;
 
@@ -4702,6 +4933,7 @@ else if (cmd.type === 'path_move') {
 update() {
         if (this.clickDelay > 0) this.clickDelay--;
         this.frameCount++;
+        MapUtils._pathBudget = 6; // Не больше 6 полноценных A* за один тик - остальные поедут напрямую
         const speed = 15;
 
         // Энергия обновляется независимо от остального UI
@@ -4796,9 +5028,9 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
                     html += `
                     <div class="hud-row" style="color:${color}">
                          <span>${name}</span>
-                        <span>💵 ${Math.floor(b.money)}</span>
+                        <span>💵 ${formatMoneyShort(b.money)}</span>
                         <span>👤 ${count}</span>
-                        <span style="font-size:0.8em">⚡${gen}/${use}</span>
+                        <span style="font-size:0.8em">⚡${formatMoneyShort(gen)}/${formatMoneyShort(use)}</span>
                     </div>`;
                 });
                 hud.innerHTML = html;
@@ -4806,7 +5038,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
 // --- ЧИТЫ ДЛЯ ПЕСОЧНИЦЫ ---
         if (this.isSandbox) {
-            this.money = 999999;
+            this.money = 1000000000;
             this.resources.iron = 9999;
             this.resources.chem = 9999;
             this.resources.chips = 9999;
@@ -4871,8 +5103,8 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         
         this.money += income;
         this.lastIncomePerSec = income;
-        document.getElementById('income-display').innerText = `(+${income}/s)`;
-        document.getElementById('money').innerText = Math.floor(this.money);
+        document.getElementById('income-display').innerText = `(+${formatMoneyShort(income)}/s)`;
+        document.getElementById('money').innerText = formatMoneyShort(this.money);
 
 // --- РАСЧЕТ НАСЕЛЕНИЯ ---
         let baseMaxPop = 0;
@@ -4899,7 +5131,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
         // ТУТ ЖЕ добавляем логику Авто-перезарядки (каждые 60 кадров):
         if (this.autoReload) {
-            const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0 && !u.pendingAmmo);
+            const targets = this.units.filter(u => u.side === this.myRole && (u.type === 'GRAD' || u.type === 'NASAMS' || u.type === 'HELICOPTER' || u.type === 'SENTINEL') && u.ammo <= 0 && u.maxAmmo > 0 && !u.pendingAmmo && !(u.hasSupply && u.supply <= 0));
             
             targets.forEach(u => {
                 const neededAmmo = u.maxAmmo - u.ammo;
@@ -5228,6 +5460,13 @@ onDown(e) {
             this.kamikazeMode = false;
             document.body.style.cursor = 'default';
 
+            // Бомбить можно только территорию, с владельцем которой мы в состоянии войны
+            const targetOwner = this.getTerritoryOwner(m.x, m.y);
+            if (targetOwner && targetOwner !== this.myRole && targetOwner !== 'neutral' && !Diplomacy.isAtWar(this.myRole, targetOwner)) {
+                this.showError("⛔ ВЫ НЕ В СОСТОЯНИИ ВОЙНЫ С ЭТОЙ СТРАНОЙ!");
+                return;
+            }
+
             const drones = this.selection.filter(u => (u.type === 'FPV' || u.type === 'SHAHED') && u.side === this.myRole && u.hp > 0);
             if (drones.length === 0) return;
 
@@ -5493,20 +5732,22 @@ menuAction(type) {
     // === ЛОГИКА ПОСАДКИ И ВЫСАДКИ В ЛОДКУ ===
         if (type === 'BOAT_LOAD' || type === 'BOAT_UNLOAD') {
             const boat = this.selection[0];
-            if (!boat || (boat.type !== 'BOAT' && boat.type !== 'BOAT_BOMBER')) return;
+            const CARRIER_TYPES = ['BOAT', 'BOAT_BOMBER', 'TRUCK'];
+            if (!boat || !CARRIER_TYPES.includes(boat.type)) return;
             if (!boat.passengers) boat.passengers = [];
 
+            const carrierName = (UNITS[boat.type] && UNITS[boat.type].name) ? UNITS[boat.type].name.toUpperCase() : 'ТРАНСПОРТ';
             const capacity = (UNITS[boat.type] && UNITS[boat.type].capacity) ? UNITS[boat.type].capacity : 4;
 
             if (type === 'BOAT_LOAD') {
-                let loadRadius = 120; // Радиус погрузки вокруг лодки
-                let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(p.type) ? 4 : 1), 0);
+                let loadRadius = 120; // Радиус погрузки вокруг транспорта
+                let currentWeight = boat.passengers.reduce((sum, p) => sum + (['TANK', 'T90', 'GRAD', 'NASAMS', 'TRUCK'].includes(p.type) ? 4 : 1), 0);
                 
-                if (currentWeight >= capacity) { this.showError("ЛОДКА ПОЛНАЯ!"); return; }
+                if (currentWeight >= capacity) { this.showError(`${carrierName} ПОЛНЫЙ!`); return; }
 
-                // Ищем своих юнитов вокруг лодки
+                // Ищем своих юнитов вокруг транспорта
                 let nearby = this.units.filter(u => 
-                    u.side === this.myRole && u.hp > 0 && u !== boat && !u.isFlying && (u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER') && !u.isProducer && 
+                    u.side === this.myRole && u.hp > 0 && u !== boat && (!u.isFlying || u.type === 'SHAHED') && !CARRIER_TYPES.includes(u.type) && !u.isProducer && 
                     !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SILO','WAREHOUSE','WALL'].includes(u.type) &&
                     Math.hypot(u.x - boat.x, u.y - boat.y) <= loadRadius
                 );
@@ -5517,7 +5758,7 @@ menuAction(type) {
                 let removedUnits = []; // <-- НОВЫЙ МАССИВ ДЛЯ ТИХОГО УДАЛЕНИЯ
 
                 // 1. Сначала грузим технику, пока есть место (техника = 4 места)
-                const vehicles = nearby.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type));
+                const vehicles = nearby.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS', 'TRUCK'].includes(u.type));
                 for (let i = 0; i < vehicles.length; i++) {
                     if (currentWeight + 4 > capacity) break;
                     const vehicle = vehicles[i];
@@ -5530,7 +5771,7 @@ menuAction(type) {
                 // 2. Потом забиваем оставшиеся места пехотой
                 for (let i = 0; i < nearby.length; i++) {
                     let u = nearby[i];
-                    if (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type)) continue;
+                    if (['TANK', 'T90', 'GRAD', 'NASAMS', 'TRUCK'].includes(u.type)) continue;
                     if (currentWeight + 1 > capacity) break;
                     boat.passengers.push({ type: u.type, hp: u.hp, level: u.level });
                     removedUnits.push(u);
@@ -5545,19 +5786,19 @@ menuAction(type) {
                     this.selection = this.selection.filter(u => !removedUnits.includes(u));
                     // ===================================
 
-                    this.showError(`ПОГРУЖЕНО В ЛОДКУ: ${loadedCount}`);
+                    this.showError(`ПОГРУЖЕНО: ${loadedCount}`);
                     Game.effects.push({x: boat.x, y: boat.y - 30, char: '📥', life: 30});
                     if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });
                     
                     let menuItems = ['BOAT_LOAD', 'BOAT_UNLOAD'];
-                    this.updateUI(menuItems, true, `ЛОДКА (Мест: ${capacity - currentWeight}/${capacity})`);
+                    this.updateUI(menuItems, true, `${carrierName} (Мест: ${capacity - currentWeight}/${capacity})`);
                 } else {
                     this.showError("ТЕХНИКА ЗАНИМАЕТ 4 МЕСТА!");
                 }
             } 
             else if (type === 'BOAT_UNLOAD') {
-                if (boat.passengers.length === 0) { this.showError("ЛОДКА ПУСТАЯ!"); return; }
-                if (MapUtils.getTerrain(boat.x, boat.y) === 'DEEP') { this.showError("СЛИШКОМ ГЛУБОКО ДЛЯ ВЫСАДКИ!"); return; }
+                if (boat.passengers.length === 0) { this.showError(`${carrierName} ПУСТ!`); return; }
+                if (boat.type !== 'TRUCK' && MapUtils.getTerrain(boat.x, boat.y) === 'DEEP') { this.showError("СЛИШКОМ ГЛУБОКО ДЛЯ ВЫСАДКИ!"); return; }
 
                 boat.passengers.forEach(p => {
                     let newTroop = new Unit(p.type, boat.x + (Math.random()-0.5)*70, boat.y + (Math.random()-0.5)*70, this.myRole);
@@ -5566,7 +5807,7 @@ menuAction(type) {
                 });
                 boat.passengers = [];
                 Game.effects.push({x: boat.x, y: boat.y - 30, char: '📤', life: 40});
-                this.updateUI(['BOAT_LOAD'], true, `ЛОДКА (Мест: ${capacity}/${capacity})`);
+                this.updateUI(['BOAT_LOAD'], true, `${carrierName} (Мест: ${capacity}/${capacity})`);
             }
             return;
         }
@@ -5721,35 +5962,46 @@ if (type === 'RELOAD_ROCKET' || type === 'RELOAD_HEAVY') {
             }
             else if (type === 'WH_DEPOSIT') {
                 if(slot.locked) return;
-                let rType = slot.type;
-                if(rType === 'empty') {
-                    // Авто-выбор ресурса из кармана
-                    if(this.resources.iron>0) rType='iron'; else if(this.resources.chem>0) rType='chem'; 
-                    else if(this.resources.chips>0) rType='chips'; else if(this.money>0) rType='money';
-                    else { this.showError("КАРМАНЫ ПУСТЫ!"); return; }
-                }
-               // Если деньги - лимит кошелька, если ресурсы - наш новый динамический лимит
-const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
-                const pocket = (rType==='money')?this.money:this.resources[rType];
-                const transfer = Math.min(limit - slot.count, pocket);
-                
-                if(transfer<=0) { this.showError("СЛОТ ПОЛОН ИЛИ НЕТ РЕСУРСОВ"); return; }
-                
-                if(rType==='money') this.money-=transfer; else this.resources[rType]-=transfer;
-                slot.type = rType; slot.count+=transfer;
+                if (!slot.units) slot.units = [];
+                if (slot.units.length >= WAREHOUSE_SLOT_CAPACITY) { this.showError("СЛОТ ПОЛОН (5/5)!"); return; }
+
+                const loadRadius = 150;
+                let nearby = this.units.filter(u =>
+                    u.side === this.myRole && u.hp > 0 && u !== wh && WAREHOUSE_VEHICLE_TYPES.includes(u.type) &&
+                    (slot.type === 'empty' || u.type === slot.type) &&
+                    Math.hypot(u.x - wh.x, u.y - wh.y) <= loadRadius
+                );
+
+                if (nearby.length === 0) { this.showError(slot.type === 'empty' ? "НЕТ ТЕХНИКИ РЯДОМ!" : `НЕТ РЯДОМ: ${(UNITS[slot.type]||{}).name || slot.type}!`); return; }
+
+                let freeSpace = WAREHOUSE_SLOT_CAPACITY - slot.units.length;
+                let loaded = nearby.slice(0, freeSpace);
+                let loadedType = slot.type === 'empty' ? loaded[0].type : slot.type;
+                loaded = loaded.filter(u => u.type === loadedType);
+
+                loaded.forEach(u => slot.units.push({ hp: u.hp }));
+                slot.type = loadedType;
+
+                const killedIds = loaded.map(u => u.id);
+                this.units = this.units.filter(u => !loaded.includes(u));
+                this.selection = this.selection.filter(u => !loaded.includes(u));
+
+                this.showError(`ЗАГРУЖЕНО: ${loaded.length}`);
+                Game.effects.push({x: wh.x, y: wh.y - 30, char: '📥', life: 30});
+                if (this.isMultiplayer && CURRENT_ROOM) this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: killedIds });
                 this.openWarehouseMenu(wh);
             }
             else if (type === 'WH_WITHDRAW') {
-                if(slot.type==='empty'||slot.count<=0) return;
-                const rType = slot.type;
-                const limit = (rType==='money')?MAX_MONEY_POCKET:RES_LIMIT;
-                const pocket = (rType==='money')?this.money:this.resources[rType];
-                const transfer = Math.min(limit - pocket, slot.count);
-                
-                if(transfer<=0) { this.showError("В КАРМАНЕ НЕТ МЕСТА"); return; }
-                
-                if(rType==='money') this.money+=transfer; else this.resources[rType]+=transfer;
-                slot.count-=transfer; if(slot.count<=0) slot.type='empty';
+                if(slot.type==='empty' || !slot.units || slot.units.length<=0) return;
+                const vType = slot.type;
+                const stored = slot.units.pop();
+                if (slot.units.length === 0) slot.type = 'empty';
+
+                let newVehicle = new Unit(vType, wh.x + (Math.random()-0.5)*90, wh.y + (Math.random()-0.5)*90, this.myRole);
+                newVehicle.hp = stored.hp;
+                this.units.push(newVehicle);
+
+                Game.effects.push({x: wh.x, y: wh.y - 30, char: '📤', life: 40});
                 this.openWarehouseMenu(wh);
             }
             return;
@@ -5815,7 +6067,7 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
             if (count > 0) {
                 const f = this.selection[0];
                 let list = [...UNITS.HOUSE.spawnList || []];
-                if ((f.level||0) < 6) list.push('UPGRADE_HOUSE');
+                if ((f.level||0) < HOUSE_UPGRADES.length - 1) list.push('UPGRADE_HOUSE');
                 
                 // ИСПРАВЛЕНИЕ: Правильный вывод названия при обновлении
                 let currentType = HOUSE_UPGRADES[f.level || 0];
@@ -5885,7 +6137,7 @@ const limit = (rType === 'money') ? MAX_MONEY_POCKET : this.getPlayerResLimit();
             let list = [...UNITS[first.type].spawnList];
             let title = (first.type==='HOUSE') ? HOUSE_UPGRADES[first.level||0].name.toUpperCase() : 'МЕНЮ ЗАВОДА';
             
-            if (first.type==='HOUSE' && (first.level||0)<5) list.push('UPGRADE_HOUSE');
+            if (first.type==='HOUSE' && (first.level||0) < HOUSE_UPGRADES.length - 1) list.push('UPGRADE_HOUSE');
             
             this.updateUI(list, true, title + ` (${capableProducers.length})`);
         } else {
@@ -5969,9 +6221,9 @@ if (this.roadDragStart) {
                     }
                 }
                 this.money -= costTotal; 
-                document.getElementById('money').innerText = Math.floor(this.money); 
+                document.getElementById('money').innerText = formatMoneyShort(this.money); 
             } else {
-                if (this.showError) this.showError(`НЕТ ДЕНЕГ! (Нужно: ${costTotal}$)`);
+                if (this.showError) this.showError(`НЕТ ДЕНЕГ! (Нужно: ${formatMoneyShort(costTotal)}$)`);
             }
             return;
         }
@@ -6049,18 +6301,19 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                     else if (this.selection.length === 1 && s0.type === 'HOSPITAL') {
                         this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
                     }
-                    // === НОВОЕ: МЕНЮ ДЛЯ ЛОДКИ ===
-                    else if (this.selection.length === 1 && (s0.type === 'BOAT' || s0.type === 'BOAT_BOMBER')) {
+                    // === НОВОЕ: МЕНЮ ДЛЯ ТРАНСПОРТА (ЛОДКА / ГРУЗОВИК) ===
+                    else if (this.selection.length === 1 && (s0.type === 'BOAT' || s0.type === 'BOAT_BOMBER' || s0.type === 'TRUCK')) {
                         let menuItems = ['BOAT_LOAD'];
                         if (s0.passengers && s0.passengers.length > 0) menuItems.push('BOAT_UNLOAD');
                         
                         // Считаем вес (Техника = 4 места, Пехота = 1 место)
                         let weight = 0;
                         if (s0.passengers) {
-                            s0.passengers.forEach(p => { weight += (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(p.type)) ? 4 : 1; });
+                            s0.passengers.forEach(p => { weight += (['TANK', 'T90', 'GRAD', 'NASAMS', 'TRUCK'].includes(p.type)) ? 4 : 1; });
                         }
                         const cap = (UNITS[s0.type] && UNITS[s0.type].capacity) ? UNITS[s0.type].capacity : 4;
-                        this.updateUI(menuItems, true, `ЛОДКА (Мест: ${cap - weight}/${cap})`);
+                        const carrierName = (UNITS[s0.type] && UNITS[s0.type].name) ? UNITS[s0.type].name.toUpperCase() : 'ТРАНСПОРТ';
+                        this.updateUI(menuItems, true, `${carrierName} (Мест: ${cap - weight}/${cap})`);
                     }
                     // ==============================
                     // --- НОВАЯ ЛОГИКА ДЛЯ МАССОВОГО ВЫДЕЛЕНИЯ ДОМОВ И ЗАВОДОВ ---
@@ -6074,7 +6327,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         
                         if (s0.type === 'HOUSE') {
                             // Если хотя бы один дом можно улучшить - показываем кнопку апгрейда
-                            if (this.selection.some(u => (u.level || 0) < 6)) menuItems.push('UPGRADE_HOUSE');
+                            if (this.selection.some(u => (u.level || 0) < HOUSE_UPGRADES.length - 1)) menuItems.push('UPGRADE_HOUSE');
                             
                             // ИСПРАВЛЕНИЕ: Берем имя из UNITS, а не из строки
                             let currentType = HOUSE_UPGRADES[s0.level || 0];
@@ -6191,7 +6444,7 @@ onRight(e) {
       
 
         // Оставляем только тех, кто может ходить (убираем здания)
-        const mobileUnits = this.selection.filter(u => !u.isProducer && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SILO','WAREHOUSE','WALL'].includes(u.type));
+        const mobileUnits = this.selection.filter(u => !u.isProducer && u.type !== 'SHAHED' && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SILO','WAREHOUSE','WALL'].includes(u.type));
         
         if (mobileUnits.length === 0) return;
         
@@ -6554,8 +6807,10 @@ for (let i = 0; i < this.effects.length; i++) {
             
             // --- ОПТИМИЗАЦИЯ: ПРОПУСКАЕМ ОТРИСОВКУ ЭФФЕКТОВ ЗА КАДРОМ ---
             let z = this.zoom || 1;
-            if (e.x + 100 < this.camera.x || e.x - 100 > this.camera.x + (canvas.width/z) ||
-                e.y + 100 < this.camera.y || e.y - 100 > this.camera.y + (canvas.height/z)) {
+            // Ядерный гриб и вспышка визуально гораздо больше своей точки координат - им нужен большой запас, иначе они мигают/пропадают у края экрана
+            const cullMargin = (e.type === 'nuke_mushroom' || e.type === 'nuke_fireball' || e.type === 'scorch') ? 700 : 100;
+            if (e.x + cullMargin < this.camera.x || e.x - cullMargin > this.camera.x + (canvas.width/z) ||
+                e.y + cullMargin * 2 < this.camera.y || e.y - cullMargin > this.camera.y + (canvas.height/z)) {
                 // Физику частиц все равно считаем (чтобы они исчезли вовремя)
                 if (e.vx) e.x += e.vx; 
                 if (e.vy) e.y += e.vy;
@@ -6563,6 +6818,7 @@ for (let i = 0; i < this.effects.length; i++) {
                 if (e.life <= 0) {
                     this.effects[i] = this.effects[this.effects.length - 1];
                     this.effects.pop();
+                    i--; // Пересматриваем перемещенный на это место элемент в этом же кадре, иначе он на 1 кадр "пропадет"
                 }
                 continue; // Пропускаем весь код отрисовки (ctx...) ниже!
             }
@@ -6604,9 +6860,12 @@ for (let i = 0; i < this.effects.length; i++) {
                 e.life--;
             }
             else if (e.type === 'shockwave') {
-                ctx.strokeStyle = (e.color) ? e.color : `rgba(255, 50, 0, ${e.life/20})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.stroke();
-                if (e.maxRadius) { if (e.radius < e.maxRadius) e.radius += 2; } else e.radius += 3;
-                e.life--;
+                if (e.delay > 0) { e.delay--; }
+                else {
+                    ctx.strokeStyle = (e.color) ? e.color : `rgba(255, 50, 0, ${e.life/20})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.stroke();
+                    if (e.maxRadius) { if (e.radius < e.maxRadius) e.radius += 2; } else e.radius += 3;
+                    e.life--;
+                }
             } 
             // --- НОВЫЕ ЭФФЕКТЫ ВОДЫ ---
             else if (e.type === 'ripple' || e.type === 'wind_ripple' || e.type === 'splash_ring') {
@@ -6680,31 +6939,111 @@ for (let i = 0; i < this.effects.length; i++) {
                 ctx.restore();
                 e.life--;
             }
+            else if (e.type === 'nuke_fireball') {
+                let progress = 1 - (e.life / 45); // от 0 до 1
+                let r = 40 + progress * 220; // Огромный огненный шар быстро раздувается
+                let alpha = 1 - progress;
+                let grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+                grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+                grad.addColorStop(0.35, `rgba(255, 240, 150, ${alpha})`);
+                grad.addColorStop(0.7, `rgba(255, 120, 0, ${alpha * 0.9})`);
+                grad.addColorStop(1, `rgba(255, 30, 0, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI*2); ctx.fill();
+                e.life--;
+            }
+            else if (e.type === 'scorch') {
+                let alpha = Math.min(0.75, e.life / 300);
+                let grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.maxRadius);
+                grad.addColorStop(0, `rgba(10, 8, 6, ${alpha})`);
+                grad.addColorStop(0.6, `rgba(20, 15, 10, ${alpha * 0.8})`);
+                grad.addColorStop(1, `rgba(30, 20, 15, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(e.x, e.y, e.maxRadius, 0, Math.PI*2); ctx.fill();
+                e.life--;
+            }
             else if (e.type === 'nuke_mushroom') {
-                let progress = 1 - (e.life / 180); // от 0 до 1
-                let mHeight = progress * 350;      // Высота ножки растет
-                let capRadius = 60 + progress * 150; // Шапка раздувается
-                let stemWidth = 40 + progress * 30;
-                
-                // Ножка гриба (темнеет со временем)
-                ctx.fillStyle = `rgba(${80 - progress*50}, ${80 - progress*50}, ${80 - progress*50}, ${e.life / 180})`;
-                ctx.beginPath();
-                ctx.ellipse(e.x, e.y - mHeight/2, stemWidth, mHeight/2, 0, 0, Math.PI*2);
-                ctx.fill();
+                if (e.maxLife === undefined) e.maxLife = e.life;
 
-                // Огненная шапка гриба, которая со временем превращается в черный дым
-                let red = 255 - progress * 200;
-                let green = 150 - progress * 150;
-                ctx.fillStyle = `rgba(${red}, ${green}, 0, ${e.life / 180})`;
-                ctx.beginPath();
-                ctx.arc(e.x, e.y - mHeight, capRadius, 0, Math.PI*2);
-                ctx.fill();
+                // Клубы шапки располагаем тремя кольцами (как настоящая "цветная капуста" ядерного гриба),
+                // а не одним идеальным кругом - край получается рваным и объемным
+                if (!e.capPuffs) {
+                    e.capPuffs = [];
+                    const rings = [ { count: 14, ringR: 1.0,  size: 0.55 }, { count: 9, ringR: 0.62, size: 0.78 }, { count: 5, ringR: 0.28, size: 1.0 } ];
+                    rings.forEach(ring => {
+                        for (let i = 0; i < ring.count; i++) {
+                            e.capPuffs.push({
+                                angle: (i / ring.count) * Math.PI * 2 + Math.random() * 0.5,
+                                ringR: ring.ringR,
+                                size: ring.size + Math.random() * 0.3,
+                                bob: Math.random() * Math.PI * 2,
+                                jitterX: (Math.random() - 0.5) * 25,
+                                layer: ring.ringR > 0.8 ? 0 : (ring.ringR > 0.45 ? 1 : 2)
+                            });
+                        }
+                    });
+                }
+                // Ножка - серия сужающихся книзу клубов, образующих воронку, а не ровный овал
+                if (!e.stemPuffs) {
+                    e.stemPuffs = [];
+                    for (let i = 0; i < 7; i++) {
+                        e.stemPuffs.push({ t: i / 6, wobble: (Math.random() - 0.5) * 14, sizeMul: 0.75 + Math.random() * 0.4 });
+                    }
+                }
 
-                // Внутренние бурлящие кольца огня
-                ctx.fillStyle = `rgba(255, 200, 0, ${(1-progress) * (e.life / 180)})`;
-                ctx.beginPath(); ctx.arc(e.x - capRadius*0.3, e.y - mHeight + 10, capRadius*0.5, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(e.x + capRadius*0.3, e.y - mHeight - 10, capRadius*0.4, 0, Math.PI*2); ctx.fill();
-                
+                let progress = 1 - (e.life / e.maxLife); // 0 (взрыв) -> 1 (рассеялось)
+                let growPhase = Math.min(1, progress / 0.22); // быстрый рост первые 22% жизни
+                let holdFade = progress <= 0.55 ? 1 : Math.max(0, 1 - (progress - 0.55) / 0.45); // держится плотным, потом тает
+
+                let mHeight = growPhase * 400;
+                let capRadius = 90 + growPhase * 150 + progress * 70; // после роста облако продолжает медленно расползаться
+                let stemBaseW = 26 + growPhase * 16;
+                let stemTopW = 55 + growPhase * 40;
+                let capY = e.y - mHeight - progress * 25; // центр шапки медленно всплывает со временем
+
+                ctx.save();
+
+                // === НОЖКА (воронкообразная, сужается у земли и расширяется к шапке) ===
+                for (let i = 0; i < e.stemPuffs.length; i++) {
+                    const sp = e.stemPuffs[i];
+                    const sy = e.y - mHeight * sp.t;
+                    const sw = (stemBaseW + (stemTopW - stemBaseW) * sp.t) * sp.sizeMul;
+                    const shade = 50 - sp.t * 12;
+                    ctx.fillStyle = `rgba(${shade + 12}, ${shade}, ${shade - 8}, ${0.55 * holdFade})`;
+                    ctx.beginPath();
+                    ctx.ellipse(e.x + sp.wobble * growPhase, sy, sw, sw * 0.95, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // === ШАПКА: три слоя неровных клубов (тень снизу -> средний тон -> светлые верхушки) ===
+                const layerShades = [ [65, 50, 42], [140, 95, 62], [215, 165, 115] ];
+                const layerAlpha = [0.55, 0.55, 0.5];
+                e.capPuffs.forEach(p => {
+                    const r = capRadius * p.ringR;
+                    const bobY = Math.sin(progress * 8 + p.bob) * 6 * growPhase;
+                    const px = e.x + Math.cos(p.angle) * r * growPhase + p.jitterX * growPhase;
+                    const py = capY - Math.sin(p.angle) * r * 0.4 * growPhase + bobY - p.layer * 18;
+                    const pr = (30 + capRadius * 0.22) * p.size * growPhase;
+                    let [rr, gg, bb] = layerShades[p.layer];
+                    // Первые мгновения после взрыва клубы озаряются огненной подсветкой изнутри
+                    if (progress < 0.15) {
+                        const glow = (0.15 - progress) / 0.15;
+                        rr += (255 - rr) * glow * 0.6; gg += (200 - gg) * glow * 0.5; bb += (60 - bb) * glow * 0.3;
+                    }
+                    ctx.fillStyle = `rgba(${rr|0}, ${gg|0}, ${bb|0}, ${layerAlpha[p.layer] * holdFade})`;
+                    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+                });
+
+                // === "ЮБКА" КОНДЕНСАЦИИ - характерное белесое кольцо на стыке шапки и ножки настоящего ядерного гриба ===
+                if (progress < 0.5) {
+                    let skirtAlpha = ((0.5 - progress) / 0.5) * 0.35 * holdFade;
+                    ctx.fillStyle = `rgba(230, 230, 230, ${skirtAlpha})`;
+                    ctx.beginPath();
+                    ctx.ellipse(e.x, e.y - mHeight * 0.78, capRadius * 0.75 * growPhase, 22 * growPhase, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
                 e.life--;
             }
             else if (e.type === 'ash') {
@@ -6723,6 +7062,7 @@ for (let i = 0; i < this.effects.length; i++) {
             if (e.life <= 0) {
                 this.effects[i] = this.effects[this.effects.length - 1];
                 this.effects.pop();
+                i--; // Пересматриваем перемещенный на это место элемент в этом же кадре, иначе он на 1 кадр "пропадет"
             }
         }
 
@@ -6930,7 +7270,7 @@ for (let i = 0; i < this.effects.length; i++) {
     },
 
     updateUI(unlocks, isMenu = false, titleText = '') {
-        document.getElementById('money').innerText = this.money;
+        document.getElementById('money').innerText = formatMoneyShort(this.money);
         document.getElementById('level').innerText = this.level;
         const menu = document.getElementById('build-menu'); const menuTitle = document.getElementById('menu-title');
         if (isMenu || Game.state === 'PLACE') { 
@@ -6954,7 +7294,7 @@ for (let i = 0; i < this.effects.length; i++) {
                         ? `<img src="${ammo.imageSrc}" style="width: 50px; height: 50px; object-fit: contain; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));">` 
                         : `<div style="font-size:2em">${ammo.emoji}</div>`;
                     
-                    div.innerHTML = `${iconHtml}<div class="card-price">В наличии: ${stock}</div>`; 
+                    div.innerHTML = `${iconHtml}<div class="card-name">${ammo.name || ''}</div><div class="card-price">В наличии: ${stock}</div>`; 
                     div.onclick = () => { this.menuAction(key); };
                     menu.appendChild(div); return;
                 }
@@ -7009,7 +7349,7 @@ for (let i = 0; i < this.effects.length; i++) {
         ? `<img src="${iconSrc}" style="width: 50px; height: 50px; object-fit: contain; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));">` 
         : `<div style="font-size:2em">${u.emoji || '⚙️'}</div>`;
     
-    div.innerHTML = `${displayIcon}<div class="card-price">${formatCost(u)}</div>`;
+    div.innerHTML = `${displayIcon}<div class="card-name">${u.name || ''}</div><div class="card-price">${formatCost(u)}</div>`;
 }
                 menu.appendChild(div);
             });
@@ -7132,37 +7472,68 @@ function drawT90Model(ctx, u) {
 }
 
 function drawShahedModel(ctx, u) {
+    const flyHeight = u.flyHeight || 0;
+    const flyState = u.flyState || 0;
+    const elevation = flyHeight * 45; // насколько высоко визуально поднимаем дрон над землей
+
+    // --- ТЕНЬ НА ЗЕМЛЕ (отделяется от корпуса по мере набора высоты) ---
+    if (flyHeight > 0.02) {
+        ctx.save();
+        const shrink = 1 - flyHeight * 0.35;
+        ctx.beginPath();
+        ctx.ellipse(u.x, u.y + 6, 15 * shrink, 8 * shrink, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${0.4 * (1 - flyHeight * 0.5)})`;
+        ctx.fill();
+        ctx.restore();
+    }
+
     ctx.save();
-    ctx.translate(u.x, u.y);
+    ctx.translate(u.x, u.y - elevation);
     ctx.rotate(u.angle);
     const s = u.radius / 8;
     ctx.scale(s, s);
 
-    ctx.save();
-    ctx.translate(15, 20);
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-15, 12); ctx.lineTo(-15, -12); ctx.fill();
-    ctx.restore();
+    // На земле (мотор не запущен) - дрон тусклее, как будто выключен
+    const bodyColor = flyState === 0 ? '#b8b8b0' : '#f0f0f0';
 
-    ctx.fillStyle = '#f0f0f0';
+    if (flyState !== 0) {
+        ctx.save();
+        ctx.translate(15, 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-15, 12); ctx.lineTo(-15, -12); ctx.fill();
+        ctx.restore();
+    }
+
+    ctx.fillStyle = bodyColor;
     ctx.beginPath();
     ctx.moveTo(20, 0); ctx.lineTo(-15, 14); ctx.lineTo(-15, -14);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#d0d0d0'; ctx.lineWidth = 1; ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = flyState === 0 ? '#d8d8d0' : '#ffffff';
     ctx.beginPath(); ctx.ellipse(-2, 0, 18, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 
     ctx.fillStyle = '#e0e0e0';
     ctx.fillRect(-16, 12, 6, 2);
     ctx.fillRect(-16, -14, 6, 2);
 
+    // Пропеллер крутится, только когда мотор запущен (запуск/полет), на земле - неподвижен
     ctx.save();
     ctx.translate(-18, 0);
-    ctx.rotate(Game.frameCount * 0.8);
-    ctx.fillStyle = 'rgba(50,50,50,0.7)';
+    if (flyState > 0) {
+        const rpm = flyState === 1 ? 0.3 + (u.rotorSpeed || 0) * 1.6 : 0.8;
+        ctx.rotate(Game.frameCount * rpm);
+    }
+    ctx.fillStyle = flyState > 0 ? 'rgba(50,50,50,0.7)' : 'rgba(80,80,80,0.9)';
     ctx.beginPath(); ctx.ellipse(0, 0, 2, 9, 0, 0, Math.PI*2); ctx.fill();
     ctx.restore();
+
+    // Опоры на земле, пока дрон не взлетел
+    if (flyState === 0) {
+        ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-8, 14); ctx.lineTo(-8, 20); ctx.moveTo(8, 14); ctx.lineTo(8, 20); ctx.stroke();
+    }
+
     ctx.restore();
 }
 
@@ -7204,10 +7575,17 @@ class Unit {
         this.recoil = 0;      // Отдача дула
         this.trackOffset = 0; // Анимация гусениц
 
+        // --- НОВОЕ: СНАБЖЕНИЕ (боеприпасы и провиант) ---
+        this.hasSupply = (p.type === 'unit' && p.dmg > 0);
+        this.maxSupply = 100;
+        // Техника спавнится без боеприпасов (нужно подвезти) - пехота и летающие юниты (им некому подвезти) сразу полные
+        const isVehicleUnit = this.hasSupply && !p.isInfantry && !this.isBuilder && !p.isFlying;
+        this.supply = this.hasSupply ? (isVehicleUnit ? 0 : 100) : 0;
+
         // --- ИНИЦИАЛИЗАЦИЯ СКЛАДА ---
         if (this.type === 'WAREHOUSE') {
             this.storage = [];
-            for(let i=0; i<WAREHOUSE_SLOTS; i++) this.storage.push({ locked: i > 0, type: 'empty', count: 0 });
+            for(let i=0; i<WAREHOUSE_SLOTS; i++) this.storage.push({ locked: i > 0, type: 'empty', units: [] });
         }
     }
 
@@ -7223,37 +7601,52 @@ class Unit {
     }
 
 checkPower() {
-        if (!UNITS[this.type].energyUse && this.type !== 'HOUSE') { this.isPowered = true; return; }
-        
-        // --- ОПТИМИЗАЦИЯ ПИТАНИЯ (Ищем только электростанции) ---
-        // Исключаем лишние математические проверки тысяч солдат
-        const nearPP = Game.units.some(u => {
-            if (u.side !== this.side) return false;
-            // Быстрое отсечение по квадрату, прежде чем считать точный круг (hypot)
-            if (u.type === 'POWER_PLANT') return Math.abs(u.x - this.x) < 300 && Math.abs(u.y - this.y) < 300 && Math.hypot(u.x - this.x, u.y - this.y) < 300;
-            if (u.type === 'NUCLEAR_PLANT') return Math.abs(u.x - this.x) < 800 && Math.abs(u.y - this.y) < 800 && Math.hypot(u.x - this.x, u.y - this.y) < 800;
-            return false;
-        });
-        
-        let globalPower = false;
-        if (this.side === Game.myRole) globalPower = Game.energyFactor > 0.1;
-        else { const bot = Game.bots.find(b => b.side === this.side); globalPower = bot ? (bot.energyFactor > 0.1) : true; }
-        
-        this.isPowered = nearPP && globalPower;
+        if (!UNITS[this.type].energyUse && this.type !== 'HOUSE') { this.isPowered = true; this.localPowerFactor = 1; return; }
+        if (Game.isSandbox) { this.isPowered = true; this.localPowerFactor = 2; return; }
+
+        // --- ЛОКАЛЬНАЯ СЕТЬ: питание зависит от КОНКРЕТНОЙ станции, к которой подключено это здание ---
+        const rec = this._connectedPlantId ? Game.powerGridByPlant.get(this._connectedPlantId) : null;
+        if (!rec) { this.isPowered = false; this.localPowerFactor = 0; return; }
+
+        let factor = rec.use === 0 ? 100 : rec.gen / rec.use;
+        if (factor < 0.1) factor = 0.1;
+        this.localPowerFactor = factor;
+        this.isPowered = factor > 0.1;
     }
 
-    moveCmd(x, y) { if (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SILO','WAREHOUSE'].includes(this.type)) return; this.gradSeq = 0; this.pathQueue = []; this.target = {x, y}; if (this.isFlying) { if (this.flyState === 0 || this.flyState === 3) { this.flyState = 1; this.flyTimer = 180; } } }
+    moveCmd(x, y) {
+        // Шахед нельзя отправить в произвольную точку - только запуск кнопкой камикадзе
+        if (this.isProducer || this.type === 'SHAHED' || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SILO','WAREHOUSE','AMMO_CRATE'].includes(this.type)) return;
+        this.gradSeq = 0;
+        this.pathQueue = [];
+        // Наземные юниты (в т.ч. приказы от ботов) ищут путь в обход зданий/гор, как и приказы игрока по ПКМ
+        let route = null;
+        if (!this.isFlying && this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER' && Math.hypot(x - this.x, y - this.y) > 60) {
+            route = MapUtils.findPath(this.x, this.y, x, y);
+        }
+        if (route && route.length > 0) {
+            this.pathQueue = [...route];
+            const first = this.pathQueue.shift();
+            this.target = {x: first.x, y: first.y};
+        } else {
+            this.target = {x, y};
+        }
+        if (this.isFlying) { if (this.flyState === 0 || this.flyState === 3) { this.flyState = 1; this.flyTimer = 180; } }
+    }
 
     // --- НОВОЕ: попытка выпустить готовую технику из очереди завода на фиксированную точку выезда ---
     trySpawnFromBacklog() {
         if (!this.spawnBacklog || this.spawnBacklog.length === 0 || this.hp <= 0) return;
         const type = this.spawnBacklog[0];
         const dist = this.radius + 35;
-        const spawnX = this.x + Math.cos(this.spawnAngle) * dist;
-        const spawnY = this.y + Math.sin(this.spawnAngle) * dist;
+        // Ящик боеприпасов выезжает с ДРУГОЙ точки выхода, иначе он будет вечно ждать,
+        // пока техника перед ним не отъедет с основной точки (она стоит там сразу после спавна)
+        const angle = (type === 'AMMO_CRATE') ? this.spawnAngle + Math.PI / 2 : this.spawnAngle;
+        let spawnX = this.x + Math.cos(angle) * dist;
+        let spawnY = this.y + Math.sin(angle) * dist;
         const newRadius = (UNITS[type] && UNITS[type].radius) || 15;
         const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: spawnX, y: spawnY}) : Game.units;
-        // Выезд занят другим юнитом (в т.ч. предыдущей техникой, которая ещё не отъехала) - ждём
+        // Выезд занят другим юнитом (в т.ч. предыдущей техникой или ящиком, который ещё не отъехал/не израсходован) - ждём в очереди, как обычная техника
         const blocked = neighbors.some(u => u !== this && u.hp > 0 && Math.hypot(u.x - spawnX, u.y - spawnY) < u.radius + newRadius + 5);
         if (blocked) return;
 
@@ -7272,15 +7665,16 @@ checkPower() {
     }
 
     setPath(points) {
-        if (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SILO','WAREHOUSE'].includes(this.type)) return;
+        if (this.isProducer || this.type === 'SHAHED' || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SILO','WAREHOUSE'].includes(this.type)) return;
         this.pathQueue = [...points]; const first = this.pathQueue.shift();
         if (first) { this.gradSeq = 0; this.target = {x: first.x, y: first.y}; if (this.isFlying) { if (this.flyState === 0 || this.flyState === 3) { this.flyState = 1; this.flyTimer = 180; } } }
     }
 
-    moveTo(x, y) { this.target = {x, y}; }
+    moveTo(x, y) { if (this.type === 'SHAHED') return; this.target = {x, y}; }
     assignSite(site) { this.assignedSite = site; this.target = {x: site.x, y: site.y}; this.constructing = false; }
     startArtySequence(tx, ty) { 
         if (this.ammo <= 0) return;
+        if (this.hasSupply && this.supply <= 0) return;
         if (this.type === 'NASAMS' && this.himarsCooldown > Game.frameCount) return;
         this.gradSeq = (this.type === 'NASAMS') ? 60 : 360; 
         this.gradTarget = {x: tx, y: ty}; 
@@ -7300,6 +7694,7 @@ checkPower() {
     }
 
 fireArty(tx, ty, force = false) {
+        if (this.hasSupply && this.supply <= 0) return;
         if (this.type === 'BOAT_BOMBER') {
             if (this.ammo < 4 && !force) return;
             if (this.ammo >= 4) this.ammo -= 4;
@@ -7307,6 +7702,7 @@ fireArty(tx, ty, force = false) {
             if (this.ammo <= 0 && !force) return;
             if (this.ammo > 0) this.ammo -= 1;
         }
+        if (this.hasSupply) this.supply = Math.max(0, this.supply - 1.25);
         let d = Math.hypot(tx - this.x, ty - this.y);
         if (d > this.range) { let angle = Math.atan2(ty - this.y, tx - this.x); tx = this.x + Math.cos(angle) * this.range; ty = this.y + Math.sin(angle) * this.range; }
 
@@ -7359,7 +7755,7 @@ resolveCollision() {
             const isBoatB = (u.type === 'BOAT' || u.type === 'BOAT_BOMBER');
             if (isBoatA && u.side === this.side && !u.isFlying && !isBoatB) return;
             if (isBoatB && this.side === u.side && !this.isFlying && !isBoatA) return;
-        if ((this.type === 'TANK' || this.type === 'T90') && u.type === 'TREE') return;
+        if (u.type === 'TREE') return;
 
         // Быстрая проверка через квадрат расстояния (без корня)
         let dx = this.x - u.x;
@@ -7367,11 +7763,20 @@ resolveCollision() {
         let distSq = dx*dx + dy*dy;
         let minDist = (this.collisionRadius || this.radius) + (u.collisionRadius || u.radius);
 
-        if (distSq < minDist * minDist && distSq > 0.1) {
-            let dist = Math.sqrt(distSq);
+        if (distSq < minDist * minDist) {
+            let dist, ndirX, ndirY;
+            if (distSq > 0.1) {
+                dist = Math.sqrt(distSq);
+                ndirX = dx / dist; ndirY = dy / dist;
+            } else {
+                // Юниты оказались точно друг на друге (dist ~ 0) - нет направления для расталкивания, толкаем в случайном
+                dist = 0;
+                let ra = Math.random() * Math.PI * 2;
+                ndirX = Math.cos(ra); ndirY = Math.sin(ra);
+            }
             let force = (minDist - dist) / minDist;
-            let pushX = (dx / dist) * force * 2;
-            let pushY = (dy / dist) * force * 2;
+            let pushX = ndirX * force * 2;
+            let pushY = ndirY * force * 2;
 
             const isImmovable = (t) => ['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'WAREHOUSE', 'WALL'].includes(t);
             if (!this.isProducer && !isImmovable(this.type)) {
@@ -7429,6 +7834,35 @@ attemptAutoProduction() {
                 this.ammo = Math.min(this.maxAmmo, this.ammo + 1);
                 this.pendingAmmo--;
                 Game.effects.push({x: this.x, y: this.y - 20, char: '🚀', life: 20});
+            }
+        }
+
+   // --- ЛОГИКА СКЛАДА-ГАРАЖА (пассивный ремонт хранящейся техники) ---
+        if (this.type === 'WAREHOUSE' && this.storage && this.isPowered && Game.frameCount % 30 === 0) {
+            this.storage.forEach(slot => {
+                if (slot.locked || slot.type === 'empty' || !slot.units) return;
+                const maxHp = UNITS[slot.type] ? UNITS[slot.type].hp : 0;
+                slot.units.forEach(v => { v.hp = Math.min(maxHp, v.hp + WAREHOUSE_HEAL_PER_TICK); });
+            });
+        }
+
+   // --- ЛОГИКА ЯЩИКА С БОЕПРИПАСАМИ (пассивное снабжение) ---
+        if (this.type === 'AMMO_CRATE' && this.hp > 0) {
+            if (Game.frameCount % 15 === 0) {
+                const radius = UNITS.AMMO_CRATE.supplyRadius || 90;
+                const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+                for (let u of neighbors) {
+                    if (this.hp <= 0) break;
+                    if (!u.hasSupply || u.side !== this.side || u.supply >= u.maxSupply) continue;
+                    if (Math.hypot(u.x - this.x, u.y - this.y) > radius) continue;
+                    const costPerPercent = (u.type === 'HELICOPTER') ? 0.3 : 0.15; // 1 ящик ~ 2-3 юнита или 1 вертолет
+                    const need = u.maxSupply - u.supply;
+                    const affordable = this.hp / costPerPercent;
+                    const give = Math.min(need, affordable, 2);
+                    if (give <= 0) continue;
+                    u.supply = Math.min(u.maxSupply, u.supply + give);
+                    this.hp -= give * costPerPercent;
+                }
             }
         }
 
@@ -7570,15 +8004,19 @@ attemptAutoProduction() {
             }
 
             // Если есть цель - переходим к фазе развертывания
-            const target = Game.units.find(u => {
-                if (u.side === this.side || u.hp <= 0 || u.isFlying || u.type === 'MINE' || u.type === 'TREE') return false;
-                const isBuilding = u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SILO','WAREHOUSE','WALL'].includes(u.type);
-                if (isBuilding) return false;
-                if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
-                    if (!Diplomacy.isAtWar(this.side, u.side)) return false;
-                }
-                return Math.hypot(u.x - this.x, u.y - this.y) < this.range;
-            });
+            // "ЛЕНИВЫЕ МОЗГИ": полный скан армии кешируем и обновляем не каждый кадр, а раз в 6 тиков
+            if (this._sentinelTarget === undefined || Game.frameCount % 6 === (this.id % 6)) {
+                this._sentinelTarget = Game.units.find(u => {
+                    if (u.side === this.side || u.hp <= 0 || u.isFlying || u.type === 'MINE' || u.type === 'TREE') return false;
+                    const isBuilding = u.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SILO','WAREHOUSE','WALL'].includes(u.type);
+                    if (isBuilding) return false;
+                    if (u.side !== 'neutral' && typeof Diplomacy !== 'undefined') {
+                        if (!Diplomacy.isAtWar(this.side, u.side)) return false;
+                    }
+                    return Math.hypot(u.x - this.x, u.y - this.y) < this.range;
+                }) || null;
+            }
+            const target = this._sentinelTarget;
 
             if (target && this.scriptPhase === 0) {
                 this.scriptPhase = 1;
@@ -7675,11 +8113,11 @@ attemptAutoProduction() {
 
         // --- ДОСТРЕЛ ГРАДА: по одной ракете с интервалом 0.5 сек ---
         if (this.gradAutoFire) {
-            if (this.ammo > 0 && Game.frameCount >= this.gradAutoFire.nextFrame) {
+            if (this.ammo > 0 && !(this.hasSupply && this.supply <= 0) && Game.frameCount >= this.gradAutoFire.nextFrame) {
                 this.fireArty(this.gradAutoFire.tx, this.gradAutoFire.ty);
                 this.gradAutoFire.nextFrame += 30;
             }
-            if (this.ammo <= 0) this.gradAutoFire = null;
+            if (this.ammo <= 0 || (this.hasSupply && this.supply <= 0)) this.gradAutoFire = null;
             if (this.gradAutoFire) return; // стоит на месте, пока достреливает
         }
 
@@ -7701,7 +8139,8 @@ attemptAutoProduction() {
                     this.flyHeight = Math.min(1, this.flyHeight + 0.015);
                     if (this.flyHeight >= 1) this.flyState = 2; // Готов лететь
                 }
-                return; // Пока взлетаем - стоим на месте
+                // Шахед - самолетного типа, взлетает вперед и вверх (не стоит на месте, как вертолет)
+                if (!this.isShahed) return; // Вертолет/FPV ждут на месте, пока не наберут высоту
             } 
             else if (this.flyState === 3) { // Посадка (сначала высота, потом винт)
                 this.flyHeight = Math.max(0, this.flyHeight - 0.015);
@@ -7754,7 +8193,7 @@ attemptAutoProduction() {
 // --- ЛОГИКА NASAMS (ПРО + ПВО) ---
         if (this.isNASAMS) {
              if (this.reload > 0) this.reload--;
-             if (this.reload <= 0 && this.ammo > 0) {
+             if (this.reload <= 0 && this.ammo > 0 && !(this.hasSupply && this.supply <= 0)) {
                  
                  // 1. ПРИОРИТЕТ: Ищем крылатые ракеты. 
                  let cruise = Game.bullets.find(b => b.side !== this.side && b.isCruise && !b.targetedByNASAMS && Math.hypot(b.x - this.x, b.y - this.y) < this.range + 400);
@@ -7808,10 +8247,8 @@ attemptAutoProduction() {
             const isBacklogFull = this.type === 'FACTORY' && !this.productionType.startsWith('CRAFT_') && this.spawnBacklog.length >= 10;
             if (isBacklogFull) return;
             
-            // Расчет скорости (Энергия + Баффы)
-            let factor = 1;
-            if (this.side === Game.myRole) factor = Game.energyFactor;
-            else { const bot = Game.bots.find(b => b.side === this.side); if (bot) factor = bot.energyFactor; }
+            // Расчет скорости (Энергия своей локальной станции + Баффы)
+            let factor = (this.localPowerFactor !== undefined) ? this.localPowerFactor : 1;
             if (this.buffSpeedMult) factor *= this.buffSpeedMult;
             
             this.spawnCooldown -= factor;
@@ -8011,12 +8448,15 @@ if (this.type === 'NASAMS') {
         if (this.reload > 0) this.reload--;
 
         // --- ИИ ДЛЯ БОТОВ (АГРЕССИЯ) ---
+        // "ЛЕНИВЫЕ МОЗГИ": дорогой скан всей армии на предмет врагов делаем не каждый кадр, а раз в 10 тиков на юнит
+        // (сильно снижает нагрузку при больших армиях), но простой юнит все равно каждый кадр быстро выходит через resolveCollision
         if (!Game.isMultiplayer && !Game.isSandbox && this.side !== 'player') {
+            const scanNow = Game.frameCount % 10 === (this.id % 10);
             if (!this.isBuilder) {
                 // Вертолет бота
                 if (this.type === 'HELICOPTER') {
                      if (this.ammo > 0) {
-                          if (!this.aggro) {
+                          if (!this.aggro && scanNow) {
                              let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 800);
                              if (nearestEnemy) { 
                                  this.aggro = true; 
@@ -8031,7 +8471,7 @@ if (this.type === 'NASAMS') {
                      }
                 }
                 // Град бота (попытка отъехать)
-                if (this.type === 'GRAD') {
+                if (this.type === 'GRAD' && scanNow) {
                     let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 400);
                     if (nearestEnemy) {
                         let angle = Math.atan2(this.y - nearestEnemy.y, this.x - nearestEnemy.x);
@@ -8041,6 +8481,7 @@ if (this.type === 'NASAMS') {
                 }
                 // Обычные юниты бота
                 if (!this.aggro && this.type !== 'HELICOPTER' && this.type !== 'GRAD') {
+                    if (!scanNow) { this.resolveCollision(); return; }
                     let nearestEnemy = Game.units.find(u => u.side !== this.side && Math.hypot(u.x - this.x, u.y - this.y) < 700);
                     if (nearestEnemy) { 
                         this.aggro = true; 
@@ -8169,6 +8610,10 @@ if (this.type === 'NASAMS') {
             // Ручная камикадзе-цель: взрываемся по прибытии
             if (this.isKamikaze && this.kamikazeTarget) {
                 let d = Math.hypot(this.kamikazeTarget.x - this.x, this.kamikazeTarget.y - this.y);
+                // Шахед пикирует на цель: снижается на подлете, а не взрывается на крейсерской высоте
+                if (this.isShahed && this.flyState === 2 && d < 180) {
+                    this.flyHeight = Math.max(0.1, this.flyHeight - 0.035);
+                }
                 if (d <= 20) {
                     this.hp = 0;
                     let explosion = new Bullet(this.x, this.y, this.x, this.y, this.damage, this.side, true, null, this, this.splashRadius);
@@ -8194,13 +8639,14 @@ if (this.type === 'NASAMS') {
                     }
                 } 
                 // Стандартная стрельба
-                else if (d <= this.range) {
+                else if (d <= this.range && !(this.hasSupply && this.supply <= 0)) {
                     busy = true;
                     let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
                     this.angle = targetAngle; // Поворачиваемся к цели
 
                     if (this.reload <= 0) {
                         this.reload = this.reloadMax;
+                        if (this.hasSupply) this.supply = Math.max(0, this.supply - 1.25);
                         let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
 
                         let spawnX = this.x;
@@ -8372,50 +8818,6 @@ _movePhysics() {
             let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT' || this.type === 'BOAT_BOMBER') ? 0.3 : 0.05;
             this.angle += diff * turnSpeed;
             
-            // --- КОЛЮЧАЯ ПРОВОЛОКА (WALL): замедление + урон + техника ломает за 2 секунды ---
-            if (this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER') {
-                const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
-                const isVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(this.type);
-                let onWire = false;
-
-                for (let obj of neighbors) {
-                    if (!obj || obj.hp <= 0 || obj.type !== 'WALL') continue;
-                    const distToWire = Math.hypot(this.x - obj.x, this.y - obj.y);
-                    if (distToWire > (this.radius + obj.radius + 6)) continue;
-
-                    onWire = true;
-
-                    // Сильное замедление
-                    currentSpeed *= isVehicle ? 0.25 : 0.15;
-
-                    // Урон в секунду: пехоте в 10 раз меньше
-                    this.hp -= ((isVehicle ? 20 : 2) / 60);
-
-                    // Техника ломает проволоку, если давит 2 секунды
-                    if (isVehicle) {
-                        if (!obj.wireCrushStartTime) obj.wireCrushStartTime = Date.now();
-                        if (Date.now() - obj.wireCrushStartTime >= 2000) {
-                            obj.hp = 0;
-                            Game.effects.push({type: 'smoke', x: obj.x, y: obj.y, life: 35});
-                            obj.wireCrushStartTime = null;
-                        }
-                    }
-
-                    // Не усиливаем эффект от нескольких сегментов за один кадр
-                    break;
-                }
-
-                // Если техника перестала давить, сбрасываем таймер на ближайших проволоках рядом
-                if (!onWire && isVehicle) {
-                    for (let obj of neighbors) {
-                        if (obj && obj.type === 'WALL' && obj.wireCrushStartTime) {
-                            const distToWire = Math.hypot(this.x - obj.x, this.y - obj.y);
-                            if (distToWire < (this.radius + obj.radius + 40)) obj.wireCrushStartTime = null;
-                        }
-                    }
-                }
-            }
-
             // --- НОВОЕ: КРУТИМ АНИМАЦИЮ ХОДЬБЫ ---
             if (this.walkFrame === undefined) this.walkFrame = Math.random() * 10;
             this.walkFrame += currentSpeed * 0.4; 
@@ -8445,8 +8847,25 @@ if (dist < 15) {
                 if (!this.isFlying) this.target = null; 
             }
         } else { 
-            this.x += (dx / dist) * currentSpeed; 
-            this.y += (dy / dist) * currentSpeed; 
+            const outOfSupply = this.hasSupply && this.supply <= 0;
+            const isInfantryUnit = (UNITS[this.type] && UNITS[this.type].isInfantry) || this.isBuilder;
+
+            if (outOfSupply && !isInfantryUnit) {
+                // Техника без боеприпасов не может ехать
+            } else {
+                this.x += (dx / dist) * currentSpeed; 
+                this.y += (dy / dist) * currentSpeed; 
+            }
+
+            // --- РАСХОД СНАБЖЕНИЯ ПРИ ПЕРЕДВИЖЕНИИ (в несколько раз медленнее, чем при стрельбе) ---
+            if (this.hasSupply && this.supply > 0) {
+                this.supply = Math.max(0, this.supply - currentSpeed * 0.005);
+            }
+
+            // --- ЮНИТЫ БЕЗ БОЕПРИПАСОВ МЕДЛЕННО ПОЛУЧАЮТ УРОН ---
+            if (outOfSupply && isInfantryUnit && Game.frameCount % 30 === 0) {
+                this.hp -= 1;
+            }
             
             // --- ТРОПИНКИ: следы от юнитов и техники ---
             if (!this.isFlying && this.type !== 'BOAT' && !this.isProducer && this.hp > 0) {
@@ -8901,6 +9320,12 @@ if (dist < 15) {
             let hpOffset = 20; 
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-10, this.y - hpOffset, 20, 3);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-10, this.y - hpOffset, 20 * (Math.max(0, this.hp)/this.maxHp), 3);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-10, this.y - hpOffset + 4, 20, 2);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-10, this.y - hpOffset + 4, 20 * (Math.max(0, this.supply)/this.maxSupply), 2);
+            }
             
             if (Game.selection.includes(this)) {
                 if (this.range > 0) {
@@ -9205,6 +9630,12 @@ if (dist < 15) {
             let hpOffset = this.radius + 15;
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+            }
             
             if (Game.selection.includes(this)) {
                 if (this.range > 0) {
@@ -9217,6 +9648,142 @@ if (dist < 15) {
         }
 
         
+
+// --- МОДЕЛЬ ГРУЗОВИКА (то же шасси/кабина, что у Града, но без пусковой установки) ---
+        if (this.type === 'TRUCK') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            const baseR = 27;
+            const scaleF = this.radius / baseR;
+            ctx.scale(scaleF, scaleF);
+            const r = baseR;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(4, 6, r * 1.8, r * 1.1, this.angle || 0, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.save();
+            ctx.rotate(this.angle || 0);
+
+            let cW = r * 2.8; let cH = r * 1.2;
+
+            ctx.fillStyle = '#0f0f0f';
+            let wW = 14; let wH = 7; let wDist = cH / 2 + 1;
+            [cW*0.35, -cW*0.15, -cW*0.4].forEach(wx => {
+                ctx.fillRect(wx - wW/2, -wDist - wH/2, wW, wH); ctx.fillRect(wx - wW/2, wDist - wH/2, wW, wH);
+            });
+
+            ctx.fillStyle = '#222'; ctx.fillRect(-cW/2, -cH*0.3, cW, cH*0.6);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(cW*0.1, -cH*0.45, cW*0.4, cH*0.9);
+
+            ctx.fillStyle = '#112233';
+            ctx.fillRect(cW*0.4, -cH*0.35, 5, cH*0.7);
+            ctx.fillRect(cW*0.15, -cH*0.46, 12, 2);
+            ctx.fillRect(cW*0.15, cH*0.44, 12, 2);
+
+            // Открытый грузовой кузов вместо пусковой установки
+            ctx.fillStyle = '#3a443a';
+            ctx.fillRect(-cW*0.48, -cH*0.42, cW*0.5, cH*0.84);
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+            ctx.strokeRect(-cW*0.48, -cH*0.42, cW*0.5, cH*0.84);
+            ctx.fillStyle = '#2a332a';
+            ctx.fillRect(-cW*0.42, -cH*0.3, cW*0.38, cH*0.6);
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+            for (let bx = -cW*0.38; bx < -cW*0.05; bx += cW*0.09) {
+                ctx.beginPath(); ctx.moveTo(bx, -cH*0.42); ctx.lineTo(bx, cH*0.42); ctx.stroke();
+            }
+
+            // Пассажиры/техника в открытом кузове
+            if (this.passengers && this.passengers.length > 0) {
+                this.passengers.slice(0, 6).forEach((p, i) => {
+                    let row = Math.floor(i / 2); let side = (i % 2 === 0) ? 1 : -1;
+                    let px = -cW*0.4 + row * (cW*0.13); let py = side * cH * 0.2;
+                    ctx.fillStyle = (p.type === 'SNIPER') ? '#1b2e11' : (p.type === 'BUILDER' ? '#ffcc00' : '#2d4c1e');
+                    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+                });
+            }
+
+            ctx.restore();
+            ctx.restore(); // сброс масштаба
+
+            if (this.passengers && this.passengers.length > 0) {
+                ctx.font = '11px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+                ctx.fillText(`📦${this.passengers.length}`, this.x, this.y - this.radius - 20);
+            }
+
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            if (Game.selection.includes(this)) {
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
+        }
+
+// --- МОДЕЛЬ ЯЩИКА С БОЕПРИПАСАМИ ---
+        if (this.type === 'AMMO_CRATE') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            const r = this.radius;
+
+            // тень
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.ellipse(2, r*0.8, r*1.1, r*0.5, 0, 0, Math.PI*2); ctx.fill();
+
+            // корпус ящика
+            ctx.fillStyle = '#7a5c30';
+            ctx.fillRect(-r, -r*0.75, r*2, r*1.5);
+            ctx.strokeStyle = '#3a2c15'; ctx.lineWidth = 2;
+            ctx.strokeRect(-r, -r*0.75, r*2, r*1.5);
+
+            // верхняя грань (светлее, эффект объема)
+            ctx.fillStyle = '#9c7a45';
+            ctx.fillRect(-r, -r*0.75, r*2, r*0.4);
+
+            // доски
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+            for (let lx = -r + r*0.6; lx < r; lx += r*0.6) {
+                ctx.beginPath(); ctx.moveTo(lx, -r*0.75); ctx.lineTo(lx, r*0.75); ctx.stroke();
+            }
+
+            // металлические уголки
+            ctx.fillStyle = '#2a2a2a';
+            const cs = r*0.28;
+            ctx.fillRect(-r, -r*0.75, cs, cs);
+            ctx.fillRect(r - cs, -r*0.75, cs, cs);
+            ctx.fillRect(-r, r*0.75 - cs, cs, cs);
+            ctx.fillRect(r - cs, r*0.75 - cs, cs, cs);
+
+            // центральная стяжная лента
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(-r, -r*0.12, r*2, r*0.24);
+
+            // маркировка боеприпасов
+            ctx.fillStyle = '#ffcc00'; ctx.font = `bold ${Math.max(9, r*0.75)}px Arial`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('✚', 0, -r*0.35);
+
+            ctx.restore();
+
+            // радиус снабжения при выделении
+            if (Game.selection.includes(this)) {
+                ctx.beginPath(); ctx.arc(this.x, this.y, UNITS.AMMO_CRATE.supplyRadius || 90, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(120,255,120,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+
+            // полоска ХП
+            let hpOffset = 20;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            return;
+        }
 
 // --- КРАСИВАЯ МОДЕЛЬ ГРАДА И NASAMS (С 3D-АНИМАЦИЕЙ ПОДЪЕМА) ---
         if (this.type === 'GRAD' || this.type === 'NASAMS') {
@@ -9331,6 +9898,12 @@ if (dist < 15) {
             let hpOffset = this.radius + 15;
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+            }
             
             if (Game.selection.includes(this)) {
                 if (this.range > 0) {
@@ -9440,6 +10013,12 @@ if (dist < 15) {
             let hpOffset = this.radius + 15 + (currentAlt * 10); 
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+            }
             
             if (Game.selection.includes(this)) {
                 if (this.range > 0) {
@@ -9557,6 +10136,11 @@ if (dist < 15) {
             const hpOffset = this.radius + 15;
             ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
             ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+            }
             if (Game.selection.includes(this)) {
                 if (this.range > 0) {
                     ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
@@ -9830,6 +10414,12 @@ ctx.restore();
         let hpOffset = (this.isProducer || ['AA_DEFENSE','HOSPITAL','POWER_PLANT','SENTINEL','SILO','WAREHOUSE'].includes(this.type)) ? this.radius + 10 : 20;
         ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
         ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+        if (this.hasSupply) {
+            ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+            ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+            ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+        }
         
         if (Game.selection.includes(this) && this.type === '5' && this.side === Game.myRole) {
             ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 2.2, 0, Math.PI*2);
@@ -9944,14 +10534,25 @@ class Bullet {
         }
         
         if (!this.arty && this.targetUnit && this.targetUnit.hp > 0) { this.tx = this.targetUnit.x; this.ty = this.targetUnit.y; this.updateAngle(this.tx, this.ty); this.dist = Math.hypot(this.tx - this.x, this.ty - this.y); this.traveled = 0; }
+
+        // --- РЕАЛИСТИЧНЫЙ ЗАПУСК ЯДЕРНОЙ РАКЕТЫ: сначала медленный взлет, потом разгон к цели ---
+        if (this.isNuke) {
+            if (this.nukeMaxSpeed === undefined) { this.nukeMaxSpeed = this.speed; this.speed = 0.15; }
+            this.speed = Math.min(this.nukeMaxSpeed * 2.5, this.speed + 0.02);
+        }
+
         this.x += this.dx * this.speed; this.y += this.dy * this.speed;
         this.prevVisX = this.visX; this.prevVisY = this.visY;
         let yOffset = 0;
-        if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * 100; }
+        if (this.arty) { let progress = Math.min(1, this.traveled / this.dist); yOffset = Math.sin(progress * Math.PI) * (this.isNuke ? 280 : 100); }
         this.visX = this.x; this.visY = this.y - yOffset;
         // Если это артиллерия ИЛИ если снаряд выпустил NASAMS - рисуем дымный след
         if ((this.arty || (this.owner && this.owner.isNASAMS)) && Game.frameCount % 4 === 0) { 
             Game.effects.push({type: 'smoke', x: this.visX + (Math.random()-0.5)*8, y: this.visY + (Math.random()-0.5)*8, life: 120}); 
+        }
+        // Мощный огненный шлейф во время старта ядерной ракеты
+        if (this.isNuke && this.speed < this.nukeMaxSpeed && Game.frameCount % 2 === 0) {
+            Game.effects.push({type: 'smoke', x: this.visX + (Math.random()-0.5)*10, y: this.visY + 8, life: 60});
         }
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }
     }
@@ -9969,11 +10570,16 @@ hit() {
             
             // 1. Ослепительная вспышка
             Game.effects.push({ type: 'nuke_flash', x: this.x, y: this.y, life: 50 });
-            // 2. Ударная волна
+            // 2. Огненный шар в эпицентре
+            Game.effects.push({ type: 'nuke_fireball', x: this.x, y: this.y, life: 45 });
+            // 3. Ударная волна (двойной импульс, как от настоящего ядерного взрыва)
             Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 600, life: 80, color: 'rgba(255, 60, 0, 0.7)' });
-            // 3. Грибовидное облако
-            Game.effects.push({ type: 'nuke_mushroom', x: this.x, y: this.y, life: 180 });
-            // 4. Разлетающийся пепел
+            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 700, life: 110, color: 'rgba(255, 255, 255, 0.4)', delay: 15 });
+            // 4. Грибовидное облако
+            Game.effects.push({ type: 'nuke_mushroom', x: this.x, y: this.y, life: 400 });
+            // 5. Выжженная земля (долго не исчезает)
+            if (!isWaterHit) Game.effects.push({ type: 'scorch', x: this.x, y: this.y, maxRadius: 380, life: 1800 });
+            // 6. Разлетающийся пепел
             for (let i = 0; i < 50; i++) {
                 Game.effects.push({ type: 'ash', x: this.x + (Math.random() - 0.5) * 500, y: this.y + (Math.random() - 0.5) * 500, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, life: 100 + Math.random() * 150 });
             }
@@ -10060,6 +10666,7 @@ Game.spawnRealisticExplosion(this.x, this.y, this.splashRadius > 0 ? 1.5 : 0.5);
                     
                     if (this.isNuke) {
                         if (u.type === 'SILO') damage = 0; // Бункер неуязвим
+                        else if (u.type === 'TREE') damage = 9999; // Ядерный взрыв полностью выжигает всю растительность в радиусе поражения
                         else {
                             // --- ГРАДАЦИЯ УРОНА ПО РАССТОЯНИЮ ---
                             if (d <= 150) damage = 9999;                    // Эпицентр (100% уничтожение)
@@ -10421,7 +11028,7 @@ const InitialLoader = {
     },
     fakeDownload(textEl, barEl) {
         let downloadedMB = 0;
-        const totalMB = 8192; // 1 ГБ
+        const totalMB = 1024; //
         
         // Скачиваем примерно по 50-80 МБ каждые 30 миллисекунд
         const dlInterval = setInterval(() => {
@@ -10439,7 +11046,7 @@ const InitialLoader = {
                 setTimeout(() => this.finish(), 1500);
             } else {
                 let currentGB = (downloadedMB / 1024).toFixed(2);
-                textEl.innerText = `Загрузка игры: ${currentGB} ГБ / 8.00 ГБ...`;
+                textEl.innerText = `Загрузка игры: ${currentGB} ГБ / 1.00 ГБ...`;
                 
                 // Растягиваем оставшиеся 20% полосы прогресса (от 80% до 100%)
                 let progress = 80 + (downloadedMB / totalMB) * 20;

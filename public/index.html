@@ -409,7 +409,7 @@ canvas { display: block; cursor: crosshair; }
         <div class="spec-settings">
             <h3 style="color:#0af; margin-top:0;">НАСТРОЙКИ СИМУЛЯЦИИ</h3>
             <div class="spec-row">Карта: <span id="map-size-val">4000</span> м<br><input type="range" min="2000" max="6000" step="500" value="4000" oninput="document.getElementById('map-size-val').innerText = this.value"></div>
-            <div class="spec-row">Боты: <span id="bot-count-val">4</span> шт<br><input type="range" min="2" max="8" step="1" value="4" oninput="document.getElementById('bot-count-val').innerText = this.value"></div>
+            <div class="spec-row">Боты: <span id="bot-count-val">4</span> шт<br><input type="range" id="spec-bot-count" min="2" max="16" step="1" value="4" oninput="document.getElementById('bot-count-val').innerText = this.value"></div>
             <div class="spec-row"><label style="cursor:pointer;"><input type="checkbox" id="spectator-europe-toggle"> 🇪🇺 Карта Европы (реальные страны)</label></div>
             <button class="menu-btn" style="background:rgba(68, 34, 102, 0.4); border-color:#d0f; font-size: 1em; padding: 10px 30px;" onclick="Game.transitToSpectator()">📺 ЗАПУСТИТЬ СИМУЛЯЦИЮ</button>
         </div>
@@ -667,11 +667,14 @@ const formatCost = (u) => {
 };
 
 const UNITS = {
-    SOLDIER: { type:'unit', name: 'Штурмовик', emoji: '🪖', cost: 5000, hp: 125, dmg: 10, range: 350, speed: 0.25, reload: 40, color: '#44aaff', radius: 4, buildTime: 5, isInfantry: true },
-    SNIPER:  { type:'unit', name: 'Снайпер', emoji: '🏹', cost: 10000, hp: 40, dmg: 125, range: 500, speed: 1, reload: 100, color: '#ffffff', radius: 5, buildTime: 5, isInfantry: true },
+    SOLDIER: { type:'unit', name: 'Штурмовик', emoji: '🪖', cost: 5000, hp: 125, dmg: 35, range: 350, speed: 0.25, reload: 20, color: '#44aaff', radius: 4, buildTime: 5, isInfantry: true },
+    SNIPER:  { type:'unit', name: 'Снайпер', emoji: '🏹', cost: 10000, hp: 40, dmg: 170, range: 500, speed: 0.20, reload: 200, color: '#ffffff', radius: 5, buildTime: 5, isInfantry: true },
+    // Гранатометчик с РПГ: дорогой пехотинец, отлично уничтожает толпы (сплэш) или технику в 1-2 попадания,
+    // но боеприпасы (supply) расходует в 3 раза быстрее остальных - см. general firing code
+    RPG_INFANTRY: { type:'unit', name: 'Гранатометчик', emoji: '🚀', cost: 100000, hp: 100, dmg: 500, range: 500, speed: 0.25, reload: 320, color: '#6a7850', radius: 4, buildTime: 8, isInfantry: true, splash: 90 },
     
 // --- ТЕХНИКА С НОВЫМИ ЦЕНАМИ ---
-    TANK:    { type:'unit', name: 'Танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
+    TANK:    { type:'unit', name: 'Легкий танк',   emoji: '🚜', imageSrc: 'https://pngimg.com/uploads/tank/tank_PNG101041.png', 
                cost: 2000000, resCost: { iron: 35, chem: 2 }, 
                hp: 600, dmg: 120, range: 400, speed: 0.5, reload: 120, color: '#22aa22', radius: 11, buildTime: 20 },
 
@@ -686,6 +689,12 @@ const UNITS = {
     TRUCK:   { type:'unit', name: 'Грузовик', emoji: '🚛',
                cost: 50000, resCost: { iron: 15 },
                hp: 350, dmg: 0, range: 0, speed: 0.8, color: '#4a554a', radius: 13, buildTime: 12, capacity: 8 },
+
+    // БТР: бронетранспортёр. Возит либо десант, либо груз боеприпасов (3 мест), сам вооружен
+    // пулеметом КПВТ (слабый урон, но скорострельность как у пехоты)
+    BTR:     { type:'unit', name: 'БТР', emoji: '🛻',
+               cost: 800000, resCost: { iron: 30, chem: 1 },
+               hp: 700, dmg: 50, range: 350, speed: 0.6, reload: 20, color: '#4a5c38', radius: 12, buildTime: 18, capacity: 3 },
 
     AMMO_CRATE: { type:'unit', name: 'Боеприпасы', emoji: '📦',
                cost: 400, resCost: { iron: 10, chem: 5 },
@@ -735,12 +744,12 @@ FPV: {
 NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 10000000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 1500 },
 SENTINEL: { type:'unit', name: 'Минометчик', emoji: '🏯', cost: 15000, dmg: 100, hp: 125, range: 500, reload: 100, color: '#556677', radius: 8, buildTime: 10, speed: 0.2, maxAmmo: 3, isInfantry: true },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 40000000, resCost: { iron: 18, chips: 5 }, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
-   HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER', 'SENTINEL'] },
+   HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER', 'SENTINEL', 'RPG_INFANTRY'] },
     
 FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 2000000, hp: 600, income: 2, radius: 50, color: '#607d8b', 
              
 // Замените строчку spawnList у FACTORY на эту:
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'TRUCK', 'AMMO_CRATE', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
+spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'TRUCK', 'BTR', 'AMMO_CRATE', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 20000000, hp: 350, range: 800, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 50 },
@@ -826,11 +835,21 @@ const FACTIONS = {
     'bot3': { name: "БОТ 3", color: "#16a34a" },
     'bot4': { name: "БОТ 4", color: "#9333ea" },
     'bot5': { name: "БОТ 5", color: "#db2777" },
-    'bot6': { name: "БОТ 6", color: "#0284c7" }
+    'bot6': { name: "БОТ 6", color: "#0284c7" },
+    'bot7': { name: "БОТ 7", color: "#65a30d" },
+    'bot8': { name: "БОТ 8", color: "#ea580c" },
+    'bot9': { name: "БОТ 9", color: "#0d9488" },
+    'bot10': { name: "БОТ 10", color: "#7c3aed" },
+    'bot11': { name: "БОТ 11", color: "#c026d3" },
+    'bot12': { name: "БОТ 12", color: "#ca8a04" },
+    'bot13': { name: "БОТ 13", color: "#2563eb" },
+    'bot14': { name: "БОТ 14", color: "#dc2626" },
+    'bot15': { name: "БОТ 15", color: "#059669" },
+    'bot16': { name: "БОТ 16", color: "#be185d" }
 };
 
 // --- НАЗВАНИЯ БОТОВ ПО УМОЛЧАНИЮ (для сброса после режима "Карта Европы") ---
-const DEFAULT_BOT_NAMES = { bot1: "БОТ 1", bot2: "БОТ 2", bot3: "БОТ 3", bot4: "БОТ 4", bot5: "БОТ 5", bot6: "БОТ 6" };
+const DEFAULT_BOT_NAMES = { bot1: "БОТ 1", bot2: "БОТ 2", bot3: "БОТ 3", bot4: "БОТ 4", bot5: "БОТ 5", bot6: "БОТ 6", bot7: "БОТ 7", bot8: "БОТ 8", bot9: "БОТ 9", bot10: "БОТ 10", bot11: "БОТ 11", bot12: "БОТ 12", bot13: "БОТ 13", bot14: "БОТ 14", bot15: "БОТ 15", bot16: "БОТ 16" };
 
 // --- КАРТА ISO-КОДОВ СТРАН (world-atlas) НА РУССКИЕ НАЗВАНИЯ (для режима "Карта Европы") ---
 const EUROPE_COUNTRY_NAMES = {
@@ -1470,7 +1489,7 @@ getWorldHeight(x, y) {
     calculateSpawns() {
         const spawns = [];
         const radius = Math.max(MAP_W, MAP_H) * 0.42;
-        for (let p = 0; p < 8; p++) {
+        for (let p = 0; p < 16; p++) {
             let best = null, maxD = -1;
             for (let t = 0; t < 1000; t++) {
               // В calculateSpawns() замените 2 строчки:
@@ -2584,7 +2603,7 @@ manageCombat() {
             this.money -= UNITS[type].cost;
             b.startProduction(type);
             // Сразу после техники - в очередь ставим ящик боеприпасов, чтобы она выехала уже снабженной
-            if (['TANK', 'T90', 'GRAD', 'NASAMS'].includes(type)) b._needsAmmoFollowup = true;
+            if (['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR'].includes(type)) b._needsAmmoFollowup = true;
             else if (type === 'AMMO_CRATE') b._needsAmmoFollowup = false;
         }
     }
@@ -4391,15 +4410,17 @@ waterOffset: 0,
         }
 
         let militaryCount = 0;
+        let armyCostPer50s = 0;
         for (let i = 0; i < this.units.length; i++) {
             const u = this.units[i];
             if (u.side !== this.myRole) continue;
             if (u.isProducer || u.isBuilder) continue;
             if (['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL','HOUSE','SHOP','MALL','OFFICE','HOTEL','APARTMENT','BANK','TREE'].includes(u.type)) continue;
             militaryCount++;
+            const def = UNITS[u.type];
+            if (def) armyCostPer50s += (def.cost || 0) * (def.isInfantry ? 0.10 : 0.01);
         }
 
-        const armyCostPer50s = militaryCount * 100;
         const armyUpkeepPerSec = armyCostPer50s / 50;
 
         const totalUpkeepPerSec = armyUpkeepPerSec + autoProdPerSec;
@@ -4665,7 +4686,7 @@ waterOffset: 0,
     },
 
  startSpectator(useEurope) {
-        const botCount = parseInt(document.querySelector('input[type=range][max="8"]').value);
+        const botCount = parseInt(document.getElementById('spec-bot-count').value);
         const mapSize = parseInt(document.querySelector('input[type=range][max="6000"]').value);
 
         this.isMultiplayer = false;
@@ -5620,7 +5641,7 @@ update() {
 
     // --- ОПТИМИЗИРОВАННЫЙ РАСЧЕТ ПРОВОДОВ ---
         if (this.frameCount % 100 === 0) {
-            if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6'];
+            if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8', 'bot9', 'bot10', 'bot11', 'bot12', 'bot13', 'bot14', 'bot15', 'bot16'];
             if (this.powerUpdateIndex === undefined) this.powerUpdateIndex = 0;
             
             let sideToUpdate = this.powerSides[this.powerUpdateIndex % this.powerSides.length];
@@ -5723,20 +5744,33 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         }
 
 // --- СОДЕРЖАНИЕ АРМИИ (КАЖДЫЕ 3000 КАДРОВ) ---
+        // Стоимость обслуживания = % от первоначальной цены юнита: 10% для пехоты (isInfantry), 1% для техники.
         if (this.frameCount % 3000 === 0 && !this.isSpectator && this.state === 'BATTLE') {
             // Считаем военных юнитов игрока
-            let militaryCount = this.units.filter(u => u.side === this.myRole && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type)).length;
-            
-            if (militaryCount > 0) {
-                let cost = militaryCount * 100;
+            let myMilitary = this.units.filter(u => u.side === this.myRole && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','WALL'].includes(u.type));
+
+            if (myMilitary.length > 0) {
+                let cost = 0;
+                myMilitary.forEach(u => {
+                    const def = UNITS[u.type];
+                    if (!def) return;
+                    cost += (def.cost || 0) * (def.isInfantry ? 0.10 : 0.01);
+                });
+                cost = Math.round(cost);
                 this.money -= cost; // Деньги могут уйти в минус!
-                this.showError(`💸 СОДЕРЖАНИЕ АРМИИ: -${cost}$ (Юнитов: ${militaryCount})`);
+                this.showError(`💸 СОДЕРЖАНИЕ АРМИИ: -${cost}$ (Юнитов: ${myMilitary.length})`);
             }
 
             // БОТЫ тоже платят налоги
             this.bots.forEach(b => {
-                let botMil = this.units.filter(u => u.side === b.side && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','POWER_PLANT','SENTINEL'].includes(u.type)).length;
-                b.money -= botMil * 100;
+                let botMilitary = this.units.filter(u => u.side === b.side && !u.isProducer && !u.isBuilder && !['AA_DEFENSE','POWER_PLANT','SENTINEL'].includes(u.type));
+                let botCost = 0;
+                botMilitary.forEach(u => {
+                    const def = UNITS[u.type];
+                    if (!def) return;
+                    botCost += (def.cost || 0) * (def.isInfantry ? 0.10 : 0.01);
+                });
+                b.money -= Math.round(botCost);
             });
         }
 
@@ -6405,7 +6439,7 @@ menuAction(type) {
     // === ЛОГИКА ПОСАДКИ И ВЫСАДКИ В ЛОДКУ ===
         if (type === 'BOAT_LOAD' || type === 'BOAT_UNLOAD') {
             const boat = this.selection[0];
-            const CARRIER_TYPES = ['BOAT', 'BOAT_BOMBER', 'TRUCK'];
+            const CARRIER_TYPES = ['BOAT', 'BOAT_BOMBER', 'TRUCK', 'BTR'];
             if (!boat || !CARRIER_TYPES.includes(boat.type)) return;
             if (!boat.passengers) boat.passengers = [];
 
@@ -6425,7 +6459,13 @@ menuAction(type) {
                     Math.hypot(u.x - boat.x, u.y - boat.y) <= loadRadius
                 );
 
-                if (nearby.length === 0) { this.showError("В ЗОНЕ ПОГРУЗКИ НИКОГО НЕТ!"); return; }
+                // БТР: 10 мест ЛИБО под десант, ЛИБО под ящики боеприпасов - смешивать в одной поездке нельзя
+                if (boat.type === 'BTR' && boat.passengers.length > 0) {
+                    const hasAmmoLoaded = boat.passengers.some(p => p.type === 'AMMO_CRATE');
+                    nearby = nearby.filter(u => (u.type === 'AMMO_CRATE') === hasAmmoLoaded);
+                }
+
+                if (nearby.length === 0) { this.showError(boat.type === 'BTR' && boat.passengers.length > 0 ? "БТР УЖЕ ВЕЗЁТ ДРУГОЙ ТИП ГРУЗА!" : "В ЗОНЕ ПОГРУЗКИ НИКОГО НЕТ!"); return; }
 
                 let loadedCount = 0; let killedIds = [];
                 let removedUnits = []; // <-- НОВЫЙ МАССИВ ДЛЯ ТИХОГО УДАЛЕНИЯ
@@ -6471,7 +6511,7 @@ menuAction(type) {
             } 
             else if (type === 'BOAT_UNLOAD') {
                 if (boat.passengers.length === 0) { this.showError(`${carrierName} ПУСТ!`); return; }
-                if (boat.type !== 'TRUCK' && MapUtils.getTerrain(boat.x, boat.y) === 'DEEP') { this.showError("СЛИШКОМ ГЛУБОКО ДЛЯ ВЫСАДКИ!"); return; }
+                if (!['TRUCK', 'BTR'].includes(boat.type) && MapUtils.getTerrain(boat.x, boat.y) === 'DEEP') { this.showError("СЛИШКОМ ГЛУБОКО ДЛЯ ВЫСАДКИ!"); return; }
 
                 boat.passengers.forEach(p => {
                     let newTroop = new Unit(p.type, boat.x + (Math.random()-0.5)*70, boat.y + (Math.random()-0.5)*70, this.myRole);
@@ -6927,7 +6967,7 @@ if (this.roadDragStart) {
                     
                     if (this.selectionFilter) {
                         if (this.selectionFilter === 'BUILDER') newSelection = candidates.filter(u => u.isBuilder);
-                        else if (this.selectionFilter === 'ARMY') newSelection = candidates.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'BOAT' && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type));
+                        else if (this.selectionFilter === 'ARMY') newSelection = candidates.filter(u => !u.isBuilder && !u.isProducer && u.type !== 'BOAT' && !['AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'WAREHOUSE', 'WALL'].includes(u.type));
                         else if (this.selectionFilter === 'HOUSE') newSelection = candidates.filter(u => u.type === 'HOUSE');
                         else if (this.selectionFilter === 'FACTORY') newSelection = candidates.filter(u => u.type === 'FACTORY');
                         else if (this.selectionFilter === 'BOAT') newSelection = candidates.filter(u => u.type === 'BOAT' || u.type === 'BOAT_BOMBER');
@@ -6975,7 +7015,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                         this.updateUI(['HEAL_BTN'], true, 'ГОСПИТАЛЬ');
                     }
                     // === НОВОЕ: МЕНЮ ДЛЯ ТРАНСПОРТА (ЛОДКА / ГРУЗОВИК) ===
-                    else if (this.selection.length === 1 && (s0.type === 'BOAT' || s0.type === 'BOAT_BOMBER' || s0.type === 'TRUCK')) {
+                    else if (this.selection.length === 1 && (s0.type === 'BOAT' || s0.type === 'BOAT_BOMBER' || s0.type === 'TRUCK' || s0.type === 'BTR')) {
                         let menuItems = ['BOAT_LOAD'];
                         if (s0.passengers && s0.passengers.length > 0) menuItems.push('BOAT_UNLOAD');
                         
@@ -9373,8 +9413,8 @@ if (this.type === 'NASAMS') {
 
                     if (this.reload <= 0) {
                         this.reload = this.reloadMax;
-                        // Вертолет расходует боеприпасы в 3 раза медленнее остальных юнитов
-                        if (this.hasSupply) this.supply = Math.max(0, this.supply - (this.type === 'HELICOPTER' ? 1.25 / 3 : 1.25));
+                        // Вертолет расходует боеприпасы в 3 раза медленнее остальных юнитов, гранатометчик - в 3 раза быстрее
+                        if (this.hasSupply) this.supply = Math.max(0, this.supply - (this.type === 'HELICOPTER' ? 1.25 / 3 : (this.type === 'RPG_INFANTRY' ? 1.25 * 3 : 1.25)));
                         let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
 
                         let spawnX = this.x;
@@ -9409,8 +9449,9 @@ if (this.type === 'NASAMS') {
                                 this.recoil = 12;
                             } else {
                                 SoundManager.play('shoot', 100, vol); 
+                                if (this.type === 'RPG_INFANTRY') this.recoil = 15;
                             }
-                            let splashR = (this.type === 'TANK' || this.type === 'T90') ? 60 : 0;
+                            let splashR = (this.type === 'TANK' || this.type === 'T90') ? 60 : (this.splashRadius || 0);
                             Game.bullets.push(new Bullet(spawnX, spawnY, this.targetUnit.x, this.targetUnit.y, this.damage, this.side, false, this.targetUnit, this, splashR));
                         }
                     }
@@ -9784,7 +9825,7 @@ if (dist < 15) {
         }
 
 // --- 3D МОДЕЛИ ПЕХОТЫ И СТРОИТЕЛЕЙ (С УЛУЧШЕННОЙ АНИМАЦИЕЙ И ОРУЖИЕМ) ---
-        if (this.isBuilder || (UNITS[this.type] && UNITS[this.type].isInfantry)) {
+        if (this.isBuilder || (UNITS[this.type] && UNITS[this.type].isInfantry && this.type !== 'RPG_INFANTRY')) {
             ctx.save();
             ctx.translate(this.x, this.y);
             ctx.rotate(this.angle || 0);
@@ -9794,7 +9835,7 @@ if (dist < 15) {
             const scaleF = this.radius / baseR;
             ctx.scale(scaleF, scaleF);
 
-            let drawRad = 8;
+            let drawRad = 6;
 
             // Сложная математика шагов для реалистичности
             let isMoving = this.target && Math.hypot(this.target.x - this.x, this.target.y - this.y) > 2;
@@ -10449,6 +10490,173 @@ if (dist < 15) {
 
             if (Game.selection.includes(this)) {
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
+        }
+
+// --- МОДЕЛЬ БТР (колесный бронетранспортер с башенкой КПВТ) ---
+        if (this.type === 'BTR') {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            const baseR = 24;
+            const scaleF = this.radius / baseR;
+            ctx.scale(scaleF, scaleF);
+
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath(); ctx.ellipse(3, 4, baseR * 2.0, baseR * 1.0, this.angle || 0, 0, Math.PI*2); ctx.fill();
+
+            ctx.save();
+            ctx.rotate(this.angle || 0);
+
+            // 8 колес (4 пары)
+            [-28, -8, 12, 32].forEach(wx => {
+                [-18, 18].forEach(wy => {
+                    ctx.fillStyle = '#0f0f0f';
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(wx - 9, wy - 5, 18, 10, 2); else ctx.rect(wx - 9, wy - 5, 18, 10);
+                    ctx.fill();
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+                });
+            });
+
+            // Корпус
+            let hullGrad = ctx.createLinearGradient(-40, 0, 45, 0);
+            hullGrad.addColorStop(0, '#354228'); hullGrad.addColorStop(0.5, '#4a5c38'); hullGrad.addColorStop(1, '#5a6e45');
+            ctx.fillStyle = hullGrad; ctx.strokeStyle = '#1d2615'; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(48, 0); ctx.lineTo(35, -16); ctx.lineTo(-38, -16); ctx.lineTo(-44, -10);
+            ctx.lineTo(-44, 10); ctx.lineTo(-38, 16); ctx.lineTo(35, 16); ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // Башня с КПВТ
+            ctx.save();
+            ctx.translate(12, 0);
+            ctx.fillStyle = '#111'; ctx.fillRect(8, -1.5, 30, 3);
+            let turretGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 10);
+            turretGrad.addColorStop(0, '#5a6e45'); turretGrad.addColorStop(1, '#2c3821');
+            ctx.fillStyle = turretGrad;
+            ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.restore();
+
+            ctx.restore(); // rotate
+            ctx.restore(); // scale
+
+            // Индикатор груза: десант или ящики боеприпасов (перевозит либо то, либо другое)
+            if (this.passengers && this.passengers.length > 0) {
+                ctx.font = '11px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+                const icon = this.passengers[0].type === 'AMMO_CRATE' ? '📦' : '🪖';
+                ctx.fillText(`${icon}${this.passengers.length}/10`, this.x, this.y - this.radius - 20);
+            }
+
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x-15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x-15, this.y - hpOffset, 30 * (Math.max(0, this.hp)/this.maxHp), 4);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x-15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply)/this.maxSupply), 3);
+            }
+
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI*2); ctx.stroke();
+            }
+            return;
+        }
+
+// --- МОДЕЛЬ ГРАНАТОМЕТЧИКА (РПГ) ---
+        if (this.type === 'RPG_INFANTRY') {
+            const dr = 5; // Базовый масштаб модели (чуть крупнее обычного пехотинца)
+            const isMoving = Math.hypot(this.x - (this.prevX !== undefined ? this.prevX : this.x), this.y - (this.prevY !== undefined ? this.prevY : this.y)) > 0.05;
+            const wf = this.walkFrame || 0;
+            const recoilT = this.recoil || 0;
+
+            // --- НОГИ ---
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle || 0);
+
+            let legSwing = isMoving ? Math.sin(wf * 1.5) * 5 : 0;
+            let legSpread = isMoving ? 5 : 6;
+            ctx.fillStyle = '#0f140a';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(-3 + legSwing, -legSpread - 2, 6, 4, 2); else ctx.rect(-3 + legSwing, -legSpread - 2, 6, 4);
+            ctx.fill();
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(-3 - legSwing, legSpread - 2, 6, 4, 2); else ctx.rect(-3 - legSwing, legSpread - 2, 6, 4);
+            ctx.fill();
+            ctx.restore();
+
+            // --- ТОРС И ОРУЖИЕ ---
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle || 0);
+
+            let breathe = isMoving ? 0 : Math.sin(wf * 2) * 0.4;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath(); ctx.ellipse(1.5, 1.5, dr * 1.5, dr * 1.3, 0, 0, Math.PI * 2); ctx.fill();
+
+            let recoilX = recoilT > 0 ? -recoilT * 0.4 : 0;
+            ctx.translate(recoilX + breathe, 0);
+
+            let camoGrad = ctx.createLinearGradient(-dr, -dr, dr, dr);
+            camoGrad.addColorStop(0, '#354228');
+            camoGrad.addColorStop(0.5, this.color);
+            camoGrad.addColorStop(1, '#354228');
+            ctx.fillStyle = camoGrad;
+            ctx.beginPath(); ctx.ellipse(0, 0, dr, dr * 1.1, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
+
+            // Труба РПГ на плече
+            ctx.save();
+            ctx.translate(dr * 0.5, dr * 0.7);
+            ctx.fillStyle = '#3a4430'; ctx.fillRect(-dr * 2.5, -2, dr * 5, 4);
+            ctx.fillStyle = '#5c4028'; ctx.fillRect(-dr * 0.5, -2.5, dr * 1.5, 5);
+            ctx.fillStyle = '#222';
+            ctx.beginPath(); ctx.moveTo(-dr * 2.5, -2); ctx.lineTo(-dr * 3, -4); ctx.lineTo(-dr * 3, 4); ctx.lineTo(-dr * 2.5, 2); ctx.fill();
+            // Граната торчит спереди, если не в момент выстрела
+            if (recoilT === 0) {
+                ctx.fillStyle = '#4a5441';
+                ctx.beginPath();
+                ctx.moveTo(dr * 2.5, -2); ctx.lineTo(dr * 3.5, -3); ctx.lineTo(dr * 4.5, 0); ctx.lineTo(dr * 3.5, 3); ctx.lineTo(dr * 2.5, 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // Руки
+            ctx.fillStyle = '#ffccaa';
+            ctx.beginPath(); ctx.arc(-dr * 0.2, dr * 0.8, dr * 0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(dr * 0.8, dr * 0.8, dr * 0.4, 0, Math.PI * 2); ctx.fill();
+
+            // Голова в шлеме
+            ctx.fillStyle = '#354228';
+            ctx.beginPath(); ctx.arc(dr * 0.2, dr * 0.2, dr * 0.7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#ffccaa';
+            ctx.beginPath(); ctx.arc(dr * 0.5, dr * 0.2, dr * 0.4, -Math.PI / 2, Math.PI / 2.5); ctx.fill();
+
+            ctx.restore();
+
+            let hpOffset = this.radius + 15;
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30, 4);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(this.x - 15, this.y - hpOffset, 30 * (Math.max(0, this.hp) / this.maxHp), 4);
+
+            if (this.hasSupply) {
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x - 15, this.y - hpOffset + 5, 30, 3);
+                ctx.fillStyle = this.supply > 25 ? '#ffcc00' : '#ff5555';
+                ctx.fillRect(this.x - 15, this.y - hpOffset + 5, 30 * (Math.max(0, this.supply) / this.maxSupply), 3);
+            }
+
+            if (Game.selection.includes(this)) {
+                if (this.range > 0) {
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI * 2); ctx.stroke();
             }
             return;
         }

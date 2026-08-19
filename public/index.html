@@ -74,7 +74,7 @@ canvas { display: block; cursor: crosshair; }
     background: linear-gradient(180deg, rgba(12, 20, 31, 0.95) 0%, rgba(5, 10, 15, 0.8) 100%);
     border-bottom: 1px solid #00aaff; box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 25px; box-sizing: border-box; color: #eef; font-size: 0.95em; backdrop-filter: blur(5px);
+    padding: 0 25px; box-sizing: border-box; color: #eef; font-size: 0.95em;
 }
 
 /* --- ФЛАГ ИГРОКА (ЛЕВЫЙ ВЕРХНИЙ УГОЛ) --- */
@@ -492,6 +492,25 @@ canvas { display: block; cursor: crosshair; }
 <div id="end-screen" class="screen hidden clickable">
     <h1 id="end-title" style="font-size: 5em; text-shadow: 0 0 50px currentColor;">ПОБЕДА</h1>
     <button id="end-btn" class="menu-btn">ДАЛЕЕ</button>
+    <button id="end-replay-btn" class="menu-btn" style="display:none; border-color:#0af; color:#0af; box-shadow: 0 0 15px rgba(0,170,255,0.3);" onclick="Game.startReplay()">🎬 ПОВТОР МАТЧА</button>
+</div>
+
+<div id="replay-controls" class="clickable hidden" style="position:absolute; bottom:24px; left:50%; transform:translateX(-50%); background:rgba(10,15,25,0.92); border:1px solid #0af; border-radius:10px; padding:10px 16px; display:flex; align-items:center; gap:10px; z-index:60; box-shadow:0 0 20px rgba(0,170,255,0.35); flex-wrap: nowrap;">
+    <button id="replay-play-btn" class="speed-btn" onclick="Game.toggleReplayPlay()" style="width:40px;">⏸</button>
+    <input id="replay-scrub" type="range" min="0" max="1" value="0" step="1" style="width:260px;" oninput="Game.replaySetIndex(this.value)">
+    <select onchange="Game.replaySpeed = parseFloat(this.value)" class="speed-btn" style="padding:4px;">
+        <option value="0.5">0.5x</option>
+        <option value="1" selected>1x</option>
+        <option value="2">2x</option>
+        <option value="4">4x</option>
+    </select>
+    <div style="width: 1px; height: 20px; background: #555;"></div>
+    <button class="speed-btn" onclick="Game.setTerritoryMode(1)">БЛОКИ</button>
+    <button class="speed-btn" onclick="Game.setTerritoryMode(2)">ЛИНИИ</button>
+    <button class="speed-btn" onclick="Game.setTerritoryMode(3)">ПОЛИТИКА</button>
+    <button class="speed-btn" onclick="Game.setTerritoryMode(5)">ВОЙНА</button>
+    <div style="width: 1px; height: 20px; background: #555;"></div>
+    <button class="speed-btn" style="background:#c0392b; color:#fff;" onclick="Game.stopReplay()">✖ ВЫХОД</button>
 </div>
 
 <div id="country-editor-screen" class="screen hidden" style="background: rgba(5, 5, 8, 0.9); z-index: 200;">
@@ -2472,13 +2491,19 @@ manageCombat() {
         }
 
         if (enemies.length === 0) {
-            // ПАТРУЛЬ СВОЕЙ БАЗЫ В МИРНОЕ ВРЕМЯ
-            let myBaseCenter = myUnits.find(u => u.type === 'FACTORY' || u.type === 'HOUSE');
-            if (myBaseCenter) {
-                army.forEach(u => {
-                    if (!u.target && u.type !== 'SENTINEL' && u.type !== 'TRUCK' && u.type !== 'AMMO_CRATE') {
-                        u.moveCmd(myBaseCenter.x + (Math.random()-0.5)*600, myBaseCenter.y + (Math.random()-0.5)*600);
-                    }
+            // --- РАССТАНОВКА ГАРНИЗОНА В МИРНОЕ ВРЕМЯ ---
+            // Раз равномерно раскидываем свободных юнитов вокруг всех своих баз (кольцами) и больше НЕ дергаем их -
+            // просто стоят на месте, а не бегают кругами.
+            const myBases = myUnits.filter(u => u.type === 'FACTORY' || u.type === 'HOUSE');
+            if (myBases.length > 0) {
+                const idleArmy = army.filter(u => !u.garrisoned && !u.target && u.type !== 'SENTINEL' && u.type !== 'TRUCK' && u.type !== 'AMMO_CRATE');
+                idleArmy.forEach((u, i) => {
+                    const base = myBases[i % myBases.length];
+                    const ring = Math.floor(i / myBases.length);
+                    const angle = (i / idleArmy.length) * Math.PI * 2;
+                    const radius = 150 + (ring % 4) * 120; // Несколько колец обороны вокруг базы
+                    u.moveCmd(base.x + Math.cos(angle) * radius, base.y + Math.sin(angle) * radius);
+                    u.garrisoned = true;
                 });
             }
             return;
@@ -3045,7 +3070,8 @@ isSandbox: false, sandboxSide: 'player', // <--- Добавляем флаги
 
     updateFog() {
         if (!this.fogEnabled || !this.fogVisible) return;
-        if (this.frameCount - this.fogLastUpdateFrame < 45) return;
+        if (this.units.length === 0) return;
+        if (this.frameCount - this.fogLastUpdateFrame < 60) return;
         this.fogLastUpdateFrame = this.frameCount;
         this.fogVisible.fill(0);
 
@@ -3276,6 +3302,11 @@ zoom: 1,
     },
 
     setTerritoryMode(n) {
+        // --- НОВОЕ: режим ЗАЩИТА недоступен во время повтора матча ---
+        if (n === 4 && this.state === 'REPLAY') {
+            this.showError('⛔ РЕЖИМ ЗАЩИТЫ НЕДОСТУПЕН В ПОВТОРЕ');
+            return;
+        }
         this.territoryMode = n;
         const modes = ["ВЫКЛ", "БЛОКИ", "ЛИНИИ", "ПОЛИТИКА", "ЗАЩИТА", "ВОЙНА"];
         this.showError(`РЕЖИМ КАРТЫ: ${modes[n]}`);
@@ -3576,6 +3607,7 @@ setFilter(type) {
     // При отдалении камеры юниты одной стороны, оказавшиеся рядом (в одной ячейке сетки),
     // группируются, и вместо кучи мелких флагов рисуется ОДИН увеличенный флаг над толпой.
     drawUnitFlags(ctx) {
+        if (this.units.length === 0) return;
         const z = this.zoom || 1;
         // Размер ячейки кластеризации подбираем так, чтобы на ЭКРАНЕ она была примерно
         // постоянного размера (~70px) независимо от zoom — иначе при сильном отдалении
@@ -3627,6 +3659,11 @@ setFilter(type) {
     },
 
  updateTerritoryCache() {
+        // ОПТИМИЗАЦИЯ: пропускаем пересчет территории если юнитов нет (нечего рисовать)
+        if (this.units.length === 0) {
+            this.lastTerritoryTime = this.frameCount;
+            return;
+        }
         const margin = 100; 
         // ИСПРАВЛЕНИЕ БАГА: при отдалении камеры (zoom < 1) видимая область мира больше,
         // чем canvas.width/height в экранных пикселях. Учитываем zoom, чтобы кэш
@@ -3674,6 +3711,7 @@ setFilter(type) {
 
         // --- ЛОГИКА ДЛЯ 4 РЕЖИМА (ЗАЩИТА) ---
         if (this.territoryMode === 4) {
+            if (this.units.length === 0) { tCtx.globalAlpha = 1.0; return; }
             const getDefWeight = (u) => {
                 if (!u || u.hp <= 0 || u.visualOnly) return 0;
                 if (u.isBuilder || u.isProducer) return 0;
@@ -3761,6 +3799,7 @@ setFilter(type) {
         }
         
         // --- ЛОГИКА ДЛЯ ОСТАЛЬНЫХ РЕЖИМОВ (ТЕРРИТОРИИ) ---
+        if (this.units.length === 0) { tCtx.globalAlpha = 1.0; return; }
         const grid = new Array(rows * cols).fill(null);
 
         const GAP_POWER = 0.4;
@@ -4132,6 +4171,8 @@ setFilter(type) {
     territoryMode: 1,
 
     updatePowerLinesForSide(side) {
+        // ОПТИМИЗАЦИЯ: нет юнитов — нет проводов
+        if (this.units.length === 0) return;
         // Очищаем старые провода ТОЛЬКО для переданной фракции
         this.powerLinesCache = this.powerLinesCache.filter(line => line.side !== side);
 
@@ -4508,6 +4549,7 @@ waterOffset: 0,
     // а не от общего суммарного баланса энергии по всей базе.
     recalcPowerGrid() {
         this.powerGridByPlant.clear();
+        if (this.units.length === 0) return;
 
         const plants = this.units.filter(u => u.hp > 0 && (u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT'));
         plants.forEach(p => {
@@ -5084,6 +5126,10 @@ transitToEurope() {
         this.myRole = 'player';
         this.state = 'BATTLE';
         this.money = 5000000;
+        // --- НОВОЕ: сброс записи повтора матча (для экрана "ПОВТОР" после раунда) ---
+        this.replayLog = [];
+        this._replayCache = null;
+        this.replayEffects = [];
         
         MAP_W = 5000;
         MAP_H = 5000;
@@ -5631,6 +5677,28 @@ else if (cmd.type === 'path_move') {
 update() {
         if (this.clickDelay > 0) this.clickDelay--;
         this.frameCount++;
+
+        // --- РЕЖИМ ПОВТОРА МАТЧА: не гоняем обычную симуляцию, просто листаем сохраненные срезы ---
+        if (this.state === 'REPLAY') {
+            if (this.replayPlaying && this.replayLog && this.replayLog.length > 0) {
+                this.replayTimer = (this.replayTimer || 0) + 1;
+                const stepDelay = Math.max(3, Math.round(18 / (this.replaySpeed || 1)));
+                if (this.replayTimer >= stepDelay) {
+                    this.replayTimer = 0;
+                    if (this.replayIndex < this.replayLog.length - 1) {
+                        this.replayIndex++;
+                        const scrub = document.getElementById('replay-scrub');
+                        if (scrub) scrub.value = this.replayIndex;
+                    } else {
+                        this.replayPlaying = false;
+                        const btn = document.getElementById('replay-play-btn');
+                        if (btn) btn.innerText = '▶️';
+                    }
+                }
+            }
+            return;
+        }
+
         MapUtils._pathBudget = 6; // Не больше 6 полноценных A* за один тик - остальные поедут напрямую
         const speed = 15;
 
@@ -5640,7 +5708,7 @@ update() {
         }
 
     // --- ОПТИМИЗИРОВАННЫЙ РАСЧЕТ ПРОВОДОВ ---
-        if (this.frameCount % 100 === 0) {
+        if (this.frameCount % 100 === 0 && this.units.length > 0) {
             if (!this.powerSides) this.powerSides = ['player', 'enemy', 'bot1', 'bot2', 'bot3', 'bot4', 'bot5', 'bot6', 'bot7', 'bot8', 'bot9', 'bot10', 'bot11', 'bot12', 'bot13', 'bot14', 'bot15', 'bot16'];
             if (this.powerUpdateIndex === undefined) this.powerUpdateIndex = 0;
             
@@ -5674,6 +5742,19 @@ Tutorial.update();
         this.camera.y = Math.max(0, Math.min(this.camera.y, MAP_H - canvas.height));
         if (this.state === 'BATTLE') {
 
+            // --- НОВОЕ: ЗАПИСЬ ПОВТОРА МАТЧА (только продвинутый режим TERRITORY) ---
+            if (this.isIslandMode) {
+                if (!this.replayLog) this.replayLog = [];
+                if (this.frameCount % 180 === 0 && this.units.length > 0) {
+                    this.replayLog.push({
+                        frame: this.frameCount,
+                        units: this.units.filter(u => u.hp > 0 && !u.isFlying && u.side !== 'neutral' && u.type !== 'MINE' && u.type !== 'TREE')
+                            .map(u => ({ x: Math.round(u.x), y: Math.round(u.y), side: u.side }))
+                    });
+                    if (this.replayLog.length > 400) this.replayLog.shift(); // ограничение памяти на очень долгие матчи
+                }
+            }
+
             // --- ТАЙМЕР ПУТИ (WAYPOINTS) ---
             if (this.waypointTimer > 0) {
                 this.waypointTimer--;
@@ -5682,7 +5763,7 @@ Tutorial.update();
                 }
             }
 // В функции Game.update(), блок отправки sync_units замени на этот:
-if (this.isMultiplayer && this.frameCount % 15 === 0) { 
+if (this.isMultiplayer && this.frameCount % 30 === 0 && this.units.length > 0) { 
     const myUnits = this.units.filter(u => u.side === this.myRole).map(u => ({
         id: u.id,
         type: u.type, 
@@ -5697,13 +5778,15 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
     }
 }
 
-            this.bots.forEach(bot => bot.update());
+            if (this.bots.length > 0) this.bots.forEach(bot => bot.update());
 // --- ВСТАВИТЬ ЭТОТ БЛОК ---
            if (!this.spatialGrid) {
                 this.spatialGrid = new SpatialHash(250);
             }
-            this.spatialGrid.cells.clear(); // Быстро очищаем старую сетку
-            this.units.forEach(u => this.spatialGrid.add(u));
+            if (this.units.length > 0) {
+                this.spatialGrid.cells.clear();
+                this.units.forEach(u => this.spatialGrid.add(u));
+            }
             if (this.isSpectator && this.frameCount % 30 === 0) {
                 const hud = document.getElementById('spectator-hud');
                 let html = '';
@@ -5775,8 +5858,8 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         }
 
  if (this.frameCount % 60 === 0) {
-     this.powerGridDirty = true;
-    if (!this.isSpectator) {
+     if (this.units.length > 0) this.powerGridDirty = true;
+    if (!this.isSpectator && this.units.length > 0) {
         let income = 0;
         
         // 1. Сначала считаем доход
@@ -5884,10 +5967,10 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
         if (this.energyUse > this.energy) this.showError("НЕДОСТАТОЧНО ЭНЕРГИИ! ⚡");
     }
  }
-            this.units.forEach(u => u.update());
+            if (this.units.length > 0) this.units.forEach(u => u.update());
             
      // --- СЧИТАЕМ ПОТЕРИ И РИСУЕМ ВЗРЫВЫ ПЕРЕД УДАЛЕНИЕМ ---
-            this.units.forEach(u => {
+            if (this.units.length > 0) this.units.forEach(u => {
                 if (u.hp <= 0) {
                     // Считаем потери населения
                     if (u.side === this.myRole && (UNITS[u.type].isInfantry || u.isBuilder)) {
@@ -5957,7 +6040,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
             });
             
 // --- СЕТЬ: сообщаем остальным, что НАШИ юниты умерли (иначе они "призраками" останутся у других) ---
-            if (this.isMultiplayer && CURRENT_ROOM) {
+            if (this.isMultiplayer && CURRENT_ROOM && this.units.length > 0) {
                 const myDeadIds = this.units.filter(u => u.hp <= 0 && (u.side === this.myRole || u.side === 'neutral')).map(u => u.id);
                 if (myDeadIds.length > 0) {
                     this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'kill_units', ids: myDeadIds });
@@ -5966,7 +6049,7 @@ if (this.isMultiplayer && this.frameCount % 15 === 0) {
 
 // Удаляем мертвых и очищаем память от их остатков!
             let lenBefore = this.units.length;
-            this.units = this.units.filter(u => u.hp > 0);
+            if (lenBefore > 0) this.units = this.units.filter(u => u.hp > 0);
             if (this.units.length !== lenBefore) {
                 this.powerGridDirty = true;
                 // 1. Очистка выделения от убитых
@@ -6121,6 +6204,209 @@ if (this.isIslandMode || this.isMultiplayer || this.isEarthMode || this.isEurope
         document.getElementById('end-title').innerText = customTitle ? customTitle : (win ? "ПОБЕДА! 🎉" : "ПОРАЖЕНИЕ 💀");
         document.getElementById('end-btn').innerText = win ? "ДАЛЕЕ" : "ЗАНОВО";
         document.getElementById('end-btn').onclick = win ? () => Game.nextLevel() : () => Game.restartLevel();
+
+        // --- НОВОЕ: кнопка повтора матча (только продвинутый режим TERRITORY с записанной историей) ---
+        const replayBtn = document.getElementById('end-replay-btn');
+        if (replayBtn) replayBtn.style.display = (this.isIslandMode && this.replayLog && this.replayLog.length > 1) ? 'inline-block' : 'none';
+    },
+
+    // --- НОВОЕ: ПОВТОР МАТЧА (только карта + территория + флаги, без юнитов и зданий) ---
+    startReplay() {
+        if (!this.replayLog || this.replayLog.length < 2) { this.showError('НЕТ ДАННЫХ ДЛЯ ПОВТОРА'); return; }
+        document.getElementById('end-screen').classList.add('hidden');
+        this.state = 'REPLAY';
+        this.replayIndex = 0;
+        this.replayTimer = 0;
+        this.replayPlaying = true;
+        this.replaySpeed = this.replaySpeed || 1;
+        this.replayEffects = [];
+        this._replayCache = null;
+        if (this.territoryMode === 0 || this.territoryMode === 4) this.territoryMode = 1;
+
+        // Вписываем ВЕСЬ остров в экран, камера зафиксирована по центру карты
+        const z = Math.min(canvas.width / MAP_W, canvas.height / MAP_H) * 0.94;
+        this.zoom = z;
+        this.camera.x = MAP_W / 2 - (canvas.width / z) / 2;
+        this.camera.y = MAP_H / 2 - (canvas.height / z) / 2;
+
+        const scrub = document.getElementById('replay-scrub');
+        if (scrub) { scrub.max = this.replayLog.length - 1; scrub.value = 0; }
+        const playBtn = document.getElementById('replay-play-btn');
+        if (playBtn) playBtn.innerText = '⏸';
+        document.getElementById('replay-controls').classList.remove('hidden');
+    },
+
+    stopReplay() {
+        this.state = 'END';
+        document.getElementById('replay-controls').classList.add('hidden');
+        document.getElementById('end-screen').classList.remove('hidden');
+    },
+
+    toggleReplayPlay() {
+        this.replayPlaying = !this.replayPlaying;
+        const btn = document.getElementById('replay-play-btn');
+        if (btn) btn.innerText = this.replayPlaying ? '⏸' : '▶️';
+    },
+
+    replaySetIndex(v) {
+        if (!this.replayLog) return;
+        this.replayIndex = Math.max(0, Math.min(this.replayLog.length - 1, parseInt(v)));
+    },
+
+    // Считает поле влияния фракций по срезу юнитов на ВСЮ карту и рисует его в отдельный canvas.
+    // Также возвращает центроиды/площадь территории каждой фракции - для флагов и анимации захвата.
+    buildReplayTerritory(units, mode) {
+        const step = 48;
+        const cols = Math.ceil(MAP_W / step);
+        const rows = Math.ceil(MAP_H / step);
+        const canvasT = document.createElement('canvas');
+        canvasT.width = MAP_W; canvasT.height = MAP_H;
+        const tctx = canvasT.getContext('2d');
+
+        const RADIUS_PX = 260;
+        const RADIUS_CELLS = Math.ceil(RADIUS_PX / step);
+        const GAP_POWER = 0.4;
+        const INFLUENCE_COEF = 30000;
+        const grid = new Array(rows * cols).fill(null);
+
+        units.forEach(u => {
+            const cx = Math.floor(u.x / step), cy = Math.floor(u.y / step);
+            const minX = Math.max(0, cx - RADIUS_CELLS), maxX = Math.min(cols - 1, cx + RADIUS_CELLS);
+            const minY = Math.max(0, cy - RADIUS_CELLS), maxY = Math.min(rows - 1, cy + RADIUS_CELLS);
+            for (let iy = minY; iy <= maxY; iy++) {
+                for (let ix = minX; ix <= maxX; ix++) {
+                    const px = ix * step + step / 2, py = iy * step + step / 2;
+                    const dx = px - u.x, dy = py - u.y, d2 = dx * dx + dy * dy;
+                    if (d2 > RADIUS_PX * RADIUS_PX) continue;
+                    const force = INFLUENCE_COEF / (d2 + 1500);
+                    const idx = iy * cols + ix;
+                    if (!grid[idx]) grid[idx] = {};
+                    grid[idx][u.side] = (grid[idx][u.side] || 0) + force;
+                }
+            }
+        });
+
+        const counts = {}; const sums = {};
+        for (let iy = 0; iy < rows; iy++) {
+            for (let ix = 0; ix < cols; ix++) {
+                const idx = iy * cols + ix;
+                const cell = grid[idx];
+                if (!cell) continue;
+                let leader = null, max = 0, second = 0, total = 0;
+                for (let side in cell) { const f = cell[side]; total += f; if (f > max) { second = max; max = f; leader = side; } else if (f > second) second = f; }
+                if (total < 0.8 || max - second <= GAP_POWER || !leader) continue;
+
+                const px = ix * step, py = iy * step;
+                tctx.fillStyle = FACTIONS[leader] ? FACTIONS[leader].color : '#fff';
+                tctx.globalAlpha = (mode === 3) ? 0.55 : 0.3;
+                tctx.fillRect(px, py, step + 1, step + 1);
+
+                counts[leader] = (counts[leader] || 0) + 1;
+                if (!sums[leader]) sums[leader] = { x: 0, y: 0 };
+                sums[leader].x += px + step / 2; sums[leader].y += py + step / 2;
+            }
+        }
+        tctx.globalAlpha = 1;
+
+        const flags = {};
+        Object.keys(counts).forEach(side => {
+            flags[side] = { x: sums[side].x / counts[side], y: sums[side].y / counts[side] };
+        });
+
+        return { canvas: canvasT, counts, flags };
+    },
+
+    // Сравнивает площадь территории фракций между предыдущим и текущим срезом и запускает
+    // анимацию стрелок (зеленые - расширение, красные - потеря территории) от флага фракции.
+    spawnReplayCaptureEffects(prevCounts, newCounts, flags) {
+        if (!this.replayEffects) this.replayEffects = [];
+        if (!prevCounts) return;
+        const sides = new Set([...Object.keys(prevCounts), ...Object.keys(newCounts)]);
+        sides.forEach(side => {
+            const delta = (newCounts[side] || 0) - (prevCounts[side] || 0);
+            if (Math.abs(delta) < 2 || !flags[side]) return;
+            const color = delta > 0 ? ((FACTIONS[side] && FACTIONS[side].color) || '#0f0') : '#ff3333';
+            const n = Math.min(6, Math.ceil(Math.abs(delta) / 4));
+            for (let i = 0; i < n; i++) {
+                this.replayEffects.push({ x: flags[side].x, y: flags[side].y, angle: Math.random() * Math.PI * 2, life: 60, maxLife: 60, color });
+            }
+        });
+        if (this.replayEffects.length > 60) this.replayEffects.splice(0, this.replayEffects.length - 60);
+    },
+
+    drawReplay() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#050a14';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const z = this.zoom || 1;
+        ctx.save();
+        ctx.scale(z, z);
+        ctx.translate(-this.camera.x, -this.camera.y);
+
+        ctx.fillStyle = '#243b29';
+        ctx.fillRect(0, 0, MAP_W, MAP_H);
+        if (MapUtils.bgCanvas) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(MapUtils.bgCanvas, 0, 0, MAP_W, MAP_H);
+            ctx.imageSmoothingEnabled = true;
+        }
+        MapUtils.lakes.forEach(l => { ctx.beginPath(); ctx.arc(l.x, l.y, l.radius, 0, Math.PI * 2); ctx.fillStyle = l.color; ctx.fill(); });
+        MapUtils.mountains.forEach(m => { ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2); ctx.fill(); });
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 4 / z;
+        ctx.strokeRect(0, 0, MAP_W, MAP_H);
+
+        const snap = this.replayLog[this.replayIndex];
+        if (snap) {
+            const mode = (this.territoryMode === 0 || this.territoryMode === 4) ? 1 : this.territoryMode;
+            if (!this._replayCache || this._replayCache.index !== this.replayIndex || this._replayCache.mode !== mode) {
+                const built = this.buildReplayTerritory(snap.units, mode);
+                const prev = this._replayCache;
+                this.spawnReplayCaptureEffects(prev ? prev.counts : null, built.counts, built.flags);
+                this._replayCache = { index: this.replayIndex, mode, canvas: built.canvas, flags: built.flags, counts: built.counts };
+            }
+            ctx.drawImage(this._replayCache.canvas, 0, 0);
+
+            Object.keys(this._replayCache.flags).forEach(side => {
+                const f = this._replayCache.flags[side];
+                CountryEditor.drawFlagCanvas(ctx, f.x, f.y, 46, 30, side);
+                const name = (FACTIONS[side] && FACTIONS[side].name) || side;
+                ctx.font = 'bold 15px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.fillStyle = '#fff'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+                ctx.fillText(name.toUpperCase(), f.x, f.y + 20);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        if (this.replayEffects && this.replayEffects.length) {
+            this.replayEffects.forEach(e => {
+                const t = 1 - e.life / e.maxLife;
+                const alpha = Math.sin(t * Math.PI);
+                const dist = 40 * t;
+                ctx.save();
+                ctx.translate(e.x + Math.cos(e.angle) * dist, e.y + Math.sin(e.angle) * dist);
+                ctx.rotate(e.angle);
+                ctx.globalAlpha = Math.max(0, alpha);
+                ctx.fillStyle = e.color;
+                ctx.beginPath();
+                ctx.moveTo(14, 0); ctx.lineTo(-8, -8); ctx.lineTo(-3, 0); ctx.lineTo(-8, 8);
+                ctx.closePath(); ctx.fill();
+                ctx.restore();
+                e.life--;
+            });
+            ctx.globalAlpha = 1;
+            this.replayEffects = this.replayEffects.filter(e => e.life > 0);
+        }
+
+        ctx.restore();
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(canvas.width / 2 - 100, 16, 200, 34);
+        ctx.fillStyle = '#0af'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const secs = Math.floor((snap ? snap.frame : 0) / 60);
+        ctx.fillText(`⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}  (${this.replayIndex + 1}/${this.replayLog.length})`, canvas.width / 2, 33);
     },
 
 getMouse(e) {
@@ -6136,6 +6422,7 @@ getMouse(e) {
     },
 
 onDown(e) {
+        if (this.state === 'REPLAY') return; // В повторе клики по карте отключены
         if (e.button !== 0) return; // Только левый клик
         if (e.target && e.target.tagName !== 'CANVAS') return; // Игнорируем клики по кнопкам меню
         
@@ -7268,8 +7555,11 @@ onRight(e) {
     },
 
 draw() {
+        // --- НОВОЕ: ПОВТОР МАТЧА - отдельный, упрощенный рендер (только карта, территория и флаги) ---
+        if (this.state === 'REPLAY') { this.drawReplay(); return; }
+
         // Обновляем флаг игрока раз в ~30 кадров (не каждый кадр — незачем нагружать DOM)
-        if (this.frameCount % 30 === 0) CountryEditor.updateFlagDisplay();
+        if (this.frameCount % 60 === 0) CountryEditor.updateFlagDisplay();
 
         // 1. ЖЕСТКИЙ СБРОС МАСШТАБА перед новым кадром
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -7371,7 +7661,8 @@ draw() {
         });
 
         MapUtils.mountains.forEach(m => {
-            if (m.x + m.radius < this.camera.x || m.x - m.radius > this.camera.x + canvas.width) return;
+            if (m.x + m.radius < this.camera.x || m.x - m.radius > this.camera.x + cWidth ||
+                m.y + m.radius < this.camera.y || m.y - m.radius > this.camera.y + cHeight) return;
             ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(m.x + 10, m.y + 10, m.radius, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(m.x, m.y, m.radius, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(m.x - m.radius*0.2, m.y - m.radius*0.2, m.radius*0.7, 0, Math.PI*2); ctx.fill();
@@ -7383,7 +7674,7 @@ draw() {
             const margin = 100;
             const dist = Math.hypot(this.camera.x - this.lastTerritoryCam.x, this.camera.y - this.lastTerritoryCam.y);
             // Оптимизация: увеличили cooldown и дистанцию для пересчета территории
-            const cooldown = (this.territoryMode === 4) ? 60 : 30;
+            const cooldown = (this.territoryMode === 4) ? 60 : 45;
             const zoomChanged = this.lastTerritoryZoom !== (this.zoom || 1);
             const needUpdate = (this.frameCount - this.lastTerritoryTime > cooldown) || (dist > 150) || zoomChanged;
             if (needUpdate) {
@@ -7407,15 +7698,17 @@ draw() {
             }
         }
 
-        this.buffs.forEach(b => {
+        if (this.buffs.length > 0) this.buffs.forEach(b => {
             ctx.fillStyle = b.color;
             ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
         });
         
+        if (this.decor.length > 0) {
         ctx.font = '24px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle='#555';
         this.decor.forEach(d => {
-            if (d.x < this.camera.x - 100 || d.x > this.camera.x + canvas.width + 100) return;
+            if (d.x < this.camera.x - 100 || d.x > this.camera.x + cWidth + 100) return;
+            if (d.y < this.camera.y - 100 || d.y > this.camera.y + cHeight + 100) return;
             if (d.type === 'mud') {
                 // Красивое темное пятно грязи с видимым плавным радиусом замедления
                 const r = d.radius || 55;
@@ -7431,6 +7724,7 @@ draw() {
                 ctx.fillText(d.char, d.x, d.y);
             }
         });
+        }
         
 // --- ОТРИСОВКА ПРОТОПТАННЫХ ТРОПИНОК ---
         if (this.pathTracking && this.pathTracking.size > 0) {
@@ -7451,6 +7745,7 @@ draw() {
         
    
 // --- ОТРИСОВКА ПРОВОДОВ ЭЛЕКТРОПЕРЕДАЧ (ОПТИМИЗИРОВАННО) ---
+    if (this.powerLinesCache.length > 0) {
         ctx.lineWidth = 2;
         const pulse = (Math.sin(Game.frameCount * 0.1) + 1) / 2;
     
@@ -7471,9 +7766,10 @@ draw() {
             }
             ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke(); ctx.globalAlpha = 1;
         });
+    }
     if (this.state === 'PLACE' && !this.isIslandMode) { ctx.strokeStyle = '#0f0'; ctx.setLineDash([10, 10]); ctx.beginPath(); ctx.moveTo(1000, 0); ctx.lineTo(1000, MAP_H); ctx.stroke(); ctx.setLineDash([]); }
 
-        this.constructions.forEach(s => {
+        if (this.constructions.length > 0) this.constructions.forEach(s => {
             ctx.save(); ctx.globalAlpha = 0.55;
             ctx.font = (s.type && UNITS[s.type] && UNITS[s.type].emoji) ? '48px Arial' : '40px Arial';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#888';
@@ -7484,6 +7780,7 @@ draw() {
         });
 
     // РИСУЕМ СТРОГО В ТАКОМ ПОРЯДКЕ БЕЗ ФИЛЬТРОВ И ТОРМОЗОВ:
+    if (this.units.length > 0) {
         // 1. Здания
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
@@ -7513,11 +7810,14 @@ draw() {
                 u.draw(ctx);
             }
         }
+    }
     // 5. ПУЛИ И РАКЕТЫ (Вот эта строчка у нас пропала!)
+        if (this.bullets.length > 0) {
         for(let i=0; i<this.bullets.length; i++) {
             const b = this.bullets[i];
             if (this.fogEnabled && b && b.side !== this.myRole && !this.isWorldVisible(b.x, b.y)) continue;
             b.draw(ctx);
+        }
         }
 
         // --- РЕЖИМ 3 (ПОЛИТИКА): Рисуем ПОВЕРХ армии и зданий ---
@@ -7532,6 +7832,7 @@ draw() {
 
         this.updateFog();
 
+if (this.effects.length > 0)
 for (let i = 0; i < this.effects.length; i++) {
     const e = this.effects[i];
             
@@ -7798,7 +8099,7 @@ for (let i = 0; i < this.effects.length; i++) {
 
         this.drawFog(ctx);
 
-        if (window.mousePos) {
+        if (window.mousePos && this.buffs.length > 0) {
              const m = window.mousePos;
              const hoveredBuff = this.buffs.find(b => Math.abs(b.x - m.x) < b.width/2 && Math.abs(b.y - m.y) < b.height/2);
              if (hoveredBuff) {
@@ -8395,6 +8696,22 @@ checkPower() {
         if (this.isFlying) { if (this.flyState === 0 || this.flyState === 3) { this.flyState = 1; this.flyTimer = 180; } }
     }
 
+    // --- НОВОЕ: юнит-бот застрял (не проходит и клетки) - ищем случайную свободную клетку рядом и едем туда ---
+    rerouteStuckUnit() {
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 80 + Math.random() * 100; // 2-6 клеток (клетка = 30px), достаточно далеко от препятствия
+            const nx = this.x + Math.cos(ang) * dist;
+            const ny = this.y + Math.sin(ang) * dist;
+            if (nx < 50 || nx > MAP_W - 50 || ny < 50 || ny > MAP_H - 50) continue;
+            if (MapUtils.checkMountain(nx, ny, this.radius + 8)) continue;
+            if (this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER' && MapUtils.checkWater(nx, ny)) continue;
+            this.pathQueue = [];
+            this.moveCmd(nx, ny);
+            return;
+        }
+    }
+
     // --- НОВОЕ: попытка выпустить готовую технику из очереди завода на фиксированную точку выезда ---
     trySpawnFromBacklog() {
         if (!this.spawnBacklog || this.spawnBacklog.length === 0 || this.hp <= 0) return;
@@ -8630,6 +8947,30 @@ attemptAutoProduction() {
                     u.supply = Math.min(u.maxSupply, u.supply + give);
                     this.hp -= give * costPerPercent;
                 }
+            }
+        }
+
+   // --- ЛОГИКА ЯЩИКОВ БОЕПРИПАСОВ В КУЗОВЕ ТРАНСПОРТА (действуют без выгрузки) ---
+        if (this.passengers && this.passengers.length > 0 && Game.frameCount % 15 === 0) {
+            const crateCount = this.passengers.filter(p => p.type === 'AMMO_CRATE' && p.hp > 0).length;
+            if (crateCount > 0) {
+                // Чем больше ящиков загружено, тем больше радиус раздачи: 1 ящик радиуса + 50% + 10% за каждый ящик
+                const radius = (UNITS.AMMO_CRATE.supplyRadius || 90) * (1.5 + 0.1 * crateCount);
+                const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby(this) : Game.units;
+                for (let u of neighbors) {
+                    let crate = this.passengers.find(p => p.type === 'AMMO_CRATE' && p.hp > 0);
+                    if (!crate) break;
+                    if (!u.hasSupply || u.side !== this.side || u.supply >= u.maxSupply) continue;
+                    if (Math.hypot(u.x - this.x, u.y - this.y) > radius) continue;
+                    const costPerPercent = (u.type === 'HELICOPTER') ? 0.3 : 0.15;
+                    const need = u.maxSupply - u.supply;
+                    const affordable = crate.hp / costPerPercent;
+                    const give = Math.min(need, affordable, 2);
+                    if (give <= 0) continue;
+                    u.supply = Math.min(u.maxSupply, u.supply + give);
+                    crate.hp -= give * costPerPercent;
+                }
+                this.passengers = this.passengers.filter(p => p.type !== 'AMMO_CRATE' || p.hp > 0.01);
             }
         }
 
@@ -9413,8 +9754,8 @@ if (this.type === 'NASAMS') {
 
                     if (this.reload <= 0) {
                         this.reload = this.reloadMax;
-                        // Вертолет расходует боеприпасы в 3 раза медленнее остальных юнитов, гранатометчик - в 3 раза быстрее
-                        if (this.hasSupply) this.supply = Math.max(0, this.supply - (this.type === 'HELICOPTER' ? 1.25 / 3 : (this.type === 'RPG_INFANTRY' ? 1.25 * 3 : 1.25)));
+                        // Вертолет и БТР расходуют боеприпасы в 3 раза медленнее остальных юнитов, гранатометчик - в 3 раза быстрее
+                        if (this.hasSupply) this.supply = Math.max(0, this.supply - ((this.type === 'HELICOPTER' || this.type === 'BTR') ? 1.25 / 3 : (this.type === 'RPG_INFANTRY' ? 1.25 * 3 : 1.25)));
                         let vol = SoundManager.getVolumeByDistance(this.x, this.y, 1500, 0.4);
 
                         let spawnX = this.x;
@@ -9629,6 +9970,30 @@ if (dist < 15) {
             // --- РАСХОД СНАБЖЕНИЯ ПРИ ПЕРЕДВИЖЕНИИ (в несколько раз медленнее, чем при стрельбе) ---
             if (this.hasSupply && this.supply > 0) {
                 this.supply = Math.max(0, this.supply - currentSpeed * 0.005);
+            }
+
+            // --- ЗАСТРЕВАНИЕ ЮНИТОВ-БОТОВ: если бот идет к цели, но почти не двигается ---
+            // (уперся в стену/гору/здание), перенаправляем его на случайную свободную клетку рядом.
+            if (!outOfSupply && !this.isFlying && this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER') {
+                if (this.stuckCheckTimer === undefined) {
+                    this.stuckCheckTimer = 0;
+                    this.stuckCheckX = this.x;
+                    this.stuckCheckY = this.y;
+                }
+                this.stuckCheckTimer++;
+                const STUCK_WINDOW = 120; // ~2 секунды проверки
+                if (this.stuckCheckTimer >= STUCK_WINDOW) {
+                    const moved = Math.hypot(this.x - this.stuckCheckX, this.y - this.stuckCheckY);
+                    // Ожидаемая дистанция считается от СВОЕЙ скорости юнита, а не текущей (грязь/поля - это не застревание)
+                    const expectedMin = Math.max(8, this.speed * STUCK_WINDOW * 0.25);
+                    const isBotUnit = Game.bots && Game.bots.some(b => b.side === this.side);
+                    if (isBotUnit && moved < expectedMin) {
+                        this.rerouteStuckUnit();
+                    }
+                    this.stuckCheckTimer = 0;
+                    this.stuckCheckX = this.x;
+                    this.stuckCheckY = this.y;
+                }
             }
 
             // --- ЮНИТЫ БЕЗ БОЕПРИПАСОВ МЕДЛЕННО ПОЛУЧАЮТ УРОН ---

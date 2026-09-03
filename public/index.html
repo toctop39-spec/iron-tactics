@@ -4,7 +4,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Iron-Tactics v130826</title>
+    <title>Iron-Tactics v30926</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -393,7 +393,7 @@ canvas { display: block; cursor: crosshair; }
                 
 <div id="menu-screen" class="screen clickable">
     <h1 style="color:#4f4; text-shadow: 0 0 30px #0f0; font-size: 4em; letter-spacing: 5px; margin-bottom: 0;">IRON TACTICS</h1>
-    <h3 style="color:#aaa; margin-top: 5px; font-weight: normal; letter-spacing: 2px;">v130826</h3>
+    <h3 style="color:#aaa; margin-top: 5px; font-weight: normal; letter-spacing: 2px;">v30926</h3>
     
     <div style="display:flex; gap: 30px; margin-top: 40px;">
         <div style="display:flex; flex-direction:column; gap:15px;">
@@ -763,13 +763,14 @@ FPV: {
 NUCLEAR_PLANT: { type:'bldg', name: 'АЭС', emoji: '☢️', cost: 10000000, resCost: { chem: 18 }, hp: 1500, radius: 50, color: '#33ff33', constructTime: 40, energyGen: 1500 },
 SENTINEL: { type:'unit', name: 'Минометчик', emoji: '🏯', cost: 15000, dmg: 100, hp: 125, range: 500, reload: 100, color: '#556677', radius: 8, buildTime: 10, speed: 0.2, maxAmmo: 3, isInfantry: true },
     SILO:     { type:'bldg', name: 'Бункер', emoji: '🕳️', cost: 40000000, resCost: { iron: 18, chips: 5 }, hp: 999, income: 0, radius: 45, constructTime: 60, energyUse: 125, isInvulnerable: true },
-   HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER', 'SOLDIER', 'SNIPER', 'SENTINEL', 'RPG_INFANTRY'] },
+   HOUSE: { type: 'bldg', name: 'Жилой Дом', emoji: '🏠', cost: 300, hp: 500, radius: 45, constructTime: 5, energyUse: 0, color: '#aaa', spawnList: ['BUILDER'] },
     
-FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 2000000, hp: 600, income: 2, radius: 50, color: '#607d8b', 
-             
-// Замените строчку spawnList у FACTORY на эту:
-spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TANK', 'T90', 'GRAD', 'TRUCK', 'BTR', 'AMMO_CRATE', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BOAT', 'BTN_AUTO'],
+FACTORY: { type:'bldg', name: 'Завод',  emoji: '🏭', cost: 2000000, hp: 600, income: 2, radius: 50, color: '#607d8b',
+               spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEAVY', 'CRAFT_CRUISE', 'CRAFT_NUKE', 'TRUCK', 'AMMO_CRATE', 'BOAT', 'TANK', 'T90', 'GRAD', 'BTR', 'NASAMS', 'HELICOPTER', 'FPV', 'SHAHED', 'BTN_AUTO'],
                constructTime: 40, energyUse: 15 },
+
+    BASE: { type: 'bldg', name: 'База', emoji: '🏛️', imageSrc: 'Base.png', cost: 3000000, hp: 3000, radius: 70, constructTime: 80, energyUse: 40, color: '#444466',
+            spawnList: ['SOLDIER', 'SNIPER', 'RPG_INFANTRY', 'SENTINEL', 'BTN_AUTO'] },
                
     AA_DEFENSE: { type:'bldg', name: 'ПВО', emoji: '📡', cost: 20000000, hp: 350, range: 800, reload: 50, color: '#006064', radius: 50, constructTime: 30, energyUse: 50 },
     HOSPITAL: { type:'bldg', name: 'Госпиталь', emoji: '🏥', cost: 2200, hp: 500, income: 10, range: 0, radius: 60, constructTime: 30, color: '#ef5350', energyUse: 10 },
@@ -813,14 +814,14 @@ spawnList: ['CRAFT_IRON', 'CRAFT_CHEM', 'CRAFT_CHIP', 'CRAFT_ROCKET', 'CRAFT_HEA
 };
 
 const HOUSE_UPGRADES = [
-    { type: 'HOUSE', name: 'Жилой Дом', emoji: '🏠', cost: 300, energy: 10, income: 5, maxSpawn: 4 },
-    { type: 'SHOP', name: 'Магазин', emoji: '🏪', cost: 1000, energy: 10, income: 150, maxSpawn: 8 },
-    { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 40000, energy: 30, income: 400, maxSpawn: 15 },
-    { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 150000, energy: 60, income: 800, maxSpawn: 25 },
-    { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 250000, energy: 40, income: 1500, maxSpawn: 40 },
-    { type: 'APARTMENT', name: '5-Этажка', emoji: '🏨', cost: 450000, energy: 40, income: 3000, maxSpawn: 60 },
-    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 10000000, energy: 50, income: 6000, maxSpawn: 20 },
-    { type: 'SKYSCRAPER', name: 'Небоскреб', emoji: '🏙️', cost: 20000000, energy: 80, income: 18000, maxSpawn: 30 },
+    { type: 'HOUSE', name: 'Жилой Дом', emoji: '🏠', cost: 300, energy: 10, income: 5, maxSpawn: 1 },
+    { type: 'SHOP', name: 'Магазин', emoji: '🏪', cost: 1000, energy: 10, income: 150, maxSpawn: 1 },
+    { type: 'MALL', name: 'Торговый центр', emoji: '🏬', cost: 40000, energy: 30, income: 400, maxSpawn: 1 },
+    { type: 'OFFICE', name: 'Бизнес-центр', emoji: '🏢', cost: 150000, energy: 60, income: 800, maxSpawn: 2 },
+    { type: 'HOTEL', name: 'Отель', emoji: '🏨', cost: 250000, energy: 40, income: 1500, maxSpawn: 4 },
+    { type: 'APARTMENT', name: '5-Этажка', emoji: '🏨', cost: 450000, energy: 40, income: 3000, maxSpawn: 6 },
+    { type: 'BANK', name: 'Центральный Банк', emoji: '🏦', cost: 10000000, energy: 50, income: 6000, maxSpawn: 2 },
+    { type: 'SKYSCRAPER', name: 'Небоскреб', emoji: '🏙️', cost: 20000000, energy: 80, income: 18000, maxSpawn: 3 },
 ];
     
 const SILO_AMMO = {
@@ -1922,6 +1923,56 @@ renderBackground() {
                 }
             }
         }
+    },
+
+    _segmentCircleIntersect(x1, y1, x2, y2, cx, cy, r) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const lx = cx - x1, ly = cy - y1;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < 0.0001) return Math.hypot(lx, ly) <= r;
+        const t = Math.max(0, Math.min(1, (lx*dx + ly*dy) / d2));
+        const closestX = x1 + t*dx, closestY = y1 + t*dy;
+        return Math.hypot(closestX - cx, closestY - cy) <= r;
+    },
+
+    // Проверяет, есть ли преграда (здание, гора, другой юнит) между двумя точками.
+    // ignore1/ignore2 — юниты, которые игнорируются (стрелок и цель).
+    hasLineOfSight(x1, y1, x2, y2, ignore1, ignore2) {
+        const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+        const nearby = Game.spatialGrid ? Game.spatialGrid.getNearby({x: midX, y: midY}) : Game.units;
+        for (let u of nearby) {
+            if (u === ignore1 || u === ignore2) continue;
+            if (u.hp <= 0) continue;
+            if (u.isFlying && u.flyHeight > 0.3) continue;
+            if (u.type === 'TREE') {
+                // Деревья — мягкое укрытие: с шансом ~35% заглушают пулю/наведение
+                if (Math.random() > 0.35) continue;
+            }
+            const r = (u.collisionRadius || u.radius || 10) + 4;
+            if (this._segmentCircleIntersect(x1, y1, x2, y2, u.x, u.y, r)) return false;
+        }
+        for (let m of this.mountains) {
+            if (this._segmentCircleIntersect(x1, y1, x2, y2, m.x, m.y, m.radius + 8)) return false;
+        }
+        return true;
+    },
+
+    // Проверяет, стоит ли на линии выстрела здание/укрытие, за которым прячется цель.
+    // Возвращает обьект-преграду или null (полезно для снарядов и проверок).
+    getLineBlocker(x1, y1, x2, y2, ignore1, ignore2) {
+        const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+        const nearby = Game.spatialGrid ? Game.spatialGrid.getNearby({x: midX, y: midY}) : Game.units;
+        for (let u of nearby) {
+            if (u === ignore1 || u === ignore2) continue;
+            if (u.hp <= 0) continue;
+            if (u.isFlying && u.flyHeight > 0.3) continue;
+            const r = (u.collisionRadius || u.radius || 10) + 4;
+            if (this._segmentCircleIntersect(x1, y1, x2, y2, u.x, u.y, r)) return u;
+        }
+        for (let m of this.mountains) {
+            if (this._segmentCircleIntersect(x1, y1, x2, y2, m.x, m.y, m.radius + 8)) return m;
+        }
+        return null;
     }
 };
 
@@ -2058,6 +2109,10 @@ class BotAI {
         this.color = FACTIONS[side] ? FACTIONS[side].color : '#ff0000';
         this.timer = Math.floor(Math.random() * 60); // Сдвиг фазы: боты не думают все в один кадр
         this.resources = { iron: 0, chem: 0, chips: 0, rockets: 0, heavies: 0, cruises: 0, nukes: 0 };
+        // Лимит населения как у игрока: ёмкость домов минус погибшие/использованные люди
+        this.population = 0;
+        this.maxPopulation = 0;
+        this.casualties = 0;
     }
 
     update() {
@@ -2105,6 +2160,17 @@ class BotAI {
         if (this.money < 50) this.money += 30;
         if (use === 0) this.energyFactor = 100;
         else this.energyFactor = gen / use;
+
+        // --- НАСЕЛЕНИЕ БОТА (та же формула, что у игрока) ---
+        let baseMaxPop = 0, usedPop = 0;
+        Game.units.forEach(u => {
+            if (u.side === this.side) {
+                if (u.type === 'HOUSE') baseMaxPop += HOUSE_UPGRADES[u.level || 0].maxSpawn || 0;
+                if (UNITS[u.type].isInfantry || u.isBuilder) usedPop++;
+            }
+        });
+        this.maxPopulation = Math.max(0, baseMaxPop - (this.casualties || 0));
+        this.population = Math.max(0, this.maxPopulation - usedPop);
     }
 
 manageBase() {
@@ -2114,6 +2180,7 @@ manageBase() {
         const houseCount = myUnits.filter(u => u.type === 'HOUSE').length;
         const factoryCount = myUnits.filter(u => u.type === 'FACTORY').length;
         const whCount = myUnits.filter(u => u.type === 'WAREHOUSE').length;
+        const baseCount = myUnits.filter(u => u.type === 'BASE').length;
         const defenseCount = myUnits.filter(u => u.type === 'SENTINEL' || u.type === 'AA_DEFENSE').length;
 
         // --- ЗАПЛАТКА ДЛЯ НАКОПЛЕНИЯ ---
@@ -2147,29 +2214,46 @@ manageBase() {
         if (builders.length === 0) return;
         const builder = builders[0];
 
+        // --- САМОЕ НАЧАЛО: 1 СЭС и 1 база ---
+        const powerPlantCount = myUnits.filter(u => u.type === 'POWER_PLANT').length;
+        if (powerPlantCount < 1 && this.money >= UNITS.POWER_PLANT.cost) {
+            if (this.placePowerPlantSmart(builder)) return;
+            if (this.placeBuildingGeneral(builder, 'POWER_PLANT')) return;
+        }
+        if (baseCount < 1 && this.money >= UNITS.BASE.cost * 1.05 && this.energyFactor > 1.0) {
+            if (this.placeBuildingGeneral(builder, 'BASE')) return;
+        }
+
         // --- ПРИОРИТЕТЫ СТРОЙКИ ---
         
-// 1. УМНАЯ СЭС (строим только при РЕАЛЬНОМ дефиците энергии, а не от одного отдельного
-// отключенного здания на отшибе — иначе бот застревает в бесконечной стройке СЭС и
-// перестаёт расширяться домами вообще)
+// 1. СЭС — ПЕРВЫЙ ПРИОРИТЕТ: как только хотя бы одно здание без питания или генерации
+// не хватает, бот сразу идёт ставить СЭС, ДО расширения домами.
         const unpowered = myUnits.filter(u => !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
-        const energyCritical = this.energyFactor < 1.1 || unpowered.length > 3;
+        // Не ставим вторую СЭС подряд, пока первая ещё в стройке
+        const plantInProgress = Game.constructions.some(c => c.owner === this.side && c.type === 'POWER_PLANT');
+        const energyCritical = this.energyFactor < 1.2 || unpowered.length > 0;
 
-        if (energyCritical && this.money >= UNITS.POWER_PLANT.cost) {
+        if (energyCritical && !plantInProgress && this.money >= UNITS.POWER_PLANT.cost) {
             if (this.placePowerPlantSmart(builder)) return;
         }
-        // ФИКС: если денег на СЭС не хватает, НЕ блокируем стройку целиком —
-        // бот продолжает копить, но тем временем достраивает дешёвые дома ниже по приоритету.
+        // Серьёзный дефицит (генерации не хватает даже на текущие здания) ИЛИ много обесточенных —
+        // НЕ строим новые дома, копим/ждём СЭС, иначе сделаем дефицит ещё хуже
+        if ((this.energyFactor < 1.0 || unpowered.length > 2) && powerPlantCount > 0) return;
 
         let buildTarget = null;
 
-        // 2. ГЛОБАЛЬНЫЙ ПЛАН ЗАСТРОЙКИ (Цель: 40 домов, 20 заводов)
+        // 2. ГЛОБАЛЬНЫЙ ПЛАН ЗАСТРОЙКИ (Цель: 40 домов, 20 заводов, 3-5 баз)
         if (houseCount < 3 && this.money >= UNITS.HOUSE.cost) buildTarget = 'HOUSE'; // Стартовый рывок
         else if (factoryCount < 1 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY'; // Первый завод
+        else if (baseCount < 1 && this.money >= UNITS.BASE.cost * 1.05 && this.energyFactor > 1.0 && houseCount >= 3 && factoryCount >= 1) buildTarget = 'BASE'; // Первая база
         else if (defenseCount < (houseCount + factoryCount) / 3.5 && this.money >= UNITS.AA_DEFENSE.cost) buildTarget = 'AA_DEFENSE';
+        else if (factoryCount < 2 && houseCount >= 5 && this.money >= UNITS.FACTORY.cost) buildTarget = 'FACTORY';
+        else if (baseCount < 2 && this.money >= UNITS.BASE.cost * 1.05 && this.energyFactor > 1.0 && houseCount >= 6 && factoryCount >= 2) buildTarget = 'BASE'; // Вторая база
         // Массовое расширение:
         else if (houseCount < 40 && this.money >= UNITS.HOUSE.cost && this.energyFactor > 1.1) buildTarget = 'HOUSE';
         else if (factoryCount < 20 && houseCount >= 5 && this.money >= UNITS.FACTORY.cost && this.energyFactor > 1.1) buildTarget = 'FACTORY';
+        // Добиваем базы до 3-5
+        else if (baseCount < 5 && this.money >= UNITS.BASE.cost && this.energyFactor > 1.0 && houseCount >= 10 && factoryCount >= 4) buildTarget = 'BASE';
         // Логистика и лейтгейм:
         else if (whCount < Math.ceil(factoryCount / 3) && this.money >= UNITS.WAREHOUSE.cost) buildTarget = 'WAREHOUSE';
         else if (this.money > UNITS.SILO.cost * 3 && !myUnits.some(u => u.type === 'SILO')) buildTarget = 'SILO';
@@ -2258,6 +2342,11 @@ placePowerPlantSmart(builder) {
         else if (type === 'SENTINEL' || type === 'AA_DEFENSE') {
             anchors = myUnits.filter(u => u.type === 'HOUSE' || u.type === 'FACTORY' || u.type === 'SILO');
         }
+        else if (type === 'BASE') {
+            // Базу ставим в радиусе СЭС, чтобы она сразу была запитана
+            const plants = myUnits.filter(u => u.type === 'POWER_PLANT' || u.type === 'NUCLEAR_PLANT');
+            anchors = plants.length > 0 ? plants : myUnits.filter(u => u.type === 'FACTORY' || u.type === 'HOUSE');
+        }
         else {
             anchors = myUnits.filter(u => u.type === 'HOUSE');
         }
@@ -2280,7 +2369,14 @@ placePowerPlantSmart(builder) {
             }
             
             // Ищем дальше от центра базы! От 80 до 400 пикселей
-            const dist = anchor.radius + bRadius + 80 + Math.random() * 380; 
+            let dist = anchor.radius + bRadius + 80 + Math.random() * 380;
+            // Если строим базу от электростанции — не выходим за радиус её действия
+            if (type === 'BASE' && (anchor.type === 'POWER_PLANT' || anchor.type === 'NUCLEAR_PLANT')) {
+                const powerRange = anchor.type === 'NUCLEAR_PLANT' ? 800 : 300;
+                const maxDist = powerRange - 10; // небольшой запас
+                const minDist = anchor.radius + bRadius + 80;
+                dist = minDist + Math.random() * Math.max(20, maxDist - minDist);
+            } 
             const tx = anchor.x + Math.cos(angle) * dist;
             const ty = anchor.y + Math.sin(angle) * dist;
 
@@ -2306,15 +2402,18 @@ placePowerPlantSmart(builder) {
     }
 
 manageIndustry() {
-        const factories = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY' && u.spawnCooldown <= 0 && u.isPowered);
+        const producers = Game.units.filter(u => u.side === this.side && (u.type === 'FACTORY' || u.type === 'BASE') && u.spawnCooldown <= 0 && u.isPowered);
         const army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer);
-        
+
         const tanks = army.filter(u => u.type === 'TANK').length;
         const helis = army.filter(u => u.type === 'HELICOPTER').length;
         const grads = army.filter(u => u.type === 'GRAD').length;
         const fpv = army.filter(u => u.type === 'FPV').length;
         const himars = army.filter(u => u.type === 'NASAMS').length;
         const shaheds = army.filter(u => u.type === 'SHAHED').length;
+        const snipers = army.filter(u => u.type === 'SNIPER').length;
+        const rpg = army.filter(u => u.type === 'RPG_INFANTRY').length;
+        const sentinels = army.filter(u => u.type === 'SENTINEL').length;
         // Лодки для ботов отключены - ИИ десанта не справляется, боты просто не строят BOAT
         const mySilo = Game.units.find(u => u.side === this.side && u.type === 'SILO' && u.hp > 0);
 
@@ -2324,38 +2423,54 @@ manageIndustry() {
         const vehicleCount = army.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type)).length;
         const vehiclesNeedingSupply = army.filter(u => ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(u.type) && u.hasSupply && u.supply <= u.maxSupply * 0.4).length;
 
-        factories.forEach(f => {
+        producers.forEach(f => {
             // 1. УМНЫЙ ВЫБОР ЦЕЛИ
-            let targetUnit = 'TANK'; // Танк — это "хлеб", строим его по умолчанию
+            let targetUnit = 'TANK';
 
-            // Приоритет №0: сразу после техники завод обязан сделать ящик боеприпасов на той же точке выезда,
-            // чтобы новая техника выезжала уже снабженной (и так по кругу)
-            if (f._needsAmmoFollowup) targetUnit = 'AMMO_CRATE';
-            // Критично: если технике нечем ехать/стрелять - сперва нужен грузовик, который довезет ящик до фронта
-            else if (vehiclesNeedingSupply > 0 && trucks < 1) targetUnit = 'TRUCK';
-            // Затем сами ящики со снабжением, которые грузовик повезет к технике
-            else if (vehiclesNeedingSupply > 0 && ammoCrates < Math.max(1, Math.ceil(vehicleCount / 5))) targetUnit = 'AMMO_CRATE';
-            // Рой дронов (строят чаще, чтобы кошмарить базу)
-            else if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
-            // Шахеды - дальнобойные камикадзе по вражеской базе
-            else if (tanks >= 3 && shaheds < 3 && this.money > UNITS.SHAHED.cost * 2) targetUnit = 'SHAHED';
-            // Элитная артиллерия (Хаймарс) - копят на него активнее
-            else if (tanks >= 4 && himars < 1 && this.money > UNITS.NASAMS.cost * 1.1) targetUnit = 'NASAMS';
-            // Массовая артиллерия (Град)
-            else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
-            // Авиация (Вертолеты)
-            else if (tanks >= 10 && helis < 3 && this.money > UNITS.HELICOPTER.cost * 1.1) targetUnit = 'HELICOPTER';
-            // Бункер построен - копим боеприпасы для ядерного удара, если очень богаты
-            else if (mySilo && this.resources.nukes < 1 && this.money > UNITS.CRAFT_NUKE.cost * 1.5) targetUnit = 'CRAFT_NUKE';
-            else if (mySilo && this.resources.rockets < 2 && this.money > UNITS.CRAFT_ROCKET.cost * 1.5) targetUnit = 'CRAFT_ROCKET';
+            if (f.type === 'FACTORY') {
+                // Приоритет №0: сразу после техники завод обязан сделать ящик боеприпасов на той же точке выезда,
+                // чтобы новая техника выезжала уже снабженной (и так по кругу)
+                if (f._needsAmmoFollowup) targetUnit = 'AMMO_CRATE';
+                // Критично: если технике нечем ехать/стрелять - сперва нужен грузовик, который довезет ящик до фронта
+                else if (vehiclesNeedingSupply > 0 && trucks < 1) targetUnit = 'TRUCK';
+                // Затем сами ящики со снабжением, которые грузовик повезет к технике
+                else if (vehiclesNeedingSupply > 0 && ammoCrates < Math.max(1, Math.ceil(vehicleCount / 5))) targetUnit = 'AMMO_CRATE';
+                // Рой дронов (строят чаще, чтобы кошмарить базу)
+                else if (tanks >= 2 && fpv < 4) targetUnit = 'FPV';
+                // Шахеды - дальнобойные камикадзе по вражеской базе
+                else if (tanks >= 3 && shaheds < 3 && this.money > UNITS.SHAHED.cost * 2) targetUnit = 'SHAHED';
+                // Элитная артиллерия (Хаймарс) - копят на него активнее
+                else if (tanks >= 4 && himars < 1 && this.money > UNITS.NASAMS.cost * 1.1) targetUnit = 'NASAMS';
+                // Массовая артиллерия (Град)
+                else if (tanks >= 5 && grads < 2) targetUnit = 'GRAD';
+                // Авиация (Вертолеты)
+                else if (tanks >= 10 && helis < 3 && this.money > UNITS.HELICOPTER.cost * 1.1) targetUnit = 'HELICOPTER';
+                // Бункер построен - копим боеприпасы для ядерного удара, если очень богаты
+                else if (mySilo && this.resources.nukes < 1 && this.money > UNITS.CRAFT_NUKE.cost * 1.5) targetUnit = 'CRAFT_NUKE';
+                else if (mySilo && this.resources.rockets < 2 && this.money > UNITS.CRAFT_ROCKET.cost * 1.5) targetUnit = 'CRAFT_ROCKET';
+                else if (this.resources.chips < 10) targetUnit = 'CRAFT_CHIP';
+                else if (this.resources.chem < 30) targetUnit = 'CRAFT_CHEM';
+                else if (this.resources.iron < 50) targetUnit = 'CRAFT_IRON';
+                else targetUnit = 'CRAFT_IRON';
+            } else if (f.type === 'BASE') {
+                // База производит только пехоту
+                targetUnit = 'SOLDIER';
+                if (snipers < 5 && this.money > UNITS.SNIPER.cost) targetUnit = 'SNIPER';
+                else if (rpg < 3 && this.money > UNITS.RPG_INFANTRY.cost) targetUnit = 'RPG_INFANTRY';
+                else if (sentinels < 2 && this.money > UNITS.SENTINEL.cost) targetUnit = 'SENTINEL';
+
+                // ЛИМИТ НАСЕЛЕНИЯ: как у игрока — нет свободных людей, база не производит пехоту
+                if (this.population <= 0) return;
+            }
 
             const uInfo = UNITS[targetUnit];
 
             // Ветка прямого крафта боеприпасов для СИЛО (не требует ресурсов на входе кроме денег/материалов)
             if (targetUnit.startsWith('CRAFT_')) {
-                const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
-                const hasChem = this.resources.chem >= (uInfo.resCost.chem || 0);
-                const hasChips = this.resources.chips >= (uInfo.resCost.chips || 0);
+                const res = uInfo.resCost || {};
+                const hasIron = this.resources.iron >= (res.iron || 0);
+                const hasChem = this.resources.chem >= (res.chem || 0);
+                const hasChips = this.resources.chips >= (res.chips || 0);
                 if (hasIron && hasChem && hasChips && this.money >= uInfo.cost) {
                     this.craft(f, targetUnit);
                 }
@@ -2363,9 +2478,10 @@ manageIndustry() {
             }
 
             // Проверяем, хватает ли ресурсов (не денег, а именно материалов)
-            const hasIron = this.resources.iron >= (uInfo.resCost.iron || 0);
-            const hasChem = this.resources.chem >= (uInfo.resCost.chem || 0);
-            const hasChips = this.resources.chips >= (uInfo.resCost.chips || 0);
+            const res = uInfo.resCost || {};
+            const hasIron = this.resources.iron >= (res.iron || 0);
+            const hasChem = this.resources.chem >= (res.chem || 0);
+            const hasChips = this.resources.chips >= (res.chips || 0);
             const hasAllRes = hasIron && hasChem && hasChips;
      
             // СЦЕНАРИЙ А: Ресурсы есть, но денег нет?
@@ -2425,10 +2541,6 @@ manageHouse() {
         let buildersInProd = Game.units.filter(u => u.side === this.side && u.type === 'HOUSE' && u.productionType === 'BUILDER' && u.spawnCooldown > 0).length;
         let totalBuilders = builders + buildersInProd;
 
-        let snipers = Game.units.filter(u => u.side === this.side && u.type === 'SNIPER').length;
-        let sentinels = Game.units.filter(u => u.side === this.side && u.type === 'SENTINEL').length;
-        let army = Game.units.filter(u => u.side === this.side && !u.isBuilder && !u.isProducer && u.type === 'SOLDIER').length;
-
         // ФИКС ЭКОНОМИКИ: Проверяем, нужна ли нам СЭС
         let factoryCount = Game.units.filter(u => u.side === this.side && u.type === 'FACTORY').length;
         let needPower = this.energyFactor < 1.2 || Game.units.some(u => u.side === this.side && !u.isPowered && (UNITS[u.type].energyUse || u.type === 'HOUSE') && u.type !== 'POWER_PLANT');
@@ -2438,28 +2550,20 @@ manageHouse() {
         else if (factoryCount < 2) reserve = UNITS.FACTORY.cost * 1.05; // Копим на заводы в начале игры
 
         houses.forEach(h => {
+            // ЛИМИТ ДОМА (как у игрока): дом уже выпустил максимум людей
+            const stats = HOUSE_UPGRADES[h.level || 0];
+            if (h.spawnedCount >= stats.maxSpawn) return;
+            // И НЕТ СВОБОДНОГО НАСЕЛЕНИЯ
+            if (this.population <= 0) return;
+
             // Исключение: Если строителей НОЛЬ, тратим деньги игнорируя резерв (чтобы было кому строить СЭС)
             let currentReserve = (totalBuilders === 0) ? 0 : reserve;
 
             if (totalBuilders < 10 && this.money >= UNITS.BUILDER.cost + currentReserve) { 
                 this.craft(h, 'BUILDER'); 
                 totalBuilders++; 
+                this.population--;
                 return; 
-            }
-            if (snipers < 5 && this.money >= UNITS.SNIPER.cost + reserve) { 
-                this.craft(h, 'SNIPER'); 
-                snipers++;
-                return; 
-            }
-            if (sentinels < 3 && this.money >= UNITS.SENTINEL.cost + reserve) { 
-                this.craft(h, 'SENTINEL'); 
-                sentinels++;
-                return; 
-            }
-            if (army < 15 && this.money >= UNITS.SOLDIER.cost + reserve) { 
-                this.craft(h, 'SOLDIER'); 
-                army++;
-                return;
             }
         });
     }
@@ -3606,13 +3710,14 @@ setFilter(type) {
     // Рисует над юнитами их настоящий (кастомный) флаг вместо простого цвета.
     // При отдалении камеры юниты одной стороны, оказавшиеся рядом (в одной ячейке сетки),
     // группируются, и вместо кучи мелких флагов рисуется ОДИН увеличенный флаг над толпой.
-    drawUnitFlags(ctx) {
-        if (this.units.length === 0) return;
+    drawUnitFlags(ctx, unitArr = this.units) {
+        const arr = unitArr || this.units;
+        if (arr.length === 0) return;
         const z = this.zoom || 1;
         // Размер ячейки кластеризации подбираем так, чтобы на ЭКРАНЕ она была примерно
-        // постоянного размера (~70px) независимо от zoom — иначе при сильном отдалении
+        // постоянного размера (~120px) независимо от zoom — иначе при сильном отдалении
         // юниты той же группы будут разлетаться по разным ячейкам мира.
-        const cellSize = Math.max(40, 70 / z);
+        const cellSize = Math.max(80, 120 / z);
         const clusters = new Map();
 
         const skipTypes = ['HOUSE', 'WALL', 'TREE', 'MINE', 'ROAD', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SENTINEL', 'SILO', 'WAREHOUSE', 'FACTORY'];
@@ -3620,8 +3725,8 @@ setFilter(type) {
         const viewW = canvas.width / z, viewH = canvas.height / z;
         const padding = 150;
 
-        for (let i = 0; i < this.units.length; i++) {
-            const u = this.units[i];
+        for (let i = 0; i < arr.length; i++) {
+            const u = arr[i];
             if (u.hp <= 0 || u.visualOnly) continue;
             if (!FACTIONS[u.side] || u.side === 'neutral') continue;
             if (u.isProducer || (UNITS[u.type] && UNITS[u.type].spawnList) || skipTypes.includes(u.type)) continue;
@@ -4699,10 +4804,33 @@ waterOffset: 0,
         this.groundPattern = document.getElementById('gameCanvas').getContext('2d').createPattern(offCanvas, 'repeat');
     },
 
-    getTerritoryOwner(x, y) {
+    // --- Определяет, чьи войска доминируют вокруг точки (для захвата зданий) ---
+    // В отличие от getTerritoryOwner, считает ТОЛЬКО мобильные боевые юниты (не здания),
+    // чтобы скопление своих построек не мешало реальному захвату вражескими войсками.
+    getCaptureController(x, y, radius) {
+        radius = radius || 250;
+        const counts = {};
+        const neighbors = this.spatialGrid ? this.spatialGrid.getNearby({x, y}) : this.units;
+        for (let i = 0; i < neighbors.length; i++) {
+            const u = neighbors[i];
+            if (u.hp <= 0 || u.isFlying) continue;
+            if (!['TANK', 'T90', 'SOLDIER', 'HELICOPTER', 'GRAD', 'NASAMS', 'FPV', 'SHAHED', 'BOAT'].includes(u.type)) continue;
+            const d = Math.hypot(u.x - x, u.y - y);
+            if (d > radius) continue;
+            counts[u.side] = (counts[u.side] || 0) + 1;
+        }
+        let bestSide = null, bestCount = 0;
+        for (const s in counts) {
+            if (counts[s] > bestCount) { bestCount = counts[s]; bestSide = s; }
+        }
+        return bestSide;
+    },
+
+    getTerritoryOwner(x, y, excludeUnit) {
         let owner = null;
         let min = 200; // Уменьшаем радиус поиска для более точного определения
         this.units.forEach(u => {
+            if (u === excludeUnit) return;
             if (u.isFlying) return; 
             // Считаем только здания и основных юнитов для определения территории
             if (!u.isProducer && !UNITS[u.type].isBuilding && !['TANK', 'T90', 'SOLDIER', 'HELICOPTER', 'GRAD', 'NASAMS', 'FPV', 'SHAHED', 'BOAT'].includes(u.type)) return;
@@ -5745,11 +5873,11 @@ Tutorial.update();
             // --- НОВОЕ: ЗАПИСЬ ПОВТОРА МАТЧА (только продвинутый режим TERRITORY) ---
             if (this.isIslandMode) {
                 if (!this.replayLog) this.replayLog = [];
-                if (this.frameCount % 180 === 0 && this.units.length > 0) {
+                if ((this.frameCount % 180 === 0 || this.replayLog.length === 0) && this.units.length > 0) {
                     this.replayLog.push({
                         frame: this.frameCount,
                         units: this.units.filter(u => u.hp > 0 && !u.isFlying && u.side !== 'neutral' && u.type !== 'MINE' && u.type !== 'TREE')
-                            .map(u => ({ x: Math.round(u.x), y: Math.round(u.y), side: u.side }))
+                            .map(u => ({ x: Math.round(u.x), y: Math.round(u.y), side: u.side, type: u.type }))
                     });
                     if (this.replayLog.length > 400) this.replayLog.shift(); // ограничение памяти на очень долгие матчи
                 }
@@ -5972,9 +6100,12 @@ if (this.isMultiplayer && this.frameCount % 30 === 0 && this.units.length > 0) {
      // --- СЧИТАЕМ ПОТЕРИ И РИСУЕМ ВЗРЫВЫ ПЕРЕД УДАЛЕНИЕМ ---
             if (this.units.length > 0) this.units.forEach(u => {
                 if (u.hp <= 0) {
-                    // Считаем потери населения
+                    // Считаем потери населения (у игрока и у ботов одинаково)
                     if (u.side === this.myRole && (UNITS[u.type].isInfantry || u.isBuilder)) {
                         this.casualties = (this.casualties || 0) + 1; 
+                    } else if (UNITS[u.type].isInfantry || u.isBuilder) {
+                        const bot = this.bots.find(b => b.side === u.side);
+                        if (bot) bot.casualties = (bot.casualties || 0) + 1;
                     }
 
                     // --- КИНЕМАТОГРАФИЧНОЕ УНИЧТОЖЕНИЕ ---
@@ -6377,6 +6508,9 @@ if (this.isIslandMode || this.isMultiplayer || this.isEarthMode || this.isEurope
                 ctx.fillText(name.toUpperCase(), f.x, f.y + 20);
                 ctx.shadowBlur = 0;
             });
+
+            // Поверх территории рисуем флаги над группами юнитов
+            this.drawUnitFlags(ctx, snap.units);
         }
 
         if (this.replayEffects && this.replayEffects.length) {
@@ -7352,7 +7486,7 @@ if (this.selection.length === 1 && s0.type === 'WAREHOUSE') {
                     }
         else if (this.selection.some(u => u.isBuilder)) {
                         // Если в куче выделенного есть хотя бы один строитель - показываем меню стройки
-                       this.updateUI(['HOUSE', 'FACTORY', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");
+                       this.updateUI(['HOUSE', 'FACTORY', 'BASE', 'AA_DEFENSE', 'HOSPITAL', 'POWER_PLANT', 'NUCLEAR_PLANT', 'SILO', 'WAREHOUSE', 'WALL', 'ROAD'], true, "ПОСТРОЙКИ");
                     }
                     else {
                         // --- ИЗМЕНЕНО: Для армии пишем количество, а если включен фильтр - даем кнопку продажи ---
@@ -7794,13 +7928,18 @@ draw() {
             let u = this.units[i];
             if(u.type === 'BOAT') u.draw(ctx);
         }
-        // 3. Наземная техника
+        // 3. Наземная техника (без деревьев - они идут своим слоем выше)
         for(let i=0; i<this.units.length; i++) {
             let u = this.units[i];
-            if(!u.isFlying && u.type !== 'BOAT' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) {
+            if(!u.isFlying && u.type !== 'BOAT' && u.type !== 'TREE' && !UNITS[u.type].spawnList && !['AA_DEFENSE','HOSPITAL','POWER_PLANT','NUCLEAR_PLANT','SENTINEL','SILO','WAREHOUSE','FACTORY','WALL'].includes(u.type)) {
                 if (this.fogEnabled && u.side !== this.myRole && !this.isWorldVisible(u.x, u.y)) continue;
                 u.draw(ctx);
             }
+        }
+        // 3.5. Деревья всегда ПОВЕРХ наземных юнитов (юнит идёт под кроной)
+        for(let i=0; i<this.units.length; i++) {
+            let u = this.units[i];
+            if(u.type === 'TREE') u.draw(ctx);
         }
         // 4. Летуны
         for(let i=0; i<this.units.length; i++) {
@@ -7870,23 +8009,27 @@ for (let i = 0; i < this.effects.length; i++) {
                 e.life--;
             }
                 else if (e.type === 'fire') {
-                let ratio = e.life / e.maxLife;
+                let maxLife = (e.maxLife || e.life) || 1;
+                let ratio = e.life / maxLife;
+                let size = (e.size || 10) * ratio;
                 ctx.globalCompositeOperation = 'lighter'; // Режим наложения для эффекта свечения
                 ctx.fillStyle = `rgba(255, ${Math.floor(100 + 155 * ratio)}, 0, ${ratio})`;
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.size * ratio, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(e.x, e.y, size, 0, Math.PI*2); ctx.fill();
                 ctx.globalCompositeOperation = 'source-over'; // Возвращаем обратно!
-                e.x += e.vx; e.y += e.vy;
+                e.x += e.vx || 0; e.y += e.vy || 0;
                 e.vx *= 0.9; e.vy *= 0.9; // Замедление
                 e.life--;
             }
             else if (e.type === 'dark_smoke') {
-                let ratio = e.life / e.maxLife;
-                let r = e.baseSize + (1 - ratio) * e.growth; // Дым расширяется со временем
-                ctx.fillStyle = e.color + (ratio * 0.7) + ')'; // e.color содержит начало 'rgba(...'
-                ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+                let maxLife = (e.maxLife || e.life) || 1;
+                let ratio = e.life / maxLife;
+                let r = (e.baseSize || 5) + (1 - ratio) * (e.growth || 15); // Дым расширяется со временем
+                let color = e.color || 'rgba(100, 100, 100,';
+                ctx.fillStyle = color + (ratio * 0.7) + ')'; // e.color содержит начало 'rgba(...'
+                ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle || 0);
                 ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.8, 0, 0, Math.PI*2); ctx.fill();
                 ctx.restore();
-                e.x += e.vx; e.y += e.vy;
+                e.x += e.vx || 0; e.y += e.vy || 0;
                 e.vx *= 0.92; e.vy *= 0.92;
                 e.life--;
             }
@@ -8637,6 +8780,11 @@ class Unit {
         this.recoil = 0;      // Отдача дула
         this.trackOffset = 0; // Анимация гусениц
 
+        // --- ОСТОРОЖНОЕ ПОВЕДЕНИЕ В БОЮ (боты) ---
+        this.combatState = 'none';
+        this.combatTimer = 0;
+        this.coverPoint = null;
+
         // --- НОВОЕ: СНАБЖЕНИЕ (боеприпасы и провиант) ---
         this.hasSupply = (p.type === 'unit' && p.dmg > 0);
         this.maxSupply = 100;
@@ -8693,6 +8841,8 @@ checkPower() {
         } else {
             this.target = {x, y};
         }
+        // Новый приказ - сброс инерции для тяжелой техники (чтобы не улетала по старому курсу)
+        if (['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR', 'TRUCK'].includes(this.type)) this.vehicleSpeed = 0;
         if (this.isFlying) { if (this.flyState === 0 || this.flyState === 3) { this.flyState = 1; this.flyTimer = 180; } }
     }
 
@@ -8884,7 +9034,7 @@ attemptAutoProduction() {
         if (this.isProducer && this.side === Game.myRole && this.autoTarget && this.spawnCooldown <= 0 && this.isPowered) {
             
             // 1. Пробуем купить
-            if (Game.checkCost(this.autoTarget) && Game.hasSpaceForCraft(this.autoTarget)) {
+            if (Game.checkCost(this.autoTarget) && Game.hasSpaceForCraft(this.autoTarget) && Game.checkPopulation(this.autoTarget)) {
                 Game.payCost(this.autoTarget);
                 this.startProduction(this.autoTarget);
                 
@@ -8908,6 +9058,29 @@ attemptAutoProduction() {
         this.color = FACTIONS[this.side] ? FACTIONS[this.side].color : '#999';
        if (Game.frameCount % 30 === (this.id % 30)) {
             this.checkPower();
+        }
+
+        // --- ЗАХВАТ ЗДАНИЙ СИЛОЙ ТЕРРИТОРИИ (вместо захвата обстрелом) ---
+        // Раз в 30 кадров проверяем, кто контролирует территорию вокруг здания.
+        // Если её удерживает враг - лояльность падает, при 0 здание переходит на его сторону.
+        // Если территория безопасна (своя/нейтральная) - лояльность медленно восстанавливается.
+        if (this.hp > 0 && CAPTURABLE_BUILDINGS.includes(this.type) && Game.frameCount % 30 === (this.id % 30)) {
+            const controller = Game.getCaptureController(this.x, this.y);
+            const isHostileControl = controller && controller !== this.side && controller !== 'neutral' &&
+                (typeof Diplomacy === 'undefined' || Diplomacy.isAtWar(this.side, controller));
+            if (isHostileControl) {
+                this.loyalty -= this.maxLoyalty * 0.05; // ~15 сек полного захвата под непрерывным контролем
+                if (this.loyalty <= 0) {
+                    this.side = controller; this.loyalty = this.maxLoyalty * 0.5; this.hp = this.maxHp;
+                    this.target = null; this.spawnCooldown = this.spawnMax;
+                    Game.powerGridDirty = true;
+                    Game.effects.push({x: this.x, y: this.y - 50, char: '🚩', life: 80});
+                    Game.effects.push({x: this.x, y: this.y, type: 'shockwave', radius: 50, color: '#ff69b4', life: 30});
+                    if (!Game.isMultiplayer) { const oldBot = Game.bots.find(b => b.side === this.side); if (oldBot) oldBot.checkPanic(); }
+                }
+            } else if (this.loyalty < this.maxLoyalty) {
+                this.loyalty = Math.min(this.maxLoyalty, this.loyalty + this.maxLoyalty * 0.02);
+            }
         }
 
         // --- НЕ МГНОВЕННАЯ ПЕРЕЗАРЯДКА ГРАД/NASAMS: 1 ракета в pendingAmmoDelay кадров (по умолчанию 2 сек) ---
@@ -9670,6 +9843,9 @@ if (this.type === 'NASAMS') {
                         // Для Sentinel отдельная логика - проверка была выше
                         if (this.type !== 'SENTINEL' && u.side !== this.side && u.hp > 0 && u.type !== 'MINE' && u.type !== 'TREE') {
                             
+                            // Захватываемые здания нельзя обстреливать - только захватывать через контроль территории
+                            if (CAPTURABLE_BUILDINGS.includes(u.type)) continue;
+                            
                             // Для остальных юнитов проверяем войну
                             if (!Diplomacy.isAtWar(this.side, u.side)) continue;
                             
@@ -9678,8 +9854,12 @@ if (this.type === 'NASAMS') {
                             let distSq = dx*dx + dy*dy;
                             
                             if (distSq < minSq) {
-                                minSq = distSq;
-                                near = u;
+                                // Не выбираем цель, которую не видно из-за укрытия/здания
+                                const canSee = MapUtils.hasLineOfSight(this.x, this.y, u.x, u.y, this, u);
+                                if (canSee) {
+                                    minSq = distSq;
+                                    near = u;
+                                }
                             }
                         }
                     }
@@ -9698,8 +9878,12 @@ if (this.type === 'NASAMS') {
                                         let distSq = dx*dx + dy*dy;
                                         
                                         if (distSq < minSq) {
-                                            minSq = distSq;
-                                            near = u;
+                                            // SENTINEL тоже не стреляет сквозь укрытия
+                                            const canSee = MapUtils.hasLineOfSight(this.x, this.y, u.x, u.y, this, u);
+                                            if (canSee) {
+                                                minSq = distSq;
+                                                near = u;
+                                            }
                                         }
                                     }
                                 }
@@ -9747,12 +9931,58 @@ if (this.type === 'NASAMS') {
                     }
                 } 
                 // Стандартная стрельба
-                else if (d <= this.range && !(this.hasSupply && this.supply <= 0)) {
+                else if (d <= this.range && !(this.hasSupply && this.supply <= 0) &&
+                         MapUtils.hasLineOfSight(this.x, this.y, this.targetUnit.x, this.targetUnit.y, this, this.targetUnit)) {
                     busy = true;
                     let targetAngle = Math.atan2(this.targetUnit.y - this.y, this.targetUnit.x - this.x);
-                    this.angle = targetAngle; // Поворачиваемся к цели
+                    const isTurreted = this.type === 'TANK' || this.type === 'T90' || this.type === 'BTR' || this.type === 'GRAD' || this.type === 'NASAMS';
 
-                    if (this.reload <= 0) {
+                    // --- НАВЕДЕНИЕ И ПОВОРОТ БАШНИ ---
+                    if (this.type === 'TANK' || this.type === 'T90') {
+                        if (this.turretAngle === undefined) this.turretAngle = this.angle || 0;
+                        let turretDiff = targetAngle - this.turretAngle;
+                        while (turretDiff < -Math.PI) turretDiff += Math.PI * 2;
+                        while (turretDiff > Math.PI) turretDiff -= Math.PI * 2;
+                        this.turretAngle += turretDiff * 0.12;
+                    } else if (this.type === 'BTR' || this.type === 'GRAD' || this.type === 'NASAMS') {
+                        this.angle = targetAngle; // корпус с оружием поворачивается к цели
+                        if (this.turretAngle === undefined) this.turretAngle = this.angle || 0;
+                        this.turretAngle = this.angle;
+                    } else {
+                        this.angle = targetAngle; // Пехота разворачивается к цели
+                    }
+
+                    // --- ВРЕМЯ НАВЕДЕНИЯ (сведения) ---
+                    if (this.aimProgress === undefined) this.aimProgress = 0;
+                    if (this.aimTime === undefined) {
+                        if (this.type === 'TANK' || this.type === 'T90') this.aimTime = 55;
+                        else if (this.type === 'GRAD' || this.type === 'NASAMS') this.aimTime = 75;
+                        else if (this.type === 'BTR' || this.type === 'HELICOPTER') this.aimTime = 25;
+                        else if (this.type === 'RPG_INFANTRY') this.aimTime = 30;
+                        else if (this.reloadMax >= 40) this.aimTime = 15; // медленно стреляющая пехота
+                        else this.aimTime = 0; // быстрая пехота стреляет мгновенно
+                    }
+
+                    // Сброс наведения при смене цели
+                    if (this._aimTarget !== this.targetUnit) { this._aimTarget = this.targetUnit; this.aimProgress = 0; }
+
+                    // Накапливаем сведение только если оружие смотрит в цель
+                    let aligned = false;
+                    if (isTurreted) {
+                        let turretDiff = targetAngle - (this.turretAngle || this.angle || 0);
+                        while (turretDiff < -Math.PI) turretDiff += Math.PI * 2;
+                        while (turretDiff > Math.PI) turretDiff -= Math.PI * 2;
+                        aligned = Math.abs(turretDiff) < 0.12;
+                    } else {
+                        aligned = true;
+                    }
+
+                    if (aligned) this.aimProgress++;
+                    else this.aimProgress = Math.max(0, this.aimProgress - 2);
+
+                    // --- ВЫСТРЕЛ ---
+                    if (this.reload <= 0 && this.aimProgress >= this.aimTime) {
+                        this.aimProgress = 0;
                         this.reload = this.reloadMax;
                         // Вертолет и БТР расходуют боеприпасы в 3 раза медленнее остальных юнитов, гранатометчик - в 3 раза быстрее
                         if (this.hasSupply) this.supply = Math.max(0, this.supply - ((this.type === 'HELICOPTER' || this.type === 'BTR') ? 1.25 / 3 : (this.type === 'RPG_INFANTRY' ? 1.25 * 3 : 1.25)));
@@ -9797,10 +10027,10 @@ if (this.type === 'NASAMS') {
                         }
                     }
                 } 
-                // Преследование
+                // Преследование (боты ведут себя осторожно)
                 else if (!Game.isMultiplayer && this.side !== 'player') {
                     if (this.type === 'HELICOPTER' && this.ammo <= 0) this.target = null; 
-                    else this.target = {x: this.targetUnit.x, y: this.targetUnit.y};
+                    else this._updateCautiousAI();
                 }
             }
             
@@ -9880,7 +10110,7 @@ _movePhysics() {
                 else if (terrain === 'DEEP') { currentSpeed *= 0.25; onWater = true; }
                 else {
                     // Мы на суше. Проверяем грунт!
-                    let isVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS'].includes(this.type);
+                    let isVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR', 'TRUCK'].includes(this.type);
                     
                     if (ground === 'ROAD') {
                         currentSpeed *= 1.5; // На дороге все быстрее на 50%
@@ -9917,11 +10147,12 @@ _movePhysics() {
         let dist = Math.hypot(dx, dy);
 
         // --- ПЛАВНЫЙ ПОВОРОТ И АНИМАЦИЯ ШАГОВ ---
+        let diff = 0;
         if (dist > 0.1) {
             let targetAngle = Math.atan2(dy, dx);
             if (this.angle === undefined) this.angle = targetAngle;
             
-            let diff = targetAngle - this.angle;
+            diff = targetAngle - this.angle;
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
             
@@ -9933,23 +10164,13 @@ _movePhysics() {
             this.walkFrame += currentSpeed * 0.4; 
         }
 
-  // --- ПЛАВНЫЙ ПОВОРОТ ДЛЯ ВСЕЙ ТЕХНИКИ ---
-        if (dist > 0.1) {
-            let targetAngle = Math.atan2(dy, dx);
-            if (this.angle === undefined) this.angle = targetAngle;
-            
-            let diff = targetAngle - this.angle;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            
-            // Пехота крутится быстро (0.3), Танки и Вертолеты поворачивают нос плавно (0.05)
-            let turnSpeed = (UNITS[this.type].isInfantry || this.isBuilder || this.type === 'BOAT' || this.type === 'BOAT_BOMBER') ? 0.3 : 0.05;
-            this.angle += diff * turnSpeed;
-        }
-
-if (dist < 15) { 
-            this.x = this.target.x; 
-            this.y = this.target.y;
+        if (dist < 15) { 
+            const isHeavyVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR', 'TRUCK'].includes(this.type);
+            if (!isHeavyVehicle) {
+                this.x = this.target.x; 
+                this.y = this.target.y;
+                this.vehicleSpeed = 0;
+            }
             if (this.pathQueue.length > 0) { 
                 const next = this.pathQueue.shift(); 
                 this.target = {x: next.x, y: next.y}; 
@@ -9959,9 +10180,38 @@ if (dist < 15) {
         } else { 
             const outOfSupply = this.hasSupply && this.supply <= 0;
             const isInfantryUnit = (UNITS[this.type] && UNITS[this.type].isInfantry) || this.isBuilder;
+            const isHeavyVehicle = ['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR', 'TRUCK'].includes(this.type);
 
             if (outOfSupply && !isInfantryUnit) {
                 // Техника без боеприпасов не может ехать
+            } else if (isHeavyVehicle && !this.isFlying) {
+                // --- ФИЗИКА ТЯЖЕЛОЙ БРОНЕТЕХНИКИ / ТРАНСПОРТА ---
+                // Поворачиваем не мгновенно, а с ограниченной скоростью. Поворот замедляет машину.
+                let maxTurn = 0.05 + (currentSpeed * 0.01); // Быстрее едешь - шише поворот
+                if (Math.abs(diff) > maxTurn) {
+                    this.angle += Math.sign(diff) * maxTurn;
+                    if (this.vehicleSpeed === undefined) this.vehicleSpeed = 0;
+                    this.vehicleSpeed *= 0.92; // торможение при резком повороте
+                } else {
+                    this.angle += diff; // докручиваем до цели
+                }
+                
+                // Нормализуем угол
+                while (this.angle < -Math.PI) this.angle += Math.PI * 2;
+                while (this.angle > Math.PI) this.angle -= Math.PI * 2;
+                
+                if (this.vehicleSpeed === undefined) this.vehicleSpeed = 0;
+                // Разгон/инерция: плавно выходим на расчетную скорость
+                const accel = currentSpeed * 0.04;
+                if (Math.abs(diff) < Math.PI / 4) {
+                    if (this.vehicleSpeed < currentSpeed) this.vehicleSpeed = Math.min(currentSpeed, this.vehicleSpeed + accel);
+                }
+                // Трение (замедление, если нет цели или стоим)
+                if (!isMoving) this.vehicleSpeed *= 0.92;
+                
+                // Движение по направлению корпуса (не напрямую к цели)
+                this.x += Math.cos(this.angle) * this.vehicleSpeed;
+                this.y += Math.sin(this.angle) * this.vehicleSpeed;
             } else {
                 this.x += (dx / dist) * currentSpeed; 
                 this.y += (dy / dist) * currentSpeed; 
@@ -10037,13 +10287,93 @@ if (dist < 15) {
             if (this.side === mySide) {
                 if (UNITS[this.type] && UNITS[this.type].isInfantry || this.isBuilder) {
                     SoundManager.play('steps', 400, 0.15); 
-                } else if (this.type === 'TANK' || this.type === 'T90' || this.type === 'GRAD' || this.type === 'NASAMS') {
+                } else if (['TANK', 'T90', 'GRAD', 'NASAMS', 'BTR', 'TRUCK'].includes(this.type)) {
                     SoundManager.play('driving', 600, 0.2);
                 }
             }
 
             }
         }
+
+    // --- ОСТОРОЖНОЕ БОЕВОЕ ПОВЕДЕНИЕ БОТОВ ---
+    _updateCautiousAI() {
+        if (!this.targetUnit || this.targetUnit.hp <= 0) {
+            this.combatState = 'none'; this.coverPoint = null; this.target = null; return;
+        }
+        const e = this.targetUnit;
+        const ex = e.x, ey = e.y;
+        const angle = Math.atan2(ey - this.y, ex - this.x);
+        const dist = Math.hypot(ex - this.x, ey - this.y);
+
+        // Тяжелая техника тоже осторожничает, но быстрее
+        const stateTicks = (this.type === 'TANK' || this.type === 'T90') ? 0.6 : 1.0;
+
+        if (this.combatState === 'none') {
+            this.combatState = 'taking_cover';
+            this.combatTimer = Math.floor((90 + Math.random() * 120) * stateTicks);
+            const backDist = Math.min(this.range, dist) * 0.35 + 30 + Math.random() * 40;
+            const side = (Math.random() - 0.5) * 120;
+            const backX = this.x - Math.cos(angle) * backDist + Math.cos(angle + Math.PI/2) * side;
+            const backY = this.y - Math.sin(angle) * backDist + Math.sin(angle + Math.PI/2) * side;
+            this.coverPoint = {x: Math.max(30, Math.min(MAP_W - 30, backX)), y: Math.max(30, Math.min(MAP_H - 30, backY))};
+            this.target = this.coverPoint;
+        }
+        else if (this.combatState === 'taking_cover') {
+            this.combatTimer--;
+            this.target = this.coverPoint;
+            if (this.combatTimer <= 0) {
+                this.combatState = 'peeking';
+                this.combatTimer = Math.floor((60 + Math.random() * 90) * stateTicks);
+                const peekDist = Math.min(this.range * 0.85, Math.max(this.range * 0.5, dist * 0.7));
+                const side = (Math.random() - 0.5) * 160;
+                const px = ex - Math.cos(angle) * peekDist + Math.cos(angle + Math.PI/2) * side;
+                const py = ey - Math.sin(angle) * peekDist + Math.sin(angle + Math.PI/2) * side;
+                this.target = {x: Math.max(30, Math.min(MAP_W - 30, px)), y: Math.max(30, Math.min(MAP_H - 30, py))};
+            }
+        }
+        else if (this.combatState === 'peeking') {
+            this.combatTimer--;
+            if (this.combatTimer <= 0) {
+                this.combatState = 'firing';
+                this.combatTimer = Math.floor((60 + Math.random() * 120) * stateTicks);
+                this.target = null;
+            }
+            // Если при выглядывании уже видим цель в зоне досягаемости — стоим и стреляем
+            else if (dist <= this.range && MapUtils.hasLineOfSight(this.x, this.y, ex, ey, this, e)) {
+                this.combatState = 'firing';
+                this.combatTimer = Math.floor((60 + Math.random() * 120) * stateTicks);
+                this.target = null;
+            }
+        }
+        else if (this.combatState === 'firing') {
+            this.combatTimer--;
+            this.target = null; // стоим и стреляем
+            if (this.combatTimer <= 0) {
+                this.combatState = 'reloading';
+                this.combatTimer = Math.floor((90 + Math.random() * 120) * stateTicks);
+                this.target = this.coverPoint;
+            }
+            // Если потеряли вид — уходим в укрытие
+            else if (dist > this.range || !MapUtils.hasLineOfSight(this.x, this.y, ex, ey, this, e)) {
+                this.combatState = 'taking_cover';
+                this.combatTimer = Math.floor((90 + Math.random() * 120) * stateTicks);
+                this.target = this.coverPoint;
+            }
+        }
+        else if (this.combatState === 'reloading') {
+            this.combatTimer--;
+            this.target = this.coverPoint;
+            if (this.combatTimer <= 0) {
+                this.combatState = 'peeking';
+                this.combatTimer = Math.floor((60 + Math.random() * 90) * stateTicks);
+                const peekDist = Math.min(this.range * 0.85, Math.max(this.range * 0.5, dist * 0.7));
+                const side = (Math.random() - 0.5) * 160;
+                const px = ex - Math.cos(angle) * peekDist + Math.cos(angle + Math.PI/2) * side;
+                const py = ey - Math.sin(angle) * peekDist + Math.sin(angle + Math.PI/2) * side;
+                this.target = {x: Math.max(30, Math.min(MAP_W - 30, px)), y: Math.max(30, Math.min(MAP_H - 30, py))};
+            }
+        }
+    }
 
     draw(ctx) {
 
@@ -10072,6 +10402,34 @@ if (dist < 15) {
             return; 
         }
         
+        // --- ВИЗУАЛЬНАЯ ЛИНИЯ НАВЕДЕНИЯ ---
+        if (this.targetUnit && this.aimProgress > 0 && (this.type === 'TANK' || this.type === 'T90' || this.type === 'BTR' || this.type === 'GRAD' || this.type === 'NASAMS')) {
+            ctx.save();
+            let aimAlpha = Math.min(0.8, 0.2 + 0.5 * (this.aimProgress / (this.aimTime || 1)));
+            ctx.strokeStyle = `rgba(255, 40, 40, ${aimAlpha})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.targetUnit.x, this.targetUnit.y);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- РАМКА ВЫДЕЛЕНИЯ (всегда для всех юнитов) ---
+        if (Game.selection.includes(this)) {
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.beginPath(); ctx.arc(this.x, this.y, 14, 0, Math.PI * 2); ctx.stroke();
+            if (this.range > 0 && !this.isProducer) {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.range * (this.buffRangeMult || 1), 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+            }
+            ctx.restore();
+        }
+
 // --- ПОЛНАЯ ЛИНИЯ ПУТИ ДЛЯ СВОИХ ЮНИТОВ ---
         if (Game.selection.includes(this) && this.target && !this.isProducer) {
             ctx.save();
@@ -11470,7 +11828,7 @@ if (dist < 15) {
 
 // --- ОТРИСОВКА КРАСИВЫХ 3D ЗДАНИЙ ---
         // Добавили SHOP, MALL, OFFICE, HOTEL, BANK
-        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL', 'HOUSE', 'SHOP', 'MALL', 'OFFICE', 'HOTEL', 'BANK'].includes(this.type)) {
+        if (['SILO', 'FACTORY', 'WAREHOUSE', 'NUCLEAR_PLANT', 'POWER_PLANT', 'AA_DEFENSE', 'HOSPITAL', 'HOUSE', 'SHOP', 'MALL', 'OFFICE', 'HOTEL', 'BANK', 'BASE'].includes(this.type)) {
             
             // Полупрозрачность, если нет электричества
             if (!this.isPowered) ctx.globalAlpha = 0.5;
@@ -11856,6 +12214,22 @@ class Bullet {
         if (this.isNuke && this.speed < this.nukeMaxSpeed && Game.frameCount % 2 === 0) {
             Game.effects.push({type: 'smoke', x: this.visX + (Math.random()-0.5)*10, y: this.visY + 8, life: 60});
         }
+
+        // --- ПУЛИ ПРЯМОЙ НАВОДКИ НЕ ПРОЛЕТАЮТ СКВОЗЬ ЗДАНИЯ И ЮНИТОВ ---
+        if (!this.arty && !this.isCruise && !this.isNuke && !this.isInterceptor) {
+            const prevX = this.x - this.dx * this.speed;
+            const prevY = this.y - this.dy * this.speed;
+            const blocker = MapUtils.getLineBlocker(prevX, prevY, this.x, this.y, this.owner, this.targetUnit);
+            if (blocker) {
+                const br = (blocker.collisionRadius || blocker.radius || 10);
+                this.x = blocker.x - this.dx * (br + 2);
+                this.y = blocker.y - this.dy * (br + 2);
+                this.visX = this.x; this.visY = this.y;
+                this.hit();
+                return;
+            }
+        }
+
         if (this.arty) { this.traveled += this.speed; if (this.traveled >= this.dist) this.hit(); } else { let d = Math.hypot(this.tx - this.x, this.ty - this.y); if (d < this.speed) this.hit(); }
     }
 
@@ -11995,19 +12369,7 @@ hit() {
                         damage = Math.ceil(this.dmg * 0.1); if (damage < 1) damage = 1; 
                     }
                     
-                    if (CAPTURABLE_BUILDINGS.includes(u.type)) {
-                        if (this.isExplosive) { u.hp -= damage; } 
-                        else {
-                             u.loyalty -= damage;
-                            if (u.loyalty <= 0) {
-                                u.side = this.side; u.loyalty = u.maxLoyalty * 0.5; u.hp = u.maxHp; u.target = null; u.spawnCooldown = u.spawnMax;
-                                Game.powerGridDirty = true;
-                                Game.effects.push({x: u.x, y: u.y - 50, char: '🚩', life: 80});
-                                Game.effects.push({x: u.x, y: u.y, type: 'shockwave', radius: 50, color: '#ff69b4', life: 30});
-                                if (!Game.isMultiplayer) { const oldBot = Game.bots.find(b => b.side === u.side); if(oldBot) oldBot.checkPanic(); }
-                            }
-                        }
-                    } else { u.hp -= damage; }
+                    u.hp -= damage;
                     
                     if (u.side !== 'player' && !u.aggro && this.owner && this.owner.hp > 0 && !Game.isMultiplayer) { 
                         u.aggro = true; Game.effects.push({x: u.x, y: u.y - 30, char: '😡', life: 40}); u.target = {x: this.owner.x, y: this.owner.y}; 

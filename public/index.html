@@ -1210,6 +1210,16 @@ const Diplomacy = {
         return this.relations[sideA][sideB] === true;
     },
 
+    // Есть ли хоть одна активная война на континенте
+    anyWar() {
+        for (const a in this.relations) {
+            for (const b in this.relations[a]) {
+                if (this.relations[a][b] === true) return true;
+            }
+        }
+        return false;
+    },
+
     canSendPeaceOffer(side) {
         const now = Date.now();
         const lastOffer = this.lastPeaceOfferTime[side] || 0;
@@ -1698,7 +1708,7 @@ getTerrain(x, y) {
     },
 
     // --- ПОИСК ПУТИ ДЛЯ ЮНИТОВ (A*, обходит горы, приоритет дорогам) ---
-    findPath(startX, startY, endX, endY) {
+    findPath(startX, startY, endX, endY, side) {
         const step = 30; // Синхронизировано с сеткой СТРОИТЕЛЬСТВА (та же, что показывает недоступные клетки при постройке)
         const margin = 6;
 
@@ -1721,6 +1731,9 @@ getTerrain(x, y) {
         const clearanceCache = new Map();
         const costCache = new Map();
 
+        // Кэш юнитов, создающих территорию, для проверки границ (только если передан side)
+        const terrUnits = side ? Game.units.filter(u => u.hp > 0 && !u.isFlying && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg') || ['TANK','T90','SOLDIER','HELICOPTER','GRAD','NASAMS','FPV','SHAHED','BOAT'].includes(u.type))) : null;
+
         // Та же логика, что и в сетке строительства: клетка занята горой ИЛИ зданием
         const rawBlocked = (cx, cy) => {
             const k = cx + ',' + cy;
@@ -1732,6 +1745,13 @@ getTerrain(x, y) {
             else {
                 const neighbors = Game.spatialGrid ? Game.spatialGrid.getNearby({x: px, y: py}) : Game.units;
                 result = neighbors.some(u => u.hp > 0 && u.type !== 'TREE' && (u.isProducer || (UNITS[u.type] && UNITS[u.type].type === 'bldg')) && Math.hypot(u.x - px, u.y - py) < u.radius + 4);
+            }
+            // ГРАНИЦА ВРАЖЕСКОЙ ТЕРРИТОРИИ: без войны — обходим чужую землю (радиус 200, как в getTerritoryOwner)
+            if (!result && terrUnits && Game.state === 'BATTLE') {
+                for (const u of terrUnits) {
+                    if (u.side === side || u.side === 'neutral') continue;
+                    if (!Diplomacy.isAtWar(side, u.side) && Math.hypot(u.x - px, u.y - py) < 200) { result = true; break; }
+                }
             }
             blockedCache.set(k, result);
             return result;
@@ -2279,6 +2299,7 @@ placePowerPlantSmart(builder) {
         const bRad = UNITS['POWER_PLANT'].radius; // 33
         const POWER_RANGE = 280; // Чуть меньше реального радиуса (300) для надежности
 
+        for (let pass = 0; pass < 2; pass++) {
         for (let k = 0; k < anchors.length; k++) {
             const anchor = anchors[k];
 
@@ -2293,6 +2314,10 @@ placePowerPlantSmart(builder) {
                 // Валидация места
                 if (tx < 150 || tx > MAP_W-150 || ty < 150 || ty > MAP_H-150) continue;
                 if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRad)) continue;
+                // Проход 0: только своя территория (как у игрока). Проход 1 (запасной): ещё и свободная нейтральная земля
+                const tOwn = Game.getTerritoryOwner(tx, ty);
+                if (pass === 0 && tOwn !== this.side) continue;
+                if (pass === 1 && tOwn !== this.side && tOwn !== null && tOwn !== 'neutral') continue;
 
                 // ФИКС: ПРАВИЛЬНАЯ проверка на занятость с учетом всех радиусов
                 const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRad + 75) || 
@@ -2316,6 +2341,8 @@ placePowerPlantSmart(builder) {
                     bestY = ty;
                 }
             }
+        }
+        if (bestScore > 0) break; // Нашли место в проходе 0 — дальше не ищем
         }
 
         if (bestScore > 0) {
@@ -2355,6 +2382,9 @@ placePowerPlantSmart(builder) {
 
         const bRadius = UNITS[type].radius;
 
+      // ДВА ПРОХОДА: сначала честный радиус (только своя территория, как у игрока),
+      // и только если место не нашлось за 100 попыток — расширенный (дальше, на нейтральную землю)
+      for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < 100; i++) {
             const anchor = anchors[Math.floor(Math.random() * anchors.length)];
             
@@ -2368,8 +2398,8 @@ placePowerPlantSmart(builder) {
                 angle = Math.random() * Math.PI * 2;
             }
             
-            // Ищем дальше от центра базы! От 80 до 400 пикселей
-            let dist = anchor.radius + bRadius + 80 + Math.random() * 380;
+            // Ищем дальше от центра базы! Обычный проход: 80-460px, запасной: 80-780px
+            let dist = anchor.radius + bRadius + 80 + Math.random() * (pass === 0 ? 380 : 700);
             // Если строим базу от электростанции — не выходим за радиус её действия
             if (type === 'BASE' && (anchor.type === 'POWER_PLANT' || anchor.type === 'NUCLEAR_PLANT')) {
                 const powerRange = anchor.type === 'NUCLEAR_PLANT' ? 800 : 300;
@@ -2386,6 +2416,12 @@ placePowerPlantSmart(builder) {
             // Проверка: не лезем ли в воду или на горы
             if (MapUtils.checkWater(tx, ty) || MapUtils.checkMountain(tx, ty, bRadius)) continue;
 
+            // ЧЕСТНЫЙ ПРОХОД (pass 0): ТЕ ЖЕ ПРАВИЛА, ЧТО У ИГРОКА: строить можно только на своей территории.
+            // ЗАПАСНОЙ ПРОХОД (pass 1): радиус больше, но на чужую землю врага всё равно не лезем
+            const terrOwner = Game.getTerritoryOwner(tx, ty);
+            if (pass === 0 && terrOwner !== this.side) continue;
+            if (pass === 1 && terrOwner !== this.side && terrOwner !== null && terrOwner !== 'neutral') continue;
+
          const busy = Game.units.some(u => Math.hypot(u.x-tx, u.y-ty) < u.radius + bRadius + 90) || 
                          Game.constructions.some(c => Math.hypot(c.x-tx, c.y-ty) < UNITS[c.type].radius + bRadius + 90);
 
@@ -2397,8 +2433,9 @@ placePowerPlantSmart(builder) {
                 builder.assignSite(site);
                 return true;
             }
+        }
         }        
-                return false; // Место не найдено даже за 100 попыток
+                return false; // Место не найдено даже за 200 попыток (оба прохода)
     }
 
 manageIndustry() {
@@ -2461,6 +2498,17 @@ manageIndustry() {
 
                 // ЛИМИТ НАСЕЛЕНИЯ: как у игрока — нет свободных людей, база не производит пехоту
                 if (this.population <= 0) return;
+            }
+
+            // МИРНОЕ ВРЕМЯ: бот не покупает военных (пехоту и технику), пока любая война не началась
+            // и пока ни один игрок/бот не начал производить военных юнитов.
+            // Но завод не простаивает — в мирное время крафтит ресурсы на склад
+            const peacetime = !Game.militaryProductionStarted && !Diplomacy.anyWar();
+            if (peacetime && f.type === 'BASE') return; // База клепает только пехоту — в мирной жизни ей делать нечего
+            if (peacetime && f.type === 'FACTORY') {
+                if (this.resources.chips < 10) targetUnit = 'CRAFT_CHIP';
+                else if (this.resources.chem < 30) targetUnit = 'CRAFT_CHEM';
+                else targetUnit = 'CRAFT_IRON';
             }
 
             const uInfo = UNITS[targetUnit];
@@ -5357,6 +5405,7 @@ Diplomacy.init();
         this.units = []; this.bullets = [];
         this.selection = []; this.constructions = []; this.effects = []; this.bots = [];
         this.buffs = [];
+        this.militaryProductionStarted = false; // Никто ещё не покупал военных — боты сидят тихо
         this.camera = {x:0, y:0};
         this.selectedProducer = null;
         this.decor = [];
@@ -5700,6 +5749,19 @@ else if (cmd.type === 'path_move') {
             }
         }
 
+// --- ДОСТРОЙКА ЗДАНИЯ ПО СЕТИ: если локальный отсчет отстал - достраиваем мгновенно ---
+        else if (cmd.type === 'build_complete') {
+            // Здание уже есть (клиент достроил сам благодаря детерминированному ID) - ничего не делаем
+            if (this.units.some(u => u.id === cmd.unitId)) return;
+            const site = this.constructions.find(s => s.id === cmd.siteId);
+            if (site) site.completed = true;
+            this.constructions = this.constructions.filter(s => s.id !== cmd.siteId);
+            const newUnit = new Unit(cmd.bType, cmd.x, cmd.y, cmd.side, cmd.unitId);
+            if (cmd.bType === 'FACTORY' && cmd.spawnAngle !== undefined) newUnit.spawnAngle = cmd.spawnAngle;
+            this.units.push(newUnit);
+            this.powerGridDirty = true;
+            this.effects.push({x: cmd.x, y: cmd.y, char: '🏗️', life: 60});
+        }
 // --- СИНХРОНИЗАЦИЯ ДОРОГ ---
         else if (cmd.type === 'build_road') {
             MapUtils.buildRoad(cmd.x, cmd.y, cmd.roadType || 'ROAD');
@@ -5788,6 +5850,16 @@ else if (cmd.type === 'path_move') {
                         localUnit.hp = srvUnit.hp;
                         if(srvUnit.loyalty !== undefined) localUnit.loyalty = srvUnit.loyalty;
                         if(srvUnit.level !== undefined) localUnit.level = srvUnit.level; // <--- ДОБАВЛЕНО ТУТ
+                        // СИНХРА АНИМАЦИИ: если у владельца юнит стоит - гасим бег на месте у себя
+                        if (srvUnit.mv === 0 && (localUnit.target || (localUnit.pathQueue && localUnit.pathQueue.length > 0))) {
+                            localUnit.target = null; localUnit.pathQueue = []; localUnit.vehicleSpeed = 0;
+                        }
+                        // И наоборот: у владельца юнит идёт, а наша копия стоит - дадим ей визуальную цель,
+                        // чтобы играла анимация бега, а не скольжение айдлом
+                        if (srvUnit.mv === 1 && !localUnit.target && (!localUnit.pathQueue || localUnit.pathQueue.length === 0)) {
+                            localUnit.target = {x: srvUnit.x, y: srvUnit.y};
+                            if (localUnit.vehicleSpeed !== undefined) localUnit.vehicleSpeed = Math.max(localUnit.vehicleSpeed || 0, localUnit.speed * 0.5);
+                        }
                     } else {
                         // Если юнита нет у нас - создаем
                         if (srvUnit.type) {
@@ -5798,6 +5870,13 @@ else if (cmd.type === 'path_move') {
                          }
                      }
                  });
+                 // Синхра прогресса строек владельца (лечит зависание за 1 пиксель до конца)
+                 if (cmd.constructions) {
+                    cmd.constructions.forEach(srvC => {
+                        const localC = this.constructions.find(c => c.id === srvC.id);
+                        if (localC && localC.remaining > srvC.remaining) localC.remaining = srvC.remaining;
+                    });
+                 }
               }
            }
        },
@@ -5899,10 +5978,13 @@ if (this.isMultiplayer && this.frameCount % 30 === 0 && this.units.length > 0) {
         y: Math.floor(u.y),
         hp: Math.floor(u.hp),
         loyalty: Math.floor(u.loyalty || 0),
-        level: u.level || 0 // <--- ДОБАВИЛИ ЭТО
+        level: u.level || 0, // <--- ДОБАВИЛИ ЭТО
+        mv: (u.target || (u.pathQueue && u.pathQueue.length > 0)) ? 1 : 0 // 1 = юнит в движении (для синхры анимации)
     }));
-    if (myUnits.length > 0 && CURRENT_ROOM) {
-        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits });
+    // Синхронизируем и прогресс СВОИХ строек, иначе у соседа стройка может зависнуть за 1 пиксель до конца
+    const myCons = this.constructions.filter(c => c.owner === this.myRole).map(c => ({ id: c.id, remaining: Math.ceil(c.remaining) }));
+    if ((myUnits.length > 0 || myCons.length > 0) && CURRENT_ROOM) {
+        this.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'sync_units', side: this.myRole, data: myUnits, constructions: myCons });
     }
 }
 
@@ -7620,7 +7702,7 @@ onRight(e) {
             let route = null;
             if (!u.isFlying && u.type !== 'BOAT' && u.type !== 'BOAT_BOMBER') {
                 if (Math.hypot(tx - u.x, ty - u.y) > 60) {
-                    const p = MapUtils.findPath(u.x, u.y, tx, ty);
+                    const p = MapUtils.findPath(u.x, u.y, tx, ty, u.side);
                     if (p && p.length > 0) route = p;
                 }
             }
@@ -8115,7 +8197,7 @@ for (let i = 0; i < this.effects.length; i++) {
             }
             else if (e.type === 'nuke_fireball') {
                 let progress = 1 - (e.life / 45); // от 0 до 1
-                let r = 40 + progress * 220; // Огромный огненный шар быстро раздувается
+                let r = 80 + progress * 440; // Огромный огненный шар быстро раздувается (x2)
                 let alpha = 1 - progress;
                 let grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
                 grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
@@ -8151,7 +8233,7 @@ for (let i = 0; i < this.effects.length; i++) {
                                 ringR: ring.ringR,
                                 size: ring.size + Math.random() * 0.3,
                                 bob: Math.random() * Math.PI * 2,
-                                jitterX: (Math.random() - 0.5) * 25,
+                                jitterX: (Math.random() - 0.5) * 50,
                                 layer: ring.ringR > 0.8 ? 0 : (ring.ringR > 0.45 ? 1 : 2)
                             });
                         }
@@ -8161,7 +8243,7 @@ for (let i = 0; i < this.effects.length; i++) {
                 if (!e.stemPuffs) {
                     e.stemPuffs = [];
                     for (let i = 0; i < 7; i++) {
-                        e.stemPuffs.push({ t: i / 6, wobble: (Math.random() - 0.5) * 14, sizeMul: 0.75 + Math.random() * 0.4 });
+                        e.stemPuffs.push({ t: i / 6, wobble: (Math.random() - 0.5) * 28, sizeMul: 0.75 + Math.random() * 0.4 });
                     }
                 }
 
@@ -8169,11 +8251,11 @@ for (let i = 0; i < this.effects.length; i++) {
                 let growPhase = Math.min(1, progress / 0.22); // быстрый рост первые 22% жизни
                 let holdFade = progress <= 0.55 ? 1 : Math.max(0, 1 - (progress - 0.55) / 0.45); // держится плотным, потом тает
 
-                let mHeight = growPhase * 400;
-                let capRadius = 90 + growPhase * 150 + progress * 70; // после роста облако продолжает медленно расползаться
-                let stemBaseW = 26 + growPhase * 16;
-                let stemTopW = 55 + growPhase * 40;
-                let capY = e.y - mHeight - progress * 25; // центр шапки медленно всплывает со временем
+                let mHeight = growPhase * 800;
+                let capRadius = 180 + growPhase * 300 + progress * 140; // после роста облако продолжает медленно расползаться (x2)
+                let stemBaseW = 52 + growPhase * 32;
+                let stemTopW = 110 + growPhase * 80;
+                let capY = e.y - mHeight - progress * 50; // центр шапки медленно всплывает со временем (x2)
 
                 ctx.save();
 
@@ -8194,10 +8276,10 @@ for (let i = 0; i < this.effects.length; i++) {
                 const layerAlpha = [0.55, 0.55, 0.5];
                 e.capPuffs.forEach(p => {
                     const r = capRadius * p.ringR;
-                    const bobY = Math.sin(progress * 8 + p.bob) * 6 * growPhase;
+                    const bobY = Math.sin(progress * 8 + p.bob) * 12 * growPhase;
                     const px = e.x + Math.cos(p.angle) * r * growPhase + p.jitterX * growPhase;
-                    const py = capY - Math.sin(p.angle) * r * 0.4 * growPhase + bobY - p.layer * 18;
-                    const pr = (30 + capRadius * 0.22) * p.size * growPhase;
+                    const py = capY - Math.sin(p.angle) * r * 0.4 * growPhase + bobY - p.layer * 36;
+                    const pr = (60 + capRadius * 0.22) * p.size * growPhase;
                     let [rr, gg, bb] = layerShades[p.layer];
                     // Первые мгновения после взрыва клубы озаряются огненной подсветкой изнутри
                     if (progress < 0.15) {
@@ -8832,7 +8914,7 @@ checkPower() {
         // Наземные юниты (в т.ч. приказы от ботов) ищут путь в обход зданий/гор, как и приказы игрока по ПКМ
         let route = null;
         if (!this.isFlying && this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER' && Math.hypot(x - this.x, y - this.y) > 60) {
-            route = MapUtils.findPath(this.x, this.y, x, y);
+            route = MapUtils.findPath(this.x, this.y, x, y, this.side);
         }
         if (route && route.length > 0) {
             this.pathQueue = [...route];
@@ -9023,6 +9105,8 @@ resolveCollision() {
 
 startProduction(type, force = false) {
         if (this.spawnCooldown > 0 && !force) return false;
+        // Первая военная покупка ЛЮБОЙ стороной — сигнал ботам, что кто-то начал вооружаться
+        if (!type.startsWith('CRAFT_') && type !== 'BUILDER' && type !== 'TREE' && type !== 'AMMO_CRATE') Game.militaryProductionStarted = true;
         this.productionType = type;
         this.spawnMax = (UNITS[type].buildTime || 5) * 60; 
         this.spawnCooldown = this.spawnMax;
@@ -9454,13 +9538,22 @@ attemptAutoProduction() {
                     const st = this.assignedSite;
                     if (!st.completed) { 
                         st.completed = true;
-                        const newUnit = new Unit(st.type, st.x, st.y, st.owner);
-                        if (st.type === 'FACTORY' && st.spawnAngle !== undefined) newUnit.spawnAngle = st.spawnAngle;
-                        newUnit.applyBuffs(); 
-                        Game.units.push(newUnit);
-                        Game.powerGridDirty = true;
-                        Game.effects.push({x: st.x, y: st.y, char: '🏗️', life: 60});
+                        // СЕТЕВАЯ СИНХРОНИЗАЦИЯ: ID здания детерминирован от ID стройки,
+                        // иначе на каждом клиенте спавнится копия со СВОИМ случайным ID (дубликаты)
+                        const newId = 'bld_' + st.id;
+                        if (!Game.units.some(u => u.id === newId)) {
+                            const newUnit = new Unit(st.type, st.x, st.y, st.owner, newId);
+                            if (st.type === 'FACTORY' && st.spawnAngle !== undefined) newUnit.spawnAngle = st.spawnAngle;
+                            newUnit.applyBuffs(); 
+                            Game.units.push(newUnit);
+                            Game.powerGridDirty = true;
+                            Game.effects.push({x: st.x, y: st.y, char: '🏗️', life: 60});
+                        }
                         Game.constructions = Game.constructions.filter(s => s !== st);
+                        // Рассылаем владельцу стройки достройку всем остальным (если их локальная симуляция отстала)
+                        if (Game.isMultiplayer && CURRENT_ROOM && st.owner === Game.myRole) {
+                            Game.socket.emit('gameCommand', { roomName: CURRENT_ROOM, type: 'build_complete', siteId: st.id, unitId: newId, bType: st.type, x: st.x, y: st.y, side: st.owner, spawnAngle: st.spawnAngle });
+                        }
                     }
                     this.assignedSite = null; this.constructing = false;
                 }
@@ -10091,6 +10184,18 @@ _movePhysics() {
     let onWater = false;
     let prevX = this.x;
     let prevY = this.y;
+
+    // --- ГРАНИЦА ТЕРРИТОРИИ: на чужую землю без войны нельзя (коллизия границы) ---
+    if (!this.isFlying && this.type !== 'BOAT' && this.type !== 'BOAT_BOMBER' && Game.state === 'BATTLE' && Game.frameCount % 10 === (this.id % 10)) {
+        const tOwner = Game.getTerritoryOwner(this.x, this.y, this);
+        if (tOwner && tOwner !== this.side && tOwner !== 'neutral' && !Diplomacy.isAtWar(this.side, tOwner)) {
+            // Нас остановила граница: возвращаем на последнюю свою точку и останавливаемся
+            if (this._lastSafeX !== undefined) { this.x = this._lastSafeX; this.y = this._lastSafeY; }
+            this.target = null; this.pathQueue = [];
+            return;
+        }
+        this._lastSafeX = this.x; this._lastSafeY = this.y;
+    }
 
     if (this.type === 'TANK' || this.type === 'T90') this.trackOffset += currentSpeed * 2.5;
 
@@ -12249,15 +12354,15 @@ hit() {
             // 2. Огненный шар в эпицентре
             Game.effects.push({ type: 'nuke_fireball', x: this.x, y: this.y, life: 45 });
             // 3. Ударная волна (двойной импульс, как от настоящего ядерного взрыва)
-            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 600, life: 80, color: 'rgba(255, 60, 0, 0.7)' });
-            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 700, life: 110, color: 'rgba(255, 255, 255, 0.4)', delay: 15 });
+            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 1200, life: 120, color: 'rgba(255, 60, 0, 0.7)' });
+            Game.effects.push({ type: 'shockwave', x: this.x, y: this.y, radius: 20, maxRadius: 1400, life: 160, color: 'rgba(255, 255, 255, 0.4)', delay: 15 });
             // 4. Грибовидное облако
             Game.effects.push({ type: 'nuke_mushroom', x: this.x, y: this.y, life: 400 });
             // 5. Выжженная земля (долго не исчезает)
-            if (!isWaterHit) Game.effects.push({ type: 'scorch', x: this.x, y: this.y, maxRadius: 380, life: 1800 });
+            if (!isWaterHit) Game.effects.push({ type: 'scorch', x: this.x, y: this.y, maxRadius: 760, life: 1800 });
             // 6. Разлетающийся пепел
-            for (let i = 0; i < 50; i++) {
-                Game.effects.push({ type: 'ash', x: this.x + (Math.random() - 0.5) * 500, y: this.y + (Math.random() - 0.5) * 500, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, life: 100 + Math.random() * 150 });
+            for (let i = 0; i < 80; i++) {
+                Game.effects.push({ type: 'ash', x: this.x + (Math.random() - 0.5) * 1000, y: this.y + (Math.random() - 0.5) * 1000, vx: (Math.random() - 0.5) * 4, vy: 1 + Math.random() * 2, life: 100 + Math.random() * 200 });
             }
             
             // --- НОВОЕ: АПОКАЛИПСИС (СОТНИ КУСКОВ ЗЕМЛИ) ---
@@ -12312,7 +12417,7 @@ hit() {
         }
         
         let range = this.arty ? (UNITS.GRAD.splash || 100) : (this.splashRadius || 15);
-        if (this.isNuke) range = 600; // Максимальный радиус поражения ядерки
+        if (this.isNuke) range = 1200; // Максимальный радиус поражения ядерки
         if (this.splashRadius > 100 && !this.isNuke) range = 150;
 
     // Берем только соседей по сетке, а не всю карту! (Если это ядерка, берем всех, так как радиус огромный)
@@ -12352,12 +12457,12 @@ hit() {
                         if (u.type === 'SILO') damage = 0; // Бункер неуязвим
                         else if (u.type === 'TREE') damage = 9999; // Ядерный взрыв полностью выжигает всю растительность в радиусе поражения
                         else {
-                            // --- ГРАДАЦИЯ УРОНА ПО РАССТОЯНИЮ ---
-                            if (d <= 150) damage = 9999;                    // Эпицентр (100% уничтожение)
-                            else if (d <= 250) damage = u.maxHp * 0.70;     // 70% от максимального ХП
-                            else if (d <= 350) damage = u.maxHp * 0.50;     // 50%
-                            else if (d <= 450) damage = u.maxHp * 0.30;     // 30%
-                            else damage = u.maxHp * 0.10;                   // 10% (край волны)
+                            // --- ГРАДАЦИЯ УРОНА ПО РАССТОЯНИЮ (x2) ---
+                            if (d <= 300) damage = 9999;                    // Эпицентр (100% уничтожение)
+                            else if (d <= 500) damage = u.maxHp * 0.70;     // 70% от максимального ХП
+                            else if (d <= 700) damage = u.maxHp * 0.50;     // 50%
+                            else if (d <= 900) damage = u.maxHp * 0.30;     // 30%
+                            else damage = u.maxHp * 0.10;                   // 10% (край волны, до 1200)
                             
                             // Эффект дыма на выживших зданиях
                             if (damage > 0 && damage < 9999 && !u.isFlying) {
